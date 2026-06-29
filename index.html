@@ -521,6 +521,16 @@ function loadData() {
     }
   } catch(e) { students = DEFAULT_STUDENTS; }
   try { records = JSON.parse(localStorage.getItem('qr_records') || '[]'); } catch(e) { records = []; }
+  // migrate: if old record has loh.sura but no newLoh, copy it to newLoh
+  records.forEach(r => {
+    if (!r.attendance_only && !r.newLoh && r.loh && r.loh.sura) {
+      r.newLoh = { sura: r.loh.sura, from: r.loh.from, to: r.loh.to };
+    }
+    if (!r.attendance_only && !r.newMadi && r.madi) {
+      const arr = Array.isArray(r.madi) ? r.madi : [r.madi];
+      r.newMadi = arr.filter(m => m && m.sura);
+    }
+  });
 }
 
 function saveData() {
@@ -693,7 +703,7 @@ function onStudentChange() {
   const name = document.getElementById('student-select').value;
   if (!name) { document.getElementById('prev-task-card').style.display='none'; return; }
   // find last non-attendance-only record for this student
-  const recs = records.filter(r=>r.student===name && !r.attendance_only).sort((a,b)=>a.date>b.date?-1:1);
+  const recs = records.filter(r=>r.student===name && !r.attendance_only).sort((a,b)=> String(b.id) > String(a.id) ? 1 : -1);
   const last = recs[0];
   if (!last) { document.getElementById('prev-task-card').style.display='none'; return; }
 
