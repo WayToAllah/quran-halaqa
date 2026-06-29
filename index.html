@@ -1183,7 +1183,7 @@ function showWhatsAppPrompt(rec, sObj) {
   const prevRec = prevRecs[0];
 
   let msg = 'السلام عليكم ورحمة الله وبركاته 🌿' + nl + nl;
-  msg += '📅 *تقييم ' + rec.student + ' اليوم*' + nl;
+  msg += '📅 *تقييم ' + rec.student.split(' ')[0] + ' اليوم*' + nl;
   msg += dateStr + nl;
   msg += '─'.repeat(30) + nl + nl;
 
