@@ -422,8 +422,16 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
+// Use the record's own id as the Firebase key → updates overwrite instead of duplicating.
+// Firebase keys can't contain . # $ [ ] / so we sanitize.
+function fbKey(id) { return String(id).replace(/[.#$\[\]\/]/g, '_'); }
+
 function saveRecordToFirebase(rec) {
-  try { db.ref('records').push(rec); } catch(e) { console.warn('Firebase record error:', e); }
+  try { db.ref('records/' + fbKey(rec.id)).set(rec); } catch(e) { console.warn('Firebase record error:', e); }
+}
+
+function deleteRecordFromFirebase(id) {
+  try { db.ref('records/' + fbKey(id)).remove(); } catch(e) { console.warn('Firebase delete error:', e); }
 }
 
 function saveStudentToFirebase(student) {
@@ -438,6 +446,55 @@ function saveStudentToFirebase(student) {
         }
       });
   } catch(e) { console.warn('Firebase student error:', e); }
+}
+
+function deleteStudentFromFirebase(name) {
+  try {
+    db.ref('students').orderByChild('name').equalTo(name).once('value', snap => {
+      if (snap.exists()) {
+        Object.keys(snap.val()).forEach(key => db.ref('students/' + key).remove());
+      }
+    });
+  } catch(e) { console.warn('Firebase student delete error:', e); }
+}
+
+// Read everything from Firebase once at startup, merge into local data, then re-render.
+function syncFromFirebase(onDone) {
+  let pending = 2;
+  const finish = () => { if (--pending === 0 && onDone) onDone(); };
+
+  // ---- records ----
+  db.ref('records').once('value', snap => {
+    try {
+      const remote = snap.val() || {};
+      const localById = {};
+      records.forEach(r => { localById[String(r.id)] = r; });
+      Object.values(remote).forEach(r => {
+        if (!r || r.id == null) return;
+        localById[String(r.id)] = r; // remote wins on conflict (last synced)
+      });
+      records = Object.values(localById);
+      saveData();
+    } catch(e) { console.warn('merge records failed', e); }
+    finish();
+  }, err => { console.warn('Firebase read records failed', err); finish(); });
+
+  // ---- students ----
+  db.ref('students').once('value', snap => {
+    try {
+      const remote = snap.val() || {};
+      const byName = {};
+      students.forEach(s => { byName[getStudentName(s)] = s; });
+      Object.values(remote).forEach(s => {
+        if (!s || !s.name) return;
+        byName[s.name] = s; // remote wins
+      });
+      const merged = Object.values(byName);
+      if (merged.length) students = merged;
+      saveData();
+    } catch(e) { console.warn('merge students failed', e); }
+    finish();
+  }, err => { console.warn('Firebase read students failed', err); finish(); });
 }
 
 const STAR_LABELS = ['','ضعيف','مقبول','جيد','جيد جداً','ممتاز'];
@@ -751,6 +808,25 @@ function init() {
   renderStudentSelect();
   renderStudentList();
   updateHeader();
+
+  // Pull latest from Firebase, then refresh everything visible
+  const sub = document.getElementById('header-sub');
+  if (sub) sub.textContent = 'جاري المزامنة…';
+  syncFromFirebase(() => {
+    const curStudent = document.getElementById('student-select').value;
+    renderStudentSelect();
+    if (curStudent) document.getElementById('student-select').value = curStudent;
+    renderStudentList();
+    updateHeader();
+    // refresh whichever screen is active
+    const active = document.querySelector('.screen.active');
+    if (active) {
+      if (active.id === 'screen-log') renderLog();
+      else if (active.id === 'screen-stats') renderStats();
+    }
+    // refresh prev-task card if a student is selected
+    if (curStudent) onStudentChange();
+  });
 }
 
 function updateHeader() {
@@ -862,9 +938,10 @@ function saveStudentModal() {
 
 function deleteStudent(e, i) {
   e.stopPropagation();
-  if (!confirm(`حذف "${getStudentName(students[i])}"؟`)) return;
+  const name = getStudentName(students[i]);
+  if (!confirm(`حذف "${name}"؟`)) return;
   students.splice(i,1);
-  saveData(); renderStudentSelect(); renderStudentList(); updateHeader();
+  saveData(); deleteStudentFromFirebase(name); renderStudentSelect(); renderStudentList(); updateHeader();
 }
 
 /* ---- Sura validation ---- */
