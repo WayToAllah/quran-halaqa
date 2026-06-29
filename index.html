@@ -703,8 +703,9 @@ function onStudentChange() {
   const name = document.getElementById('student-select').value;
   if (!name) { document.getElementById('prev-task-card').style.display='none'; return; }
   // find last non-attendance-only record for this student
-  const recs = records.filter(r=>r.student===name && !r.attendance_only).sort((a,b)=> String(b.id) > String(a.id) ? 1 : -1);
+  const recs = records.filter(r=>r.student===name && !r.attendance_only).sort((a,b)=> Number(b.id) - Number(a.id));
   const last = recs[0];
+  console.log('last record for', name, last);
   if (!last) { document.getElementById('prev-task-card').style.display='none'; return; }
 
   document.getElementById('prev-task-card').style.display='block';
@@ -934,6 +935,9 @@ function saveRecord() {
   records.push(rec);
   saveData();
   saveRecordToFirebase(rec);
+  // also re-run migration on new record so onStudentChange sees newLoh immediately
+  if (!rec.newLoh && rec.loh && rec.loh.sura) rec.newLoh = { sura: rec.loh.sura, from: rec.loh.from, to: rec.loh.to };
+  if (!rec.newMadi && rec.madi) { const arr = Array.isArray(rec.madi) ? rec.madi : [rec.madi]; rec.newMadi = arr.filter(m => m && m.sura); }
   syncToSheets('record', {record: rec});
   const sObj = students.find(s=>getStudentName(s)===student);
   resetForm();
