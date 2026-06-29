@@ -870,18 +870,15 @@ function clearErrors(prefix) {
 function saveRecord() {
   const student = document.getElementById('student-select').value;
   if (!student) { alert('اختر طالباً أولاً'); return; }
-  const lohSura = document.getElementById('loh-sura').value;
-  if (!lohSura) { alert('اختر سورة اللوح'); return; }
   if (!validateAyah('loh') || !validateAyah('madi')) { alert('يوجد خطأ في أرقام الآيات'); return; }
+  const lohSura = document.getElementById('loh-sura').value;
   const rec = {
     id: Date.now(),
     date: document.getElementById('session-date').value,
     student,
-    // تقييم المهمة القديمة (اللي سمعناها النهارده)
     loh: { score: starScores['prev-loh']||0, stars: scoreToStars(starScores['prev-loh']||0) },
     madi: { score: starScores['prev-madi']||0, stars: scoreToStars(starScores['prev-madi']||0) },
-    // المهمة الجديدة (للجلسة الجاية)
-    newLoh: { sura:lohSura, from:document.getElementById('loh-from').value, to:document.getElementById('loh-to').value },
+    newLoh: lohSura ? { sura:lohSura, from:document.getElementById('loh-from').value, to:document.getElementById('loh-to').value } : null,
     newMadi: getMadiData().map(m=>({sura:m.sura,from:m.from,to:m.to})),
     note: document.getElementById('general-note').value.trim()
   };
@@ -892,14 +889,11 @@ function saveRecord() {
   records.push(rec);
   saveData();
   saveRecordToFirebase(rec);
-  resetForm(); showToast();
   syncToSheets('record', {record: rec});
-  // offer whatsapp
   const sObj = students.find(s=>getStudentName(s)===student);
-  const phone = sObj && (sObj.phonePrimary||sObj.phoneMom);
-  if (phone) {
-    showWhatsAppPrompt(rec, sObj);
-  }
+  resetForm();
+  showToast();
+  showWhatsAppPrompt(rec, sObj);
 }
 
 function resetForm() {
@@ -1215,8 +1209,9 @@ function showWhatsAppPrompt(rec, sObj) {
   msg += 'جزاكم الله خيراً 🤲';
 
   document.getElementById('wa-preview').textContent = msg;
-  waPhone = (sObj.phonePrimary || sObj.phoneMom || '').replace(/[^0-9]/g, '');
+  waPhone = sObj ? ((sObj.phonePrimary || sObj.phoneMom || '').replace(/[^0-9]/g, '')) : '';
   if (waPhone.startsWith('0')) waPhone = '2' + waPhone;
+  document.getElementById('wa-send-btn').style.display = waPhone ? '' : 'none';
   document.getElementById('wa-modal').classList.add('open');
 }
 
