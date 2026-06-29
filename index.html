@@ -92,6 +92,10 @@
   .log-header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; }
   .log-student { font-size:15px; font-weight:500; }
   .log-date { font-size:12px; color:var(--text-hint); }
+  .log-actions { display:flex; gap:4px; }
+  .log-act-btn { background:none; border:1px solid var(--border); border-radius:6px; padding:3px 7px; cursor:pointer; font-size:13px; line-height:1; color:var(--text-muted); }
+  .log-act-btn:active { background:var(--bg); }
+  .log-act-btn.danger:active { color:var(--red); border-color:var(--red); }
   .log-line { font-size:13px; color:var(--text-muted); margin-top:3px; display:flex; align-items:center; gap:5px; }
   .badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:20px; background:var(--gold-light); color:#7a5f00; margin-top:4px; }
   .empty-state { text-align:center; color:var(--text-hint); font-size:14px; padding:2.5rem 1rem; }
@@ -563,6 +567,7 @@ const DEFAULT_STUDENTS = [
 
 let students = [], records = [], starVals = {loh:0, tajweed:0}, starScores = {loh:0, tajweed:0, 'prev-loh':0, 'prev-madi':0};
 let madiRows = []; // [{id, stars}]
+let editingRecordId = null; // when set, saveRecord updates this record instead of creating new
 let madiRowCount = 0;
 const suraMap = {};
 SURAS.forEach(([n,c]) => suraMap[n]=c);
@@ -998,8 +1003,10 @@ function saveRecord() {
   if (!student) { alert('اختر طالباً أولاً'); return; }
   if (!validateAyah('loh') || !validateAyah('madi')) { alert('يوجد خطأ في أرقام الآيات'); return; }
   const lohSura = document.getElementById('loh-sura').value;
+  const isEditing = editingRecordId !== null;
+  const existing = isEditing ? records.find(r => String(r.id) === String(editingRecordId)) : null;
   const rec = {
-    id: Date.now() + '_' + (records.length),
+    id: existing ? existing.id : (Date.now() + '_' + (records.length)),
     date: document.getElementById('session-date').value,
     student,
     loh: { score: starScores['prev-loh']||0, stars: scoreToStars(starScores['prev-loh']||0) },
@@ -1012,7 +1019,12 @@ function saveRecord() {
     if (!validateAyah('tajweed')) { alert('يوجد خطأ في آيات التجويد'); return; }
     rec.tajweed = { sura:document.getElementById('tajweed-sura').value, from:document.getElementById('tajweed-from').value, to:document.getElementById('tajweed-to').value, stars:starVals.tajweed, score:starScores.tajweed||0, note:document.getElementById('tajweed-note').value.trim() };
   }
-  records.push(rec);
+  if (isEditing && existing) {
+    const idx = records.findIndex(r => String(r.id) === String(editingRecordId));
+    records[idx] = rec;
+  } else {
+    records.push(rec);
+  }
   saveData();
   saveRecordToFirebase(rec);
   // also re-run migration on new record so onStudentChange sees newLoh immediately
@@ -1020,8 +1032,12 @@ function saveRecord() {
   if (!rec.newMadi && rec.madi) { const arr = Array.isArray(rec.madi) ? rec.madi : [rec.madi]; rec.newMadi = arr.filter(m => m && m.sura); }
   syncToSheets('record', {record: rec});
   const sObj = students.find(s=>getStudentName(s)===student);
+  const wasEditing = isEditing;
+  editingRecordId = null;
+  const btn = document.querySelector('.save-btn');
+  if (btn) btn.innerHTML = '💾 حفظ الجلسة';
   resetForm();
-  showToast();
+  showToast(wasEditing ? '✓ تم التحديث' : '✓ تم الحفظ بنجاح');
   setTimeout(() => showWhatsAppPrompt(rec, sObj), 1800);
 }
 
@@ -1067,17 +1083,22 @@ function renderLog() {
   el.innerHTML = sorted.map(r => {
     const stars = n => '★'.repeat(n)+'☆'.repeat(5-n);
     const starsScore = s => s ? renderStarsHTML(s) : '';
+    const idAttr = String(r.id).replace(/'/g, "\\'");
+    const actions = `<div class="log-actions">
+      ${!r.attendance_only ? `<button class="log-act-btn" onclick="editRecord('${idAttr}')" aria-label="تعديل">✏️</button>` : ''}
+      <button class="log-act-btn danger" onclick="deleteRecord('${idAttr}')" aria-label="حذف">🗑</button>
+    </div>`;
     if (r.attendance_only) {
       const dateStr = r.date ? new Date(r.date).toLocaleDateString('ar-EG',{day:'numeric',month:'short'}) : r.date;
       return `<div class="log-entry">
-        <div class="log-header"><span class="log-student">${r.student}</span><span class="log-date">${dateStr}</span></div>
+        <div class="log-header"><span class="log-student">${r.student}</span><div style="display:flex;align-items:center;gap:8px"><span class="log-date">${dateStr}</span>${actions}</div></div>
         <div class="log-line" style="color:var(--text-hint)"><span>✅</span> حضور فقط</div>
       </div>`;
     }
     const tj = r.tajweed ? `<div class="log-line"><span>📐</span> تجويد: ${r.tajweed.sura||'—'} (${r.tajweed.from||'?'}–${r.tajweed.to||'?'}) ${stars(r.tajweed.stars)}${r.tajweed.note?' · '+r.tajweed.note:''}</div>` : '';
     const dateStr = r.date ? new Date(r.date).toLocaleDateString('ar-EG',{day:'numeric',month:'short'}) : r.date;
     return `<div class="log-entry">
-      <div class="log-header"><span class="log-student">${r.student}</span><span class="log-date">${dateStr}</span></div>
+      <div class="log-header"><span class="log-student">${r.student}</span><div style="display:flex;align-items:center;gap:8px"><span class="log-date">${dateStr}</span>${actions}</div></div>
       ${r.newLoh&&r.newLoh.sura ? `<div class="log-line"><span>📝</span> لوح جديد: ${r.newLoh.sura} (${r.newLoh.from||'?'}–${r.newLoh.to||'?'})</div>` : (r.loh&&r.loh.sura ? `<div class="log-line"><span>📖</span> لوح: ${r.loh.sura} (${r.loh.from||'?'}–${r.loh.to||'?'}) ${r.loh.score?r.loh.score+'/100 '+renderStarsHTML(r.loh.score)+' '+scoreName(r.loh.score):''}</div>` : '')}
       ${r.loh&&r.loh.score ? `<div class="log-line"><span>⭐</span> تقييم اللوح: ${r.loh.score}/100 ${renderStarsHTML(r.loh.score)} ${scoreName(r.loh.score)}</div>` : ''}
       ${Array.isArray(r.madi)
@@ -1087,6 +1108,70 @@ function renderLog() {
       ${r.note?`<div class="log-line" style="color:var(--text-hint);font-style:italic">💬 ${r.note}</div>`:''}
     </div>`;
   }).join('');
+}
+
+function deleteRecord(id) {
+  const idx = records.findIndex(r => String(r.id) === String(id));
+  if (idx < 0) return;
+  const r = records[idx];
+  const label = r.attendance_only ? `حضور ${r.student}` : `جلسة ${r.student}`;
+  if (!confirm(`حذف "${label}"؟\nلا يمكن التراجع.`)) return;
+  records.splice(idx, 1);
+  saveData();
+  deleteRecordFromFirebase(id);
+  renderLog();
+  showToast('✓ تم الحذف');
+}
+
+function editRecord(id) {
+  const r = records.find(rr => String(rr.id) === String(id));
+  if (!r) return;
+  // switch to record screen
+  showScreen('record', document.querySelector('.nav-btn'));
+  // mark we're editing this record
+  editingRecordId = r.id;
+  // student + date
+  document.getElementById('student-select').value = r.student;
+  onStudentChange();
+  if (r.date) document.getElementById('session-date').value = r.date;
+  // prev-task evaluation scores
+  if (r.loh && r.loh.score) { document.getElementById('score-prev-loh').value = r.loh.score; onScoreInput('prev-loh'); }
+  if (r.madi && r.madi.score) { document.getElementById('score-prev-madi').value = r.madi.score; onScoreInput('prev-madi'); }
+  // new task: loh
+  if (r.newLoh && r.newLoh.sura) {
+    document.getElementById('loh-sura-input').value = r.newLoh.sura;
+    document.getElementById('loh-sura').value = r.newLoh.sura;
+    onSuraChange('loh');
+    document.getElementById('loh-from').value = r.newLoh.from || '';
+    document.getElementById('loh-to').value = r.newLoh.to || '';
+  }
+  // new task: madi rows
+  resetMadiRows();
+  const madiArr = (r.newMadi && r.newMadi.length) ? r.newMadi : [];
+  if (madiArr.length) {
+    document.getElementById('madi-rows').innerHTML = ''; madiRows = []; madiRowCount = 0;
+    madiArr.forEach(m => addMadiRow(m));
+  }
+  // tajweed
+  if (r.tajweed && r.tajweed.sura) {
+    document.getElementById('tajweed-toggle').checked = true;
+    toggleTajweed();
+    document.getElementById('tajweed-sura-input').value = r.tajweed.sura;
+    document.getElementById('tajweed-sura').value = r.tajweed.sura;
+    onSuraChange('tajweed');
+    document.getElementById('tajweed-from').value = r.tajweed.from || '';
+    document.getElementById('tajweed-to').value = r.tajweed.to || '';
+    if (r.tajweed.score) { document.getElementById('score-tajweed') && (document.getElementById('score-tajweed').value = r.tajweed.score); starScores.tajweed = r.tajweed.score; }
+    if (r.tajweed.stars) setStar('tajweed', r.tajweed.stars);
+    document.getElementById('tajweed-note').value = r.tajweed.note || '';
+  }
+  // note
+  document.getElementById('general-note').value = r.note || '';
+  // change save button label
+  const btn = document.querySelector('.save-btn');
+  if (btn) btn.innerHTML = '💾 تحديث الجلسة';
+  window.scrollTo(0, 0);
+  showToast('✏️ وضع التعديل');
 }
 
 /* ---- Stats ---- */
@@ -1377,8 +1462,9 @@ function closeWaModal(e) {
     document.getElementById('wa-modal').classList.remove('open');
 }
 
-function showToast() {
+function showToast(msg) {
   const t=document.getElementById('toast');
+  t.textContent = msg || '✓ تم الحفظ بنجاح';
   t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2200);
 }
