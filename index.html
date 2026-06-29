@@ -1145,8 +1145,23 @@ function scoreToStars(score) {
   return Math.floor(scoreToHalfStars(score));
 }
 
-function starsText(score) { return ''; }
-function renderStarsHTML(score) { return ''; }
+function starsText(score) {
+  const half = scoreToHalfStars(score);
+  const full = Math.floor(half);
+  const hasHalf = (half % 1) !== 0;
+  const empty = 5 - full - (hasHalf ? 1 : 0);
+  return '★'.repeat(full) + (hasHalf ? '⯨' : '') + '☆'.repeat(Math.max(0,empty));
+}
+
+// Visual filled stars: gold layer clipped over grey layer, snapped to half-stars
+function renderStarsHTML(score) {
+  const half = scoreToHalfStars(score);      // 0 .. 5 in 0.5 steps
+  const fillPct = (half / 5) * 100;          // width of gold layer
+  return '<span style="position:relative;display:inline-block;font-size:15px;line-height:1;vertical-align:middle;letter-spacing:2px;direction:ltr">' +
+    '<span style="color:#dcdcdc">★★★★★</span>' +
+    '<span style="position:absolute;top:0;left:0;width:' + fillPct + '%;overflow:hidden;white-space:nowrap;color:#e8a700">★★★★★</span>' +
+    '</span>';
+}
 
 function scoreName(score) {
   const s = parseInt(score);
@@ -1161,7 +1176,7 @@ function scoreName(score) {
 function scoreLabel(score) {
   const s = parseInt(score);
   if (isNaN(s) || s === 0) return '—';
-  return s + '/100 — ' + scoreName(s);
+  return renderStarsHTML(s) + ' &nbsp; ' + s + '/100 · ' + scoreName(s);
 }
 
 function onScoreInput(type) {
