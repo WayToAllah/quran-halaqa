@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="حفظ القرآن">
+<title>متابعة حفظ القرآن</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  :root {
+    --green:#1a6b3a; --green-light:#e8f5ee; --gold:#c49a1a; --gold-light:#fdf7e3;
+    --text:#1a1a1a; --text-muted:#6b6b6b; --text-hint:#a0a0a0;
+    --bg:#f7f7f5; --surface:#ffffff;
+    --border:rgba(0,0,0,0.1); --border-strong:rgba(0,0,0,0.18);
+    --radius:12px; --radius-sm:8px; --red:#d93025;
+  }
+  body { font-family:-apple-system,'Segoe UI',Tahoma,Arial,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding-bottom:80px; }
+  .header { background:var(--green); color:white; padding:16px 20px 14px; display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:50; }
+  .header-icon { font-size:22px; }
+  .header h1 { font-size:17px; font-weight:600; }
+  .header-sub { font-size:12px; opacity:0.75; margin-top:1px; }
+  .bottom-nav { position:fixed; bottom:0; left:0; right:0; background:var(--surface); border-top:1px solid var(--border); display:flex; z-index:50; padding-bottom:env(safe-area-inset-bottom); }
+  .nav-btn { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:10px 4px; background:none; border:none; cursor:pointer; color:var(--text-hint); font-size:11px; font-family:inherit; }
+  .nav-btn .icon { font-size:22px; }
+  .nav-btn.active { color:var(--green); }
+  .screen { display:none; padding:16px; }
+  .screen.active { display:block; }
+  .card { background:var(--surface); border-radius:var(--radius); border:1px solid var(--border); padding:16px; margin-bottom:12px; }
+  .card-title { font-size:12px; font-weight:600; color:var(--green); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+  .card-title .dot { width:6px; height:6px; border-radius:50%; background:var(--green); }
+  .field { margin-bottom:12px; }
+  .field:last-child { margin-bottom:0; }
+  .field label { display:block; font-size:13px; color:var(--text-muted); margin-bottom:5px; }
+  .field input, .field select, .field textarea { width:100%; font-size:15px; padding:10px 12px; border:1px solid var(--border-strong); border-radius:var(--radius-sm); background:var(--bg); color:var(--text); font-family:inherit; appearance:none; -webkit-appearance:none; }
+  .field input:focus, .field select:focus, .field textarea:focus { outline:none; border-color:var(--green); background:white; }
+  .field textarea { resize:none; }
+  .field input.invalid { border-color:var(--red) !important; background:#fff5f5 !important; }
+  .field-error { font-size:12px; color:var(--red); margin-top:4px; display:none; }
+  .field-error.show { display:block; }
+  .ayah-hint { font-size:12px; color:var(--text-hint); margin-top:4px; }
+  .row3 { display:grid; grid-template-columns:2fr 1fr 1fr; gap:8px; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .stars-row { display:flex; align-items:center; gap:4px; margin-top:2px; }
+  .stars-label { font-size:12px; color:var(--text-hint); margin-left:6px; }
+  .star-btn { font-size:26px; background:none; border:none; cursor:pointer; padding:2px; line-height:1; color:#ddd; transition:color 0.15s,transform 0.1s; }
+  .star-btn.on { color:var(--gold); }
+  .star-btn:active { transform:scale(1.2); }
+  .toggle-row { display:flex; align-items:center; justify-content:space-between; padding:2px 0; }
+  .toggle-label { font-size:14px; font-weight:500; }
+  .toggle-wrap { position:relative; width:48px; height:28px; }
+  .toggle-wrap input { opacity:0; width:0; height:0; }
+  .toggle-track { position:absolute; inset:0; background:#ddd; border-radius:28px; cursor:pointer; transition:background 0.2s; }
+  .toggle-wrap input:checked ~ .toggle-track { background:var(--green); }
+  .toggle-thumb { position:absolute; width:22px; height:22px; background:white; border-radius:50%; top:3px; right:3px; transition:right 0.2s; pointer-events:none; box-shadow:0 1px 3px rgba(0,0,0,0.2); }
+  .toggle-wrap input:checked ~ .toggle-thumb { right:auto; left:3px; }
+  .tajweed-fields { margin-top:14px; padding-top:14px; border-top:1px solid var(--border); }
+  .save-btn { width:100%; padding:15px; background:var(--green); color:white; border:none; border-radius:var(--radius); font-size:16px; font-weight:600; cursor:pointer; font-family:inherit; display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:8px; }
+  .save-btn:active { opacity:0.85; }
+
+  /* Student list */
+  .student-row { display:flex; align-items:center; padding:12px 0; border-bottom:1px solid var(--border); gap:10px; cursor:pointer; }
+  .student-row:last-child { border-bottom:none; }
+  .student-avatar { width:40px; height:40px; border-radius:50%; background:var(--green-light); color:var(--green); display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; flex-shrink:0; }
+  .student-info { flex:1; min-width:0; }
+  .student-name-main { font-size:15px; font-weight:500; }
+  .student-meta-line { font-size:12px; color:var(--text-hint); margin-top:2px; }
+  .student-actions { display:flex; gap:6px; flex-shrink:0; }
+  .icon-btn { background:none; border:1px solid var(--border); border-radius:var(--radius-sm); padding:6px 10px; cursor:pointer; font-size:15px; color:var(--text-muted); }
+  .icon-btn.danger:active { color:var(--red); border-color:var(--red); }
+
+  /* Add strip */
+  .add-fab { width:100%; padding:13px; background:var(--green-light); color:var(--green); border:1.5px dashed var(--green); border-radius:var(--radius); font-size:15px; font-weight:600; cursor:pointer; font-family:inherit; display:flex; align-items:center; justify-content:center; gap:8px; margin-top:4px; }
+
+  /* Modal overlay */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; align-items:flex-end; justify-content:center; }
+  .modal-overlay.open { display:flex; }
+  .modal-sheet { background:var(--surface); border-radius:20px 20px 0 0; width:100%; max-height:92vh; overflow-y:auto; padding:0 0 24px; }
+  .modal-handle { width:36px; height:4px; background:var(--border-strong); border-radius:4px; margin:12px auto 0; }
+  .modal-header { display:flex; align-items:center; justify-content:space-between; padding:14px 16px 8px; border-bottom:1px solid var(--border); }
+  .modal-title { font-size:16px; font-weight:600; }
+  .modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:var(--text-hint); padding:4px; line-height:1; }
+  .modal-body { padding:16px; }
+  .modal-footer { padding:0 16px; display:flex; gap:10px; }
+  .btn-primary { flex:1; padding:13px; background:var(--green); color:white; border:none; border-radius:var(--radius-sm); font-size:15px; font-weight:600; cursor:pointer; font-family:inherit; }
+  .btn-secondary { flex:1; padding:13px; background:var(--bg); color:var(--text-muted); border:1px solid var(--border-strong); border-radius:var(--radius-sm); font-size:15px; cursor:pointer; font-family:inherit; }
+
+  /* Log */
+  .log-entry { padding:12px 0; border-bottom:1px solid var(--border); }
+  .log-entry:last-child { border-bottom:none; }
+  .log-header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; }
+  .log-student { font-size:15px; font-weight:500; }
+  .log-date { font-size:12px; color:var(--text-hint); }
+  .log-line { font-size:13px; color:var(--text-muted); margin-top:3px; display:flex; align-items:center; gap:5px; }
+  .badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:20px; background:var(--gold-light); color:#7a5f00; margin-top:4px; }
+  .empty-state { text-align:center; color:var(--text-hint); font-size:14px; padding:2.5rem 1rem; }
+  .empty-state .big { font-size:36px; margin-bottom:8px; }
+
+  /* Date strip */
+  .date-strip { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; background:var(--green-light); border-radius:var(--radius-sm); padding:8px 12px; }
+  .date-strip label { font-size:13px; color:var(--green); font-weight:500; }
+  .date-strip input { border:none; background:transparent; font-size:13px; color:var(--green); font-weight:500; font-family:inherit; text-align:left; }
+  .date-strip input:focus { outline:none; }
+
+  /* Toast */
+  .toast { position:fixed; bottom:90px; left:50%; transform:translateX(-50%) translateY(10px); background:var(--green); color:white; padding:10px 22px; border-radius:30px; font-size:14px; opacity:0; transition:opacity 0.3s,transform 0.3s; pointer-events:none; white-space:nowrap; z-index:300; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* Stats */
+  .stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+  .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px; text-align:center; }
+  .stat-num { font-size:26px; font-weight:600; color:var(--green); }
+  .stat-lbl { font-size:12px; color:var(--text-muted); margin-top:3px; }
+
+  select option { direction:rtl; }
+  .fab { position:fixed; left:16px; bottom:90px; width:52px; height:52px; border-radius:50%; background:var(--green); color:white; font-size:28px; border:none; cursor:pointer; display:none; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(0,0,0,0.25); z-index:60; line-height:1; }
+  .fab.visible { display:flex; }
+  .madi-row { border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:12px; position:relative; }
+  .madi-row:last-child { border-bottom:none; margin-bottom:0; padding-bottom:0; }
+  .madi-row-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .madi-row-title { font-size:12px; color:var(--text-muted); font-weight:500; }
+  .remove-madi-btn { background:none; border:none; color:var(--text-hint); font-size:18px; cursor:pointer; padding:2px 6px; line-height:1; }
+  .remove-madi-btn:active { color:var(--red); }
+  .add-madi-btn { width:100%; padding:9px; background:transparent; color:var(--green); border:1.5px dashed var(--green); border-radius:var(--radius-sm); font-size:14px; font-weight:500; cursor:pointer; font-family:inherit; margin-top:10px; }
+  .sura-field { position:relative; }
+  .sura-dropdown { display:none; position:absolute; top:100%; right:0; left:0; background:var(--surface); border:1px solid var(--border-strong); border-radius:var(--radius-sm); z-index:999; max-height:220px; overflow-y:auto; box-shadow:0 4px 16px rgba(0,0,0,0.18); margin-top:2px; }
+  .sura-item { padding:10px 14px; cursor:pointer; font-size:14px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+  .sura-item:last-child { border-bottom:none; }
+  .sura-item:active { background:var(--green-light); color:var(--green); }
+  .sura-num { font-size:11px; color:var(--text-hint); margin-left:6px; }
+  .sura-count { font-size:11px; color:var(--text-hint); }
+  .sura-item { padding:10px 14px; cursor:pointer; font-size:14px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+  .sura-item:last-child { border-bottom:none; }
+  .sura-item:hover, .sura-item.active { background:var(--green-light); color:var(--green); }
+  .sura-item .sura-count { font-size:12px; color:var(--text-hint); }
+  @media (prefers-color-scheme:dark) {
+    :root { --text:#f0f0f0; --text-muted:#aaa; --text-hint:#666; --bg:#111; --surface:#1c1c1e; --border:rgba(255,255,255,0.1); --border-strong:rgba(255,255,255,0.18); --green-light:#0e2a1a; }
+    .field input,.field select,.field textarea { color-scheme:dark; }
+    .field input.invalid { background:#2a0a0a !important; }
+    .modal-sheet { background:#1c1c1e; }
+  }
+</style>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">📖</div>
+  <div>
+    <h1>متابعة حفظ القرآن</h1>
+    <div class="header-sub" id="header-sub">جاري التحميل...</div>
+  </div>
+</div>
+
+<!-- Record screen -->
+<div id="screen-record" class="screen active">
+  <div class="date-strip">
+    <label for="session-date">📅 تاريخ الجلسة</label>
+    <input type="date" id="session-date">
+  </div>
+  <div class="card">
+    <div class="field">
+      <label>الطالب</label>
+      <select id="student-select" onchange="onStudentChange()"><option value="">— اختر طالباً —</option></select>
+    </div>
+  </div>
+
+  <!-- ما سمعناه النهارده (من الجلسة اللي فاتت) -->
+  <div class="card" id="prev-task-card" style="display:none">
+    <div class="card-title" style="margin-bottom:6px"><div class="dot" style="background:#c49a1a"></div> 📋 ما سمعناه النهارده</div>
+    <div style="font-size:12px;color:var(--text-hint);margin-bottom:12px" id="prev-task-date"></div>
+    <div id="prev-loh-section">
+      <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px">اللوح</div>
+      <div id="prev-loh-info" style="font-size:14px;margin-bottom:8px"></div>
+      <div class="field">
+        <label>التقييم (من 100)</label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="number" id="score-prev-loh" min="0" max="100" placeholder="مثلاً 90" oninput="onScoreInput('prev-loh')" style="width:90px;font-size:18px;font-weight:600;text-align:center;padding:8px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);font-family:inherit">
+          <div id="score-prev-loh-display" style="font-size:13px;color:var(--text-hint)">—</div>
+        </div>
+      </div>
+    </div>
+    <div id="prev-madi-section" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px">الماضي</div>
+      <div id="prev-madi-info" style="font-size:14px;margin-bottom:8px"></div>
+      <div class="field">
+        <label>التقييم (من 100)</label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="number" id="score-prev-madi" min="0" max="100" placeholder="مثلاً 85" oninput="onScoreInput('prev-madi')" style="width:90px;font-size:18px;font-weight:600;text-align:center;padding:8px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);font-family:inherit">
+          <div id="score-prev-madi-display" style="font-size:13px;color:var(--text-hint)">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- المهمة الجديدة -->
+  <div class="card">
+    <div class="card-title"><div class="dot"></div> 📝 المهمة الجديدة — اللوح</div>
+    <div class="row3">
+      <div class="field sura-field">
+        <label>السورة</label>
+        <input type="text" id="loh-sura-input" placeholder="اكتب اسم السورة..." autocomplete="off" oninput="filterSuras('loh')" onfocus="showDropdown('loh')" onblur="hideDropdown('loh')">
+        <input type="hidden" id="loh-sura">
+        <div class="sura-dropdown" id="loh-sura-dropdown"></div>
+      </div>
+      <div class="field">
+        <label>من آية</label>
+        <input type="number" id="loh-from" placeholder="١" min="1" oninput="validateAyah('loh')">
+        <div class="field-error" id="err-loh-from"></div>
+      </div>
+      <div class="field">
+        <label>إلى آية</label>
+        <input type="number" id="loh-to" placeholder="١٠" min="1" oninput="validateAyah('loh')">
+        <div class="field-error" id="err-loh-to"></div>
+      </div>
+    </div>
+    <div class="ayah-hint" id="hint-loh"></div>
+
+  </div>
+  <div class="card">
+    <div class="card-title"><div class="dot" style="background:#888"></div> 📝 المهمة الجديدة — الماضي</div>
+    <div id="madi-rows"></div>
+    <button type="button" class="add-madi-btn" onclick="addMadiRow()">+ إضافة سورة</button>
+  </div>
+  <div class="card">
+    <div class="toggle-row">
+      <span class="toggle-label">مراجعة التجويد</span>
+      <label class="toggle-wrap">
+        <input type="checkbox" id="tajweed-toggle" onchange="toggleTajweed()">
+        <div class="toggle-track"></div>
+        <div class="toggle-thumb"></div>
+      </label>
+    </div>
+    <div class="tajweed-fields" id="tajweed-fields" style="display:none">
+      <div class="row3">
+        <div class="field" style="position:relative">
+          <label>السورة</label>
+          <input type="text" id="tajweed-sura-input" placeholder="اكتب اسم السورة..." autocomplete="off" oninput="filterSuras('tajweed')" onfocus="showDropdown('tajweed')" onblur="hideDropdown('tajweed')">
+          <input type="hidden" id="tajweed-sura">
+          <div id="tajweed-sura-dropdown" style="display:none;position:absolute;top:100%;right:0;left:0;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius-sm);z-index:100;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.15)"></div>
+        </div>
+        <div class="field">
+          <label>من آية</label>
+          <input type="number" id="tajweed-from" placeholder="١" min="1" oninput="validateAyah('tajweed')">
+          <div class="field-error" id="err-tajweed-from"></div>
+        </div>
+        <div class="field">
+          <label>إلى آية</label>
+          <input type="number" id="tajweed-to" placeholder="١٠" min="1" oninput="validateAyah('tajweed')">
+          <div class="field-error" id="err-tajweed-to"></div>
+        </div>
+      </div>
+      <div class="ayah-hint" id="hint-tajweed"></div>
+      <div class="field" style="margin-top:10px">
+        <label>التقييم</label>
+        <div class="stars-row" id="stars-tajweed">
+          <button class="star-btn" onclick="setStar('tajweed',1)">★</button>
+          <button class="star-btn" onclick="setStar('tajweed',2)">★</button>
+          <button class="star-btn" onclick="setStar('tajweed',3)">★</button>
+          <button class="star-btn" onclick="setStar('tajweed',4)">★</button>
+          <button class="star-btn" onclick="setStar('tajweed',5)">★</button>
+          <span class="stars-label" id="lbl-tajweed">—</span>
+        </div>
+      </div>
+      <div class="field" style="margin-top:8px">
+        <label>ملاحظة</label>
+        <input type="text" id="tajweed-note" placeholder="اختيارية">
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="field">
+      <label>ملاحظات عامة</label>
+      <textarea id="general-note" rows="2" placeholder="أي ملاحظة إضافية..."></textarea>
+    </div>
+  </div>
+  <button class="save-btn" onclick="saveRecord()">💾 حفظ الجلسة</button>
+</div>
+
+<!-- Students screen -->
+<div id="screen-students" class="screen">
+  <div class="card">
+    <div class="card-title"><div class="dot"></div> الطلاب المسجلون</div>
+    <div id="students-list"></div>
+  </div>
+</div>
+
+<!-- Log screen -->
+<div id="screen-log" class="screen">
+  <div class="card">
+    <div class="card-title"><div class="dot"></div> آخر الجلسات</div>
+    <div id="log-list"></div>
+  </div>
+</div>
+
+<!-- Stats screen -->
+<div id="screen-stats" class="screen">
+  <div class="stat-grid" id="stat-grid"></div>
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title"><div class="dot" style="background:#c49a1a"></div> 🏆 الأكثر تسميعاً للآيات</div>
+    <div id="top-ayat-list"></div>
+  </div>
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title"><div class="dot" style="background:#2d8a50"></div> ✅ الأكثر حضوراً</div>
+    <div id="top-attend-list"></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><div class="dot"></div> تفصيل الطلاب</div>
+    <div id="student-stats-list"></div>
+  </div>
+</div>
+
+<nav class="bottom-nav">
+  <button class="nav-btn active" onclick="showScreen('record',this)"><span class="icon">✏️</span><span>تسجيل</span></button>
+  <button class="nav-btn" onclick="showScreen('students',this)"><span class="icon">👥</span><span>الطلاب</span></button>
+  <button class="nav-btn" onclick="showScreen('log',this)"><span class="icon">📋</span><span>السجل</span></button>
+  <button class="nav-btn" onclick="showScreen('stats',this)"><span class="icon">📊</span><span>إحصاءات</span></button>
+</nav>
+
+<!-- Student modal -->
+<div class="modal-overlay" id="student-modal" onclick="closeModalOnBg(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">إضافة طالب</span>
+      <button class="modal-close" onclick="closeStudentModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="modal-student-idx" value="">
+      <div class="field">
+        <label>الاسم الكامل *</label>
+        <input type="text" id="modal-name" placeholder="اسم الطالب">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>السن</label>
+          <input type="number" id="modal-age" placeholder="مثلاً 10" min="4" max="25">
+        </div>
+        <div class="field">
+          <label>السنة الدراسية</label>
+          <select id="modal-grade">
+            <option value="">— اختر —</option>
+            <option>الروضة الأولى</option>
+            <option>الروضة الثانية</option>
+            <option>الصف الأول الابتدائي</option>
+            <option>الصف الثاني الابتدائي</option>
+            <option>الصف الثالث الابتدائي</option>
+            <option>الصف الرابع الابتدائي</option>
+            <option>الصف الخامس الابتدائي</option>
+            <option>الصف السادس الابتدائي</option>
+            <option>الصف الأول الإعدادي</option>
+            <option>الصف الثاني الإعدادي</option>
+            <option>الصف الثالث الإعدادي</option>
+            <option>الصف الأول الثانوي</option>
+            <option>الصف الثاني الثانوي</option>
+            <option>الصف الثالث الثانوي</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>المدرسة</label>
+        <input type="text" id="modal-school" placeholder="اسم المدرسة">
+      </div>
+      <div class="field">
+        <label>📱 رقم التواصل الأساسي</label>
+        <div style="display:flex;gap:8px">
+          <select id="modal-phone-type" style="width:110px;font-size:14px;padding:10px 8px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);font-family:inherit;appearance:none;flex-shrink:0">
+            <option value="أم">أم</option>
+            <option value="أب">أب</option>
+            <option value="ولي أمر">ولي أمر</option>
+          </select>
+          <input type="tel" id="modal-phone-primary" placeholder="01XXXXXXXXX" dir="ltr" style="flex:1">
+        </div>
+      </div>
+      <div class="field">
+        <label>📱 رقم ثانوي <span style="color:var(--text-hint);font-size:11px">اختياري</span></label>
+        <input type="tel" id="modal-phone-secondary" placeholder="01XXXXXXXXX" dir="ltr">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeStudentModal()">إلغاء</button>
+      <button class="btn-primary" onclick="saveStudentModal()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- FAB add student -->
+<button class="fab" id="fab-add-student" onclick="openStudentModal(null)" aria-label="إضافة طالب">+</button>
+
+<!-- WhatsApp modal -->
+<div class="modal-overlay" id="wa-modal" onclick="closeWaModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <span class="modal-title">إرسال ملخص الجلسة</span>
+      <button class="modal-close" onclick="document.getElementById('wa-modal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="wa-preview" style="background:var(--bg);border-radius:var(--radius-sm);padding:14px;font-size:13px;line-height:1.8;white-space:pre-wrap;direction:rtl;font-family:inherit"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="document.getElementById('wa-modal').classList.remove('open')">تخطي</button>
+      <button class="btn-primary" id="wa-send-btn" onclick="sendWhatsApp()" style="background:#25D366">📲 إرسال واتساب</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast">✓ تم الحفظ بنجاح</div>
+
+<script>
+const STAR_LABELS = ['','ضعيف','مقبول','جيد','جيد جداً','ممتاز'];
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzw3X51RGVsjg0IhXbD1Tbv0ZZ09bUP8jiM4ufEU3fVRw2Ow3nbQqVosvzeAQId1_zQjQ/exec';
+
+async function syncToSheets(type, payload) {
+  try {
+    await fetch(SHEETS_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({type, ...payload})
+    });
+  } catch(e) { console.warn('Sheets sync failed:', e); }
+}
+
+const SURAS = [
+  ['الفاتحة',7],['البقرة',286],['آل عمران',200],['النساء',176],
+  ['المائدة',120],['الأنعام',165],['الأعراف',206],['الأنفال',75],
+  ['التوبة',129],['يونس',109],['هود',123],['يوسف',111],
+  ['الرعد',43],['إبراهيم',52],['الحجر',99],['النحل',128],
+  ['الإسراء',111],['الكهف',110],['مريم',98],['طه',135],
+  ['الأنبياء',112],['الحج',78],['المؤمنون',118],['النور',64],
+  ['الفرقان',77],['الشعراء',227],['النمل',93],['القصص',88],
+  ['العنكبوت',69],['الروم',60],['لقمان',34],['السجدة',30],
+  ['الأحزاب',73],['سبأ',54],['فاطر',45],['يس',83],
+  ['الصافات',182],['ص',88],['الزمر',75],['غافر',85],
+  ['فصلت',54],['الشورى',53],['الزخرف',89],['الدخان',59],
+  ['الجاثية',37],['الأحقاف',35],['محمد',38],['الفتح',29],
+  ['الحجرات',18],['ق',45],['الذاريات',60],['الطور',49],
+  ['النجم',62],['القمر',55],['الرحمن',78],['الواقعة',96],
+  ['الحديد',29],['المجادلة',22],['الحشر',24],['الممتحنة',13],
+  ['الصف',14],['الجمعة',11],['المنافقون',11],['التغابن',18],
+  ['الطلاق',12],['التحريم',12],['الملك',30],['القلم',52],
+  ['الحاقة',52],['المعارج',44],['نوح',28],['الجن',28],
+  ['المزمل',20],['المدثر',56],['القيامة',40],['الإنسان',31],
+  ['المرسلات',50],['النبأ',40],['النازعات',46],['عبس',42],
+  ['التكوير',29],['الانفطار',19],['المطففين',36],['الانشقاق',25],
+  ['البروج',22],['الطارق',17],['الأعلى',19],['الغاشية',26],
+  ['الفجر',30],['البلد',20],['الشمس',15],['الليل',21],
+  ['الضحى',11],['الشرح',8],['التين',8],['العلق',19],
+  ['القدر',5],['البينة',8],['الزلزلة',8],['العاديات',11],
+  ['القارعة',11],['التكاثر',8],['العصر',3],['الهمزة',9],
+  ['الفيل',5],['قريش',4],['الماعون',7],['الكوثر',3],
+  ['الكافرون',6],['النصر',3],['المسد',5],['الإخلاص',4],
+  ['الفلق',5],['الناس',6]
+];
+
+const DEFAULT_STUDENTS = [
+  {name:'زيد احمد'},{name:'عبد الله احمد'},{name:'ريتال رضا'},{name:'رويدا رضا'},
+  {name:'يزن رفقي'},{name:'نادين رفقي'},{name:'ساجد محمود ناجي'},{name:'اسر محمود ناجي'},
+  {name:'يوسف خالد'},{name:'انس هيثم'},{name:'ياسين هيثم'},{name:'فاروق طارق'},
+  {name:'احمد حسام'},{name:'فريدة حسام'},{name:'عمر احمد خضر'},{name:'عبد الرحمن جار'},
+  {name:'معاذ جار'},{name:'كنزي وليد'},{name:'كندة'},{name:'سيف محمد'},
+  {name:'ياسين محمد'},{name:'حسن عيد'},{name:'مؤمن'},{name:'اياد ايمن'},
+  {name:'ياسين رزق'},{name:'سلمى ابراهيم'},{name:'ياسين ابراهيم'},
+  {name:'حازم محمد حمدي'},{name:'حمزة محمد حمدي'},{name:'حمدي محمد حمدي'},
+  {name:'عمر محمد يحيى'},{name:'عمار محمد يحيى'},{name:'عمر احمد عبد المنعم'},
+  {name:'ليلي احمد عبد المنعم'},{name:'ادم احمد'},{name:'تاج بلال'},
+  {name:'جمال احمد جمال'},{name:'نبيل احمد جمال'},{name:'مالك محمد سمير'},
+  {name:'محمد طارق فاروق'},{name:'مروان اشرف'},{name:'طارق عيد'},
+  {name:'بتول احمد'},{name:'احمد ياسر'},{name:'زين الدين اسلام'},
+  {name:'محمود عمرو محمود'},{name:'يحيى محمد'},{name:'يارا وليد'},
+  {name:'انس وليد'},{name:'زياد جابر شريف'}
+];
+
+let students = [], records = [], starVals = {loh:0, tajweed:0}, starScores = {loh:0, tajweed:0, 'prev-loh':0, 'prev-madi':0};
+let madiRows = []; // [{id, stars}]
+let madiRowCount = 0;
+const suraMap = {};
+SURAS.forEach(([n,c]) => suraMap[n]=c);
+
+function loadData() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('qr_students') || 'null');
+    if (raw) {
+      // migrate old string array to objects
+      students = raw.map(s => typeof s === 'string' ? {name:s} : s);
+    } else {
+      students = DEFAULT_STUDENTS;
+    }
+  } catch(e) { students = DEFAULT_STUDENTS; }
+  try { records = JSON.parse(localStorage.getItem('qr_records') || '[]'); } catch(e) { records = []; }
+}
+
+function saveData() {
+  localStorage.setItem('qr_students', JSON.stringify(students));
+  localStorage.setItem('qr_records', JSON.stringify(records));
+}
+
+// السور مرتبة عكسياً (الناس أولاً)
+const SURAS_REVERSED = [...SURAS].reverse();
+
+function buildSuraOptions() {
+  // no-op: using search inputs now
+}
+
+function filterSuras(prefix) {
+  const query = document.getElementById(prefix+'-sura-input').value.trim();
+  const filtered = query
+    ? SURAS_REVERSED.filter(([n]) => n.includes(query))
+    : SURAS_REVERSED;
+  renderDropdown(prefix, filtered);
+  showDropdown(prefix);
+  // clear hidden val if user is typing
+  document.getElementById(prefix+'-sura').value = '';
+  document.getElementById('hint-'+prefix).textContent = '';
+}
+
+function renderDropdown(prefix, list) {
+  const dd = document.getElementById(prefix+'-sura-dropdown');
+  if (!list.length) {
+    dd.innerHTML = '<div class="sura-item" style="color:var(--text-hint)">لا توجد نتائج</div>';
+    return;
+  }
+  dd.innerHTML = list.map(([name, count], i) => {
+    const num = SURAS.findIndex(s=>s[0]===name) + 1;
+    return `<div class="sura-item" onmousedown="selectSura('${prefix}','${name}',${count})">${num}. ${name}<span class="sura-count">${count} آية</span></div>`;
+  }).join('');
+}
+
+function selectSura(prefix, name, count) {
+  document.getElementById(prefix+'-sura-input').value = name;
+  document.getElementById(prefix+'-sura').value = name;
+  hideDropdown(prefix, true);
+  onSuraChange(prefix);
+}
+
+function showDropdown(prefix) {
+  const dd = document.getElementById(prefix+'-sura-dropdown');
+  const query = document.getElementById(prefix+'-sura-input').value.trim();
+  const list = query ? SURAS_REVERSED.filter(([n])=>n.includes(query)) : SURAS_REVERSED;
+  renderDropdown(prefix, list);
+  dd.style.display = 'block';
+}
+
+let hideTimers = {};
+function hideDropdown(prefix, immediate) {
+  if (immediate) {
+    document.getElementById(prefix+'-sura-dropdown').style.display = 'none';
+  } else {
+    hideTimers[prefix] = setTimeout(() => {
+      document.getElementById(prefix+'-sura-dropdown').style.display = 'none';
+    }, 200);
+  }
+}
+
+const IMPORTED_ATTENDANCE = [{"id": "att_احمد حسام_2026-06-04", "date": "2026-06-04", "student": "احمد حسام", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_احمد ياسر_2026-06-04", "date": "2026-06-04", "student": "احمد ياسر", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_ادم احمد_2026-06-04", "date": "2026-06-04", "student": "ادم احمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_انس هيثم_2026-06-04", "date": "2026-06-04", "student": "انس هيثم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_انس وليد_2026-06-04", "date": "2026-06-04", "student": "انس وليد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_اياد ايمن_2026-06-04", "date": "2026-06-04", "student": "اياد ايمن", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_بتول احمد_2026-06-04", "date": "2026-06-04", "student": "بتول احمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_تاج بلال_2026-06-04", "date": "2026-06-04", "student": "تاج بلال", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_جمال احمد جمال_2026-06-04", "date": "2026-06-04", "student": "جمال احمد جمال", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_حازم محمد حمدي_2026-06-04", "date": "2026-06-04", "student": "حازم محمد حمدي", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_حمدي محمد حمدي_2026-06-04", "date": "2026-06-04", "student": "حمدي محمد حمدي", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_حمزة محمد حمدي_2026-06-04", "date": "2026-06-04", "student": "حمزة محمد حمدي", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_رويدا رضا_2026-06-04", "date": "2026-06-04", "student": "رويدا رضا", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_ريتال رضا_2026-06-04", "date": "2026-06-04", "student": "ريتال رضا", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_زياد جابر شريف_2026-06-04", "date": "2026-06-04", "student": "زياد جابر شريف", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_زيد احمد_2026-06-04", "date": "2026-06-04", "student": "زيد احمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_زين الدين اسلام_2026-06-04", "date": "2026-06-04", "student": "زين الدين اسلام", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_سيف محمد_2026-06-04", "date": "2026-06-04", "student": "سيف محمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_طارق عيد_2026-06-04", "date": "2026-06-04", "student": "طارق عيد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_عبد الله احمد_2026-06-04", "date": "2026-06-04", "student": "عبد الله احمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_عمار محمد يحيى_2026-06-04", "date": "2026-06-04", "student": "عمار محمد يحيى", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_عمر  محمد يحي_2026-06-04", "date": "2026-06-04", "student": "عمر  محمد يحي", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_عمر احمد  عبد المنعم_2026-06-04", "date": "2026-06-04", "student": "عمر احمد  عبد المنعم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_عمر احمد خضر_2026-06-04", "date": "2026-06-04", "student": "عمر احمد خضر", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_فاروق طارق_2026-06-04", "date": "2026-06-04", "student": "فاروق طارق", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_فريدة حسام_2026-06-04", "date": "2026-06-04", "student": "فريدة حسام", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_ليلي احمد عبد المنعم_2026-06-04", "date": "2026-06-04", "student": "ليلي احمد عبد المنعم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_مؤمن_2026-06-04", "date": "2026-06-04", "student": "مؤمن", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_مالك محمد سمير_2026-06-04", "date": "2026-06-04", "student": "مالك محمد سمير", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_محمد طارق فاروق_2026-06-04", "date": "2026-06-04", "student": "محمد طارق فاروق", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_محمود عمرو محمود محمد_2026-06-04", "date": "2026-06-04", "student": "محمود عمرو محمود محمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_مروان  اشرف_2026-06-04", "date": "2026-06-04", "student": "مروان  اشرف", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_نادين رفقي_2026-06-04", "date": "2026-06-04", "student": "نادين رفقي", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_نبيل احمد جمال_2026-06-04", "date": "2026-06-04", "student": "نبيل احمد جمال", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_يارا وليد_2026-06-04", "date": "2026-06-04", "student": "يارا وليد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_ياسين  محمد_2026-06-04", "date": "2026-06-04", "student": "ياسين  محمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_ياسين رزق_2026-06-04", "date": "2026-06-04", "student": "ياسين رزق", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_ياسين هيثم_2026-06-04", "date": "2026-06-04", "student": "ياسين هيثم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_يحيي محمد_2026-06-04", "date": "2026-06-04", "student": "يحيي محمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_يزن رفقي_2026-06-04", "date": "2026-06-04", "student": "يزن رفقي", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_يوسف خالد_2026-06-04", "date": "2026-06-04", "student": "يوسف خالد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "حضور إضافي — 4 يونيو"}, {"id": "att_احمد حسام_2026-06-06", "date": "2026-06-06", "student": "احمد حسام", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_انس هيثم_2026-06-06", "date": "2026-06-06", "student": "انس هيثم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_اياد ايمن_2026-06-06", "date": "2026-06-06", "student": "اياد ايمن", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_رويدا رضا_2026-06-06", "date": "2026-06-06", "student": "رويدا رضا", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ريتال رضا_2026-06-06", "date": "2026-06-06", "student": "ريتال رضا", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_سلمى ابراهيم_2026-06-06", "date": "2026-06-06", "student": "سلمى ابراهيم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_عمر احمد خضر_2026-06-06", "date": "2026-06-06", "student": "عمر احمد خضر", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_فريدة حسام_2026-06-06", "date": "2026-06-06", "student": "فريدة حسام", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين ابراهيم_2026-06-06", "date": "2026-06-06", "student": "ياسين ابراهيم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين هيثم_2026-06-06", "date": "2026-06-06", "student": "ياسين هيثم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_احمد حسام_2026-06-08", "date": "2026-06-08", "student": "احمد حسام", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_انس هيثم_2026-06-08", "date": "2026-06-08", "student": "انس هيثم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_زيد احمد_2026-06-08", "date": "2026-06-08", "student": "زيد احمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_سلمى ابراهيم_2026-06-08", "date": "2026-06-08", "student": "سلمى ابراهيم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_عبد الله احمد_2026-06-08", "date": "2026-06-08", "student": "عبد الله احمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_فريدة حسام_2026-06-08", "date": "2026-06-08", "student": "فريدة حسام", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين ابراهيم_2026-06-08", "date": "2026-06-08", "student": "ياسين ابراهيم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين رزق_2026-06-08", "date": "2026-06-08", "student": "ياسين رزق", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين هيثم_2026-06-08", "date": "2026-06-08", "student": "ياسين هيثم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_احمد حسام_2026-06-13", "date": "2026-06-13", "student": "احمد حسام", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ادم احمد_2026-06-13", "date": "2026-06-13", "student": "ادم احمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_اياد ايمن_2026-06-13", "date": "2026-06-13", "student": "اياد ايمن", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_حازم محمد حمدي_2026-06-13", "date": "2026-06-13", "student": "حازم محمد حمدي", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_حمدي محمد حمدي_2026-06-13", "date": "2026-06-13", "student": "حمدي محمد حمدي", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_حمزة محمد حمدي_2026-06-13", "date": "2026-06-13", "student": "حمزة محمد حمدي", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_رويدا رضا_2026-06-13", "date": "2026-06-13", "student": "رويدا رضا", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ريتال رضا_2026-06-13", "date": "2026-06-13", "student": "ريتال رضا", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_زيد احمد_2026-06-13", "date": "2026-06-13", "student": "زيد احمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_سلمى ابراهيم_2026-06-13", "date": "2026-06-13", "student": "سلمى ابراهيم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_عبد الله احمد_2026-06-13", "date": "2026-06-13", "student": "عبد الله احمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_عمار محمد يحيى_2026-06-13", "date": "2026-06-13", "student": "عمار محمد يحيى", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_عمر  محمد يحي_2026-06-13", "date": "2026-06-13", "student": "عمر  محمد يحي", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_عمر احمد  عبد المنعم_2026-06-13", "date": "2026-06-13", "student": "عمر احمد  عبد المنعم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_عمر احمد خضر_2026-06-13", "date": "2026-06-13", "student": "عمر احمد خضر", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_فاروق طارق_2026-06-13", "date": "2026-06-13", "student": "فاروق طارق", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_فريدة حسام_2026-06-13", "date": "2026-06-13", "student": "فريدة حسام", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ليلي احمد عبد المنعم_2026-06-13", "date": "2026-06-13", "student": "ليلي احمد عبد المنعم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_مؤمن_2026-06-13", "date": "2026-06-13", "student": "مؤمن", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_نادين رفقي_2026-06-13", "date": "2026-06-13", "student": "نادين رفقي", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين  محمد_2026-06-13", "date": "2026-06-13", "student": "ياسين  محمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين ابراهيم_2026-06-13", "date": "2026-06-13", "student": "ياسين ابراهيم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين رزق_2026-06-13", "date": "2026-06-13", "student": "ياسين رزق", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_يزن رفقي_2026-06-13", "date": "2026-06-13", "student": "يزن رفقي", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_يوسف خالد_2026-06-13", "date": "2026-06-13", "student": "يوسف خالد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ادم احمد_2026-06-15", "date": "2026-06-15", "student": "ادم احمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_انس هيثم_2026-06-15", "date": "2026-06-15", "student": "انس هيثم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_تاج بلال_2026-06-15", "date": "2026-06-15", "student": "تاج بلال", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_جمال احمد جمال_2026-06-15", "date": "2026-06-15", "student": "جمال احمد جمال", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_حازم محمد حمدي_2026-06-15", "date": "2026-06-15", "student": "حازم محمد حمدي", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_حمدي محمد حمدي_2026-06-15", "date": "2026-06-15", "student": "حمدي محمد حمدي", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_حمزة محمد حمدي_2026-06-15", "date": "2026-06-15", "student": "حمزة محمد حمدي", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_سلمى ابراهيم_2026-06-15", "date": "2026-06-15", "student": "سلمى ابراهيم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_سيف محمد_2026-06-15", "date": "2026-06-15", "student": "سيف محمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_عمار محمد يحيى_2026-06-15", "date": "2026-06-15", "student": "عمار محمد يحيى", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_عمر  محمد يحي_2026-06-15", "date": "2026-06-15", "student": "عمر  محمد يحي", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_عمر احمد  عبد المنعم_2026-06-15", "date": "2026-06-15", "student": "عمر احمد  عبد المنعم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_عمر احمد خضر_2026-06-15", "date": "2026-06-15", "student": "عمر احمد خضر", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_فاروق طارق_2026-06-15", "date": "2026-06-15", "student": "فاروق طارق", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ليلي احمد عبد المنعم_2026-06-15", "date": "2026-06-15", "student": "ليلي احمد عبد المنعم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_مالك محمد سمير_2026-06-15", "date": "2026-06-15", "student": "مالك محمد سمير", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_نبيل احمد جمال_2026-06-15", "date": "2026-06-15", "student": "نبيل احمد جمال", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين  محمد_2026-06-15", "date": "2026-06-15", "student": "ياسين  محمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين ابراهيم_2026-06-15", "date": "2026-06-15", "student": "ياسين ابراهيم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين رزق_2026-06-15", "date": "2026-06-15", "student": "ياسين رزق", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين هيثم_2026-06-15", "date": "2026-06-15", "student": "ياسين هيثم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_احمد ياسر_2026-06-17", "date": "2026-06-17", "student": "احمد ياسر", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ادم احمد_2026-06-17", "date": "2026-06-17", "student": "ادم احمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_انس هيثم_2026-06-17", "date": "2026-06-17", "student": "انس هيثم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_اياد ايمن_2026-06-17", "date": "2026-06-17", "student": "اياد ايمن", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_بتول احمد_2026-06-17", "date": "2026-06-17", "student": "بتول احمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_جمال احمد جمال_2026-06-17", "date": "2026-06-17", "student": "جمال احمد جمال", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_زيد احمد_2026-06-17", "date": "2026-06-17", "student": "زيد احمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_سلمى ابراهيم_2026-06-17", "date": "2026-06-17", "student": "سلمى ابراهيم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_سيف محمد_2026-06-17", "date": "2026-06-17", "student": "سيف محمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_طارق عيد_2026-06-17", "date": "2026-06-17", "student": "طارق عيد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_عمار محمد يحيى_2026-06-17", "date": "2026-06-17", "student": "عمار محمد يحيى", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_عمر احمد  عبد المنعم_2026-06-17", "date": "2026-06-17", "student": "عمر احمد  عبد المنعم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_فاروق طارق_2026-06-17", "date": "2026-06-17", "student": "فاروق طارق", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ليلي احمد عبد المنعم_2026-06-17", "date": "2026-06-17", "student": "ليلي احمد عبد المنعم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_مالك محمد سمير_2026-06-17", "date": "2026-06-17", "student": "مالك محمد سمير", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_محمد طارق فاروق_2026-06-17", "date": "2026-06-17", "student": "محمد طارق فاروق", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_مروان  اشرف_2026-06-17", "date": "2026-06-17", "student": "مروان  اشرف", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_نبيل احمد جمال_2026-06-17", "date": "2026-06-17", "student": "نبيل احمد جمال", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين  محمد_2026-06-17", "date": "2026-06-17", "student": "ياسين  محمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين ابراهيم_2026-06-17", "date": "2026-06-17", "student": "ياسين ابراهيم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين رزق_2026-06-17", "date": "2026-06-17", "student": "ياسين رزق", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين هيثم_2026-06-17", "date": "2026-06-17", "student": "ياسين هيثم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_احمد ياسر_2026-06-20", "date": "2026-06-20", "student": "احمد ياسر", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ادم احمد_2026-06-20", "date": "2026-06-20", "student": "ادم احمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_انس هيثم_2026-06-20", "date": "2026-06-20", "student": "انس هيثم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_اياد ايمن_2026-06-20", "date": "2026-06-20", "student": "اياد ايمن", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_جمال احمد جمال_2026-06-20", "date": "2026-06-20", "student": "جمال احمد جمال", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_زين الدين اسلام_2026-06-20", "date": "2026-06-20", "student": "زين الدين اسلام", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_سلمى ابراهيم_2026-06-20", "date": "2026-06-20", "student": "سلمى ابراهيم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_طارق عيد_2026-06-20", "date": "2026-06-20", "student": "طارق عيد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_عمار محمد يحيى_2026-06-20", "date": "2026-06-20", "student": "عمار محمد يحيى", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_عمر احمد  عبد المنعم_2026-06-20", "date": "2026-06-20", "student": "عمر احمد  عبد المنعم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_عمر احمد خضر_2026-06-20", "date": "2026-06-20", "student": "عمر احمد خضر", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_فاروق طارق_2026-06-20", "date": "2026-06-20", "student": "فاروق طارق", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ليلي احمد عبد المنعم_2026-06-20", "date": "2026-06-20", "student": "ليلي احمد عبد المنعم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_محمد طارق فاروق_2026-06-20", "date": "2026-06-20", "student": "محمد طارق فاروق", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_محمود عمرو محمود محمد_2026-06-20", "date": "2026-06-20", "student": "محمود عمرو محمود محمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_مروان  اشرف_2026-06-20", "date": "2026-06-20", "student": "مروان  اشرف", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_نبيل احمد جمال_2026-06-20", "date": "2026-06-20", "student": "نبيل احمد جمال", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين  محمد_2026-06-20", "date": "2026-06-20", "student": "ياسين  محمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين ابراهيم_2026-06-20", "date": "2026-06-20", "student": "ياسين ابراهيم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين هيثم_2026-06-20", "date": "2026-06-20", "student": "ياسين هيثم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_يحيي محمد_2026-06-20", "date": "2026-06-20", "student": "يحيي محمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ادم احمد_2026-06-22", "date": "2026-06-22", "student": "ادم احمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_انس هيثم_2026-06-22", "date": "2026-06-22", "student": "انس هيثم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_انس وليد_2026-06-22", "date": "2026-06-22", "student": "انس وليد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_تاج بلال_2026-06-22", "date": "2026-06-22", "student": "تاج بلال", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_زيد احمد_2026-06-22", "date": "2026-06-22", "student": "زيد احمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_زين الدين اسلام_2026-06-22", "date": "2026-06-22", "student": "زين الدين اسلام", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_سلمى ابراهيم_2026-06-22", "date": "2026-06-22", "student": "سلمى ابراهيم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_سيف محمد_2026-06-22", "date": "2026-06-22", "student": "سيف محمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_عمار محمد يحيى_2026-06-22", "date": "2026-06-22", "student": "عمار محمد يحيى", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_فاروق طارق_2026-06-22", "date": "2026-06-22", "student": "فاروق طارق", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ليلي احمد عبد المنعم_2026-06-22", "date": "2026-06-22", "student": "ليلي احمد عبد المنعم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_مالك محمد سمير_2026-06-22", "date": "2026-06-22", "student": "مالك محمد سمير", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_محمود عمرو محمود محمد_2026-06-22", "date": "2026-06-22", "student": "محمود عمرو محمود محمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_يارا وليد_2026-06-22", "date": "2026-06-22", "student": "يارا وليد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين  محمد_2026-06-22", "date": "2026-06-22", "student": "ياسين  محمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين ابراهيم_2026-06-22", "date": "2026-06-22", "student": "ياسين ابراهيم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين رزق_2026-06-22", "date": "2026-06-22", "student": "ياسين رزق", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين هيثم_2026-06-22", "date": "2026-06-22", "student": "ياسين هيثم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_يحيي محمد_2026-06-22", "date": "2026-06-22", "student": "يحيي محمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_زياد جابر شريف_2026-06-24", "date": "2026-06-24", "student": "زياد جابر شريف", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_زيد احمد_2026-06-24", "date": "2026-06-24", "student": "زيد احمد", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_سلمى ابراهيم_2026-06-24", "date": "2026-06-24", "student": "سلمى ابراهيم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_عمار محمد يحيى_2026-06-24", "date": "2026-06-24", "student": "عمار محمد يحيى", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_عمر  محمد يحي_2026-06-24", "date": "2026-06-24", "student": "عمر  محمد يحي", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_فاروق طارق_2026-06-24", "date": "2026-06-24", "student": "فاروق طارق", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين ابراهيم_2026-06-24", "date": "2026-06-24", "student": "ياسين ابراهيم", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}, {"id": "att_ياسين رزق_2026-06-24", "date": "2026-06-24", "student": "ياسين رزق", "attendance_only": true, "loh": {"sura": "", "from": "", "to": "", "stars": 0}, "madi": {"sura": "", "from": "", "to": "", "stars": 0}, "note": "مستورد من سجل الحضور"}];
+
+function importAttendanceIfNeeded() {
+  // Only import once
+  if (localStorage.getItem('qr_att_imported') === '6') return;
+  // Merge: add records that don't already exist
+  const existingIds = new Set(records.map(r => r.id));
+  let added = 0;
+  IMPORTED_ATTENDANCE.forEach(r => {
+    if (!existingIds.has(r.id)) {
+      records.push(r);
+      added++;
+    }
+  });
+  if (added > 0) {
+    saveData();
+    // push new attendance records to Firebase
+    IMPORTED_ATTENDANCE.forEach(r => {
+      if (!existingIds.has(r.id)) {
+        saveRecordToFirebase(r);
+      }
+    });
+    console.log('Imported ' + added + ' attendance records');
+  }
+  localStorage.setItem('qr_att_imported', '6');
+}
+
+function makeMadiRowId() { return 'madi-row-' + (++madiRowCount); }
+
+function addMadiRow(data) {
+  const id = makeMadiRowId();
+  const idx = madiRows.length;
+  madiRows.push({id, stars: data ? data.stars : 0});
+  const container = document.getElementById('madi-rows');
+  const div = document.createElement('div');
+  div.className = 'madi-row';
+  div.id = id;
+  const label = idx === 0 ? 'السورة الأولى' : 'سورة ' + (idx + 1);
+  div.innerHTML = `
+    <div class="madi-row-header">
+      <span class="madi-row-title">${label}</span>
+      ${idx > 0 ? `<button type="button" class="remove-madi-btn" onclick="removeMadiRow('${id}')">✕</button>` : ''}
+    </div>
+    <div class="row3">
+      <div class="field sura-field">
+        <label>السورة</label>
+        <input type="text" id="${id}-sura-input" placeholder="اكتب اسم السورة..." autocomplete="off"
+          oninput="filterSuras('${id}')" onfocus="showDropdown('${id}')" onblur="hideDropdown('${id}')">
+        <input type="hidden" id="${id}-sura" value="${data ? data.sura||'' : ''}">
+        <div class="sura-dropdown" id="${id}-sura-dropdown"></div>
+      </div>
+      <div class="field">
+        <label>من آية</label>
+        <input type="number" id="${id}-from" placeholder="١" min="1" value="${data ? data.from||'' : ''}" oninput="validateAyah('${id}')">
+        <div class="field-error" id="err-${id}-from"></div>
+      </div>
+      <div class="field">
+        <label>إلى آية</label>
+        <input type="number" id="${id}-to" placeholder="٢٠" min="1" value="${data ? data.to||'' : ''}" oninput="validateAyah('${id}')">
+        <div class="field-error" id="err-${id}-to"></div>
+      </div>
+    </div>
+    <div class="ayah-hint" id="hint-${id}"></div>
+    <div class="field" style="display:none">
+      <div class="stars-row" id="stars-${id}">
+        <button class="star-btn" onclick="setStar('${id}',1)">★</button>
+        <button class="star-btn" onclick="setStar('${id}',2)">★</button>
+        <button class="star-btn" onclick="setStar('${id}',3)">★</button>
+        <button class="star-btn" onclick="setStar('${id}',4)">★</button>
+        <button class="star-btn" onclick="setStar('${id}',5)">★</button>
+        <span class="stars-label" id="lbl-${id}">—</span>
+      </div>
+    </div>`;
+  container.appendChild(div);
+  // restore sura name in input if editing
+  if (data && data.sura) {
+    document.getElementById(id+'-sura-input').value = data.sura;
+    onSuraChange(id);
+  }
+  // restore stars
+  if (data && data.stars) setStar(id, data.stars);
+}
+
+function removeMadiRow(id) {
+  const idx = madiRows.findIndex(r=>r.id===id);
+  if (idx > 0) { madiRows.splice(idx,1); document.getElementById(id).remove(); }
+}
+
+function resetMadiRows() {
+  madiRows = []; madiRowCount = 0;
+  document.getElementById('madi-rows').innerHTML = '';
+  addMadiRow();
+}
+
+function getMadiData() {
+  return madiRows.map(({id, stars, score}) => ({
+    sura: document.getElementById(id+'-sura').value,
+    from: document.getElementById(id+'-from').value,
+    to: document.getElementById(id+'-to').value,
+    stars,
+    score: score||0
+  })).filter(m => m.sura);
+}
+
+function onStudentChange() {
+  const name = document.getElementById('student-select').value;
+  if (!name) { document.getElementById('prev-task-card').style.display='none'; return; }
+  // find last non-attendance-only record for this student
+  const recs = records.filter(r=>r.student===name && !r.attendance_only).sort((a,b)=>a.date>b.date?-1:1);
+  const last = recs[0];
+  if (!last) { document.getElementById('prev-task-card').style.display='none'; return; }
+
+  document.getElementById('prev-task-card').style.display='block';
+  const dateStr = new Date(last.date).toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'});
+  document.getElementById('prev-task-date').textContent = 'من جلسة ' + dateStr;
+
+  // loh info
+  document.getElementById('prev-loh-info').textContent = last.newLoh
+    ? 'سورة ' + last.newLoh.sura + ' (' + last.newLoh.from + '–' + last.newLoh.to + ')'
+    : last.loh && last.loh.sura ? 'سورة ' + last.loh.sura + ' (' + last.loh.from + '–' + last.loh.to + ')' : '—';
+
+  // madi info
+  const madiArr = last.newMadi || (last.madi ? (Array.isArray(last.madi)?last.madi:[last.madi]) : []);
+  const madiFiltered = madiArr.filter(m=>m.sura);
+  document.getElementById('prev-madi-info').textContent = madiFiltered.length
+    ? madiFiltered.map(m=>'سورة '+m.sura+' ('+m.from+'–'+m.to+')').join(' + ')
+    : '—';
+
+  document.getElementById('prev-madi-section').style.display = madiFiltered.length ? 'block' : 'none';
+
+  // reset scores
+  ['prev-loh','prev-madi'].forEach(id=>{
+    const el=document.getElementById('score-'+id); if(el) el.value='';
+    const d=document.getElementById('score-'+id+'-display'); if(d) d.textContent='—';
+  });
+  starScores['prev-loh']=0; starScores['prev-madi']=0;
+}
+
+function init() {
+  loadData();
+  importAttendanceIfNeeded();
+  buildSuraOptions();
+  addMadiRow();
+  document.getElementById('session-date').value = new Date().toISOString().slice(0,10);
+  renderStudentSelect();
+  renderStudentList();
+  updateHeader();
+}
+
+function updateHeader() {
+  const today = new Date().toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'});
+  document.getElementById('header-sub').textContent = today + ' · ' + students.length + ' طالب';
+}
+
+function getStudentName(s) { return typeof s === 'string' ? s : s.name; }
+
+function renderStudentSelect() {
+  const sel = document.getElementById('student-select');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— اختر طالباً —</option>' +
+    students.map(s => { const n=getStudentName(s); return `<option value="${n}">${n}</option>`; }).join('');
+  if (students.find(s=>getStudentName(s)===cur)) sel.value = cur;
+}
+
+function renderStudentList() {
+  const el = document.getElementById('students-list');
+  if (!students.length) { el.innerHTML = '<div class="empty-state">لا يوجد طلاب بعد</div>'; return; }
+  el.innerHTML = students.map((s,i) => {
+    const name = getStudentName(s);
+    const age = s.age ? s.age + ' سنة' : '';
+    const grade = s.grade || '';
+    const school = s.school || '';
+    const meta = [age, grade, school].filter(Boolean).join(' · ');
+    const count = records.filter(r=>r.student===name).length;
+    const initials = name.trim().split(' ').slice(0,2).map(w=>w[0]).join('');
+    const primary = s.phonePrimary || s.phoneMom || '';
+    const phoneType = s.phoneType || (s.phoneMom ? 'أم' : 'أب');
+    const phoneMom = primary ? `<span style="font-size:11px;color:var(--text-hint)">${phoneType}: ${primary}</span>` : '';
+    const phoneDad = (s.phoneSecondary||s.phoneDad) ? `<span style="font-size:11px;color:var(--text-hint);margin-right:8px">ثانوي: ${s.phoneSecondary||s.phoneDad}</span>` : '';
+    return `<div class="student-row">
+      <div class="student-avatar">${initials}</div>
+      <div class="student-info" onclick="openStudentModal(${i})">
+        <div class="student-name-main">${name}</div>
+        ${meta ? `<div class="student-meta-line">${meta}</div>` : ''}
+        <div style="margin-top:2px">${phoneMom}${phoneDad}</div>
+        <div class="student-meta-line">${count} جلسة مسجلة</div>
+      </div>
+      <div class="student-actions">
+        <button class="icon-btn" onclick="openStudentModal(${i})" aria-label="تعديل">✏️</button>
+        <button class="icon-btn danger" onclick="deleteStudent(event,${i})" aria-label="حذف">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ---- Modal ---- */
+function openStudentModal(idx) {
+  const modal = document.getElementById('student-modal');
+  document.getElementById('modal-student-idx').value = idx === null ? '' : idx;
+  document.getElementById('modal-title').textContent = idx === null ? 'إضافة طالب جديد' : 'تعديل بيانات الطالب';
+  if (idx !== null) {
+    const s = students[idx];
+    document.getElementById('modal-name').value = getStudentName(s);
+    document.getElementById('modal-age').value = s.age || '';
+    document.getElementById('modal-grade').value = s.grade || '';
+    document.getElementById('modal-school').value = s.school || '';
+    document.getElementById('modal-phone-type').value = s.phoneType || 'أم';
+    document.getElementById('modal-phone-primary').value = s.phonePrimary || s.phoneMom || '';
+    document.getElementById('modal-phone-secondary').value = s.phoneSecondary || s.phoneDad || '';
+  } else {
+    ['modal-name','modal-age','modal-school','modal-phone-primary','modal-phone-secondary'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('modal-phone-type').value = 'أم';
+    document.getElementById('modal-grade').value = '';
+  }
+  modal.classList.add('open');
+  setTimeout(() => document.getElementById('modal-name').focus(), 100);
+}
+
+function closeStudentModal() {
+  document.getElementById('student-modal').classList.remove('open');
+}
+
+function closeModalOnBg(e) {
+  if (e.target === document.getElementById('student-modal')) closeStudentModal();
+}
+
+function saveStudentModal() {
+  const name = document.getElementById('modal-name').value.trim();
+  if (!name) { document.getElementById('modal-name').focus(); return; }
+  const idx = document.getElementById('modal-student-idx').value;
+  const obj = {
+    name,
+    age: document.getElementById('modal-age').value || '',
+    grade: document.getElementById('modal-grade').value || '',
+    school: document.getElementById('modal-school').value.trim(),
+    phoneType: document.getElementById('modal-phone-type').value,
+    phonePrimary: document.getElementById('modal-phone-primary').value.trim(),
+    phoneSecondary: document.getElementById('modal-phone-secondary').value.trim(),
+  };
+  if (idx === '') {
+    // check duplicate
+    if (students.find(s=>getStudentName(s)===name)) { alert('الاسم موجود بالفعل'); return; }
+    students.push(obj);
+  } else {
+    students[parseInt(idx)] = obj;
+  }
+  saveData();
+  saveStudentToFirebase(obj);
+  renderStudentSelect();
+  renderStudentList();
+  updateHeader();
+  closeStudentModal();
+  showToast();
+  syncToSheets('student', {student: obj});
+}
+
+function deleteStudent(e, i) {
+  e.stopPropagation();
+  if (!confirm(`حذف "${getStudentName(students[i])}"؟`)) return;
+  students.splice(i,1);
+  saveData(); renderStudentSelect(); renderStudentList(); updateHeader();
+}
+
+/* ---- Sura validation ---- */
+function onSuraChange(prefix) {
+  const name = document.getElementById(prefix+'-sura').value;
+  const hint = document.getElementById('hint-'+prefix);
+  const fromEl = document.getElementById(prefix+'-from');
+  const toEl = document.getElementById(prefix+'-to');
+  if (name) {
+    const max = suraMap[name];
+    fromEl.max = max; toEl.max = max;
+    hint.textContent = 'عدد آيات السورة: ' + max;
+    validateAyah(prefix);
+  } else {
+    hint.textContent = '';
+    fromEl.removeAttribute('max'); toEl.removeAttribute('max');
+    clearErrors(prefix);
+  }
+}
+
+function validateAyah(prefix) {
+  const suraEl = document.getElementById(prefix+'-sura');
+  if (!suraEl) return true;
+  const name = suraEl.value;
+  if (!name) { clearErrors(prefix); return true; }
+  const max = suraMap[name];
+  const fromEl = document.getElementById(prefix+'-from');
+  const toEl = document.getElementById(prefix+'-to');
+  if (!fromEl || !toEl) return true;
+  const errFrom = document.getElementById('err-'+prefix+'-from');
+  const errTo = document.getElementById('err-'+prefix+'-to');
+  const from = parseInt(fromEl.value), to = parseInt(toEl.value);
+  let ok = true;
+  if (fromEl.value && (from<1||from>max)) { fromEl.classList.add('invalid'); errFrom.textContent='الآية بين ١ و'+max; errFrom.classList.add('show'); ok=false; }
+  else { fromEl.classList.remove('invalid'); errFrom.classList.remove('show'); }
+  if (toEl.value && (to<1||to>max)) { toEl.classList.add('invalid'); errTo.textContent='الآية بين ١ و'+max; errTo.classList.add('show'); ok=false; }
+  else if (toEl.value && fromEl.value && to<from) { toEl.classList.add('invalid'); errTo.textContent='يجب أن تكون أكبر من آية البداية'; errTo.classList.add('show'); ok=false; }
+  else { toEl.classList.remove('invalid'); errTo.classList.remove('show'); }
+  return ok;
+}
+
+function clearErrors(prefix) {
+  ['from','to'].forEach(f => {
+    const el = document.getElementById(prefix+'-'+f);
+    const err = document.getElementById('err-'+prefix+'-'+f);
+    if(el) el.classList.remove('invalid');
+    if(err) err.classList.remove('show');
+  });
+}
+
+/* ---- Record ---- */
+function saveRecord() {
+  const student = document.getElementById('student-select').value;
+  if (!student) { alert('اختر طالباً أولاً'); return; }
+  const lohSura = document.getElementById('loh-sura').value;
+  if (!lohSura) { alert('اختر سورة اللوح'); return; }
+  if (!validateAyah('loh') || !validateAyah('madi')) { alert('يوجد خطأ في أرقام الآيات'); return; }
+  const rec = {
+    id: Date.now(),
+    date: document.getElementById('session-date').value,
+    student,
+    // تقييم المهمة القديمة (اللي سمعناها النهارده)
+    loh: { score: starScores['prev-loh']||0, stars: scoreToStars(starScores['prev-loh']||0) },
+    madi: { score: starScores['prev-madi']||0, stars: scoreToStars(starScores['prev-madi']||0) },
+    // المهمة الجديدة (للجلسة الجاية)
+    newLoh: { sura:lohSura, from:document.getElementById('loh-from').value, to:document.getElementById('loh-to').value },
+    newMadi: getMadiData().map(m=>({sura:m.sura,from:m.from,to:m.to})),
+    note: document.getElementById('general-note').value.trim()
+  };
+  if (document.getElementById('tajweed-toggle').checked) {
+    if (!validateAyah('tajweed')) { alert('يوجد خطأ في آيات التجويد'); return; }
+    rec.tajweed = { sura:document.getElementById('tajweed-sura').value, from:document.getElementById('tajweed-from').value, to:document.getElementById('tajweed-to').value, stars:starVals.tajweed, score:starScores.tajweed||0, note:document.getElementById('tajweed-note').value.trim() };
+  }
+  records.push(rec);
+  saveData();
+  saveRecordToFirebase(rec);
+  resetForm(); showToast();
+  syncToSheets('record', {record: rec});
+  // offer whatsapp
+  const sObj = students.find(s=>getStudentName(s)===student);
+  const phone = sObj && (sObj.phonePrimary||sObj.phoneMom);
+  if (phone) {
+    showWhatsAppPrompt(rec, sObj);
+  }
+}
+
+function resetForm() {
+  // clear text inputs safely
+  ['loh-from','loh-to','tajweed-from','tajweed-to','tajweed-note','general-note'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  // clear sura inputs
+  ['loh-sura','tajweed-sura'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
+  ['loh-sura-input','tajweed-sura-input'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
+  // clear hints
+  ['hint-loh','hint-tajweed'].forEach(id=>{const el=document.getElementById(id); if(el) el.textContent='';});
+  // clear errors
+  clearErrors('loh');
+  if(document.getElementById('tajweed-from')) clearErrors('tajweed');
+  // reset scores
+  starVals = {loh:0, tajweed:0};
+  starScores = {loh:0, tajweed:0, 'prev-loh':0, 'prev-madi':0};
+  document.querySelectorAll('.star-btn').forEach(b=>b.classList.remove('on'));
+  // clear score inputs
+  ['score-prev-loh','score-prev-madi','score-tajweed'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  ['score-prev-loh-display','score-prev-madi-display'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.textContent='—';
+  });
+  // reset tajweed
+  document.getElementById('tajweed-toggle').checked=false;
+  document.getElementById('tajweed-fields').style.display='none';
+  // reset madi rows
+  resetMadiRows();
+  // hide prev card
+  document.getElementById('prev-task-card').style.display='none';
+  document.getElementById('student-select').value='';
+}
+
+/* ---- Log ---- */
+function renderLog() {
+  const el = document.getElementById('log-list');
+  if (!records.length) { el.innerHTML='<div class="empty-state"><div class="big">📝</div>لا يوجد جلسات مسجلة بعد</div>'; return; }
+  const sorted = [...records].reverse().slice(0,40);
+  el.innerHTML = sorted.map(r => {
+    const stars = n => '★'.repeat(n)+'☆'.repeat(5-n);
+    const starsScore = s => s ? renderStarsHTML(s) : '';
+    if (r.attendance_only) {
+      const dateStr = r.date ? new Date(r.date).toLocaleDateString('ar-EG',{day:'numeric',month:'short'}) : r.date;
+      return `<div class="log-entry">
+        <div class="log-header"><span class="log-student">${r.student}</span><span class="log-date">${dateStr}</span></div>
+        <div class="log-line" style="color:var(--text-hint)"><span>✅</span> حضور فقط</div>
+      </div>`;
+    }
+    const tj = r.tajweed ? `<div class="log-line"><span>📐</span> تجويد: ${r.tajweed.sura||'—'} (${r.tajweed.from||'?'}–${r.tajweed.to||'?'}) ${stars(r.tajweed.stars)}${r.tajweed.note?' · '+r.tajweed.note:''}</div>` : '';
+    const dateStr = r.date ? new Date(r.date).toLocaleDateString('ar-EG',{day:'numeric',month:'short'}) : r.date;
+    return `<div class="log-entry">
+      <div class="log-header"><span class="log-student">${r.student}</span><span class="log-date">${dateStr}</span></div>
+      ${r.newLoh&&r.newLoh.sura ? `<div class="log-line"><span>📝</span> لوح جديد: ${r.newLoh.sura} (${r.newLoh.from||'?'}–${r.newLoh.to||'?'})</div>` : (r.loh&&r.loh.sura ? `<div class="log-line"><span>📖</span> لوح: ${r.loh.sura} (${r.loh.from||'?'}–${r.loh.to||'?'}) ${r.loh.score?r.loh.score+'/100 '+renderStarsHTML(r.loh.score)+' '+scoreName(r.loh.score):''}</div>` : '')}
+      ${r.loh&&r.loh.score ? `<div class="log-line"><span>⭐</span> تقييم اللوح: ${r.loh.score}/100 ${renderStarsHTML(r.loh.score)} ${scoreName(r.loh.score)}</div>` : ''}
+      ${Array.isArray(r.madi)
+        ? r.madi.map(m=>`<div class="log-line"><span>🔄</span> ماضي: ${m.sura} (${m.from||'?'}–${m.to||'?'}) ${m.score ? m.score+'/100 '+renderStarsHTML(m.score)+' '+scoreName(m.score) : stars(m.stars)}</div>`).join('')
+        : (r.madi&&r.madi.sura?`<div class="log-line"><span>🔄</span> ماضي: ${r.madi.sura} (${r.madi.from||'?'}–${r.madi.to||'?'}) ${stars(r.madi.stars)}</div>`:'')}
+      ${tj}
+      ${r.note?`<div class="log-line" style="color:var(--text-hint);font-style:italic">💬 ${r.note}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+/* ---- Stats ---- */
+function countAyat(from, to) {
+  const f = parseInt(from), t = parseInt(to);
+  if (!f || !t || t < f) return 0;
+  return t - f + 1;
+}
+
+
+function renderStats() {
+  const total = records.length;
+  const uniq = [...new Set(records.map(r=>r.student))].length;
+  const withTj = records.filter(r=>r.tajweed).length;
+  const scoredRecs = records.filter(r=>r.loh&&r.loh.score);
+  const avgL = scoredRecs.length ? Math.round(scoredRecs.reduce((a,r)=>a+r.loh.score,0)/scoredRecs.length) : (total ? Math.round(records.reduce((a,r)=>a+(r.loh?r.loh.stars:0),0)/total*20) : 0);
+
+  // count ayat
+  let lohAyat = 0, madiAyat = 0, tajweedAyat = 0;
+  records.forEach(r => {
+    lohAyat += countAyat(r.loh.from, r.loh.to);
+    if (Array.isArray(r.madi)) r.madi.forEach(m=>{ madiAyat += countAyat(m.from, m.to); });
+    else if (r.madi && r.madi.sura) madiAyat += countAyat(r.madi.from, r.madi.to);
+    if (r.tajweed && r.tajweed.sura) tajweedAyat += countAyat(r.tajweed.from, r.tajweed.to);
+  });
+  const totalAyat = lohAyat + madiAyat + tajweedAyat;
+
+  // إجمالي أيام الحلقة = الأيام الفريدة اللي اتسجل فيها أي طالب
+  const totalHalaqaDays = new Set(records.map(r=>r.date).filter(d => d && d !== '2026-06-04')).size;
+
+  document.getElementById('stat-grid').innerHTML = `
+    <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-lbl">جلسة مسجلة</div></div>
+    <div class="stat-card"><div class="stat-num">${uniq}</div><div class="stat-lbl">طالب نشط</div></div>
+    <div class="stat-card"><div class="stat-num">${totalAyat.toLocaleString()}</div><div class="stat-lbl">إجمالي الآيات</div></div>
+    <div class="stat-card"><div class="stat-num">${avgL}%</div><div class="stat-lbl">متوسط اللوح</div></div>
+    <div class="stat-card"><div class="stat-num">${lohAyat.toLocaleString()}</div><div class="stat-lbl">آيات لوح</div></div>
+    <div class="stat-card"><div class="stat-num">${madiAyat.toLocaleString()}</div><div class="stat-lbl">آيات ماضي</div></div>`;
+
+  // بيانات كل طالب
+  const per = students.map(s=>{
+    const name = getStudentName(s);
+    const recs = records.filter(r=>r.student===name);
+    if (!recs.length) return null;
+    const avg = Math.round(recs.filter(r=>r.loh.score).reduce((a,r,_,arr)=>a+r.loh.score/arr.length,0)) || Math.round(recs.reduce((a,r)=>a+r.loh.stars,0)/recs.length*20);
+    const ayat = recs.reduce((a,r)=> {
+      let sum = a + countAyat(r.loh.from,r.loh.to);
+      if (Array.isArray(r.madi)) r.madi.forEach(m=>{ sum += countAyat(m.from,m.to); });
+      else if (r.madi&&r.madi.sura) sum += countAyat(r.madi.from,r.madi.to);
+      return sum;
+    }, 0);
+    // نسبة الحضور: عدد الجلسات الفريدة / إجمالي أيام الحلقة
+    const uniqueDays = new Set(recs.map(r=>r.date)).size;
+    const attendPct = totalHalaqaDays > 0 ? Math.min(100, Math.round(uniqueDays / totalHalaqaDays * 100)) : 0;
+    return {name, count:recs.length, uniqueDays, attendPct, avg, ayat};
+  }).filter(Boolean);
+
+  // top 3 أكثر تسميعاً
+  const topAyat = [...per].sort((a,b)=>b.ayat-a.ayat).slice(0,3);
+  const MEDALS = ['🥇','🥈','🥉'];
+  const topAyatEl = document.getElementById('top-ayat-list');
+  if (!topAyat.length) { topAyatEl.innerHTML='<div class="empty-state">لا يوجد بيانات</div>'; }
+  else { topAyatEl.innerHTML = topAyat.map((x,i)=>`
+    <div class="student-row" style="cursor:default">
+      <div style="font-size:24px;width:36px;text-align:center;flex-shrink:0">${MEDALS[i]}</div>
+      <div style="flex:1">
+        <div class="student-name-main">${x.name}</div>
+        <div class="student-meta-line">${x.ayat} آية مسمّعة · ${x.count} جلسة</div>
+      </div>
+      <div style="font-size:15px;font-weight:600;color:var(--gold)">${x.ayat}</div>
+    </div>`).join(''); }
+
+  // top 3 أكثر حضوراً
+  const topAttend = [...per].sort((a,b)=>b.attendPct-a.attendPct||b.uniqueDays-a.uniqueDays).slice(0,3);
+  const topAttendEl = document.getElementById('top-attend-list');
+  if (!topAttend.length) { topAttendEl.innerHTML='<div class="empty-state">لا يوجد بيانات</div>'; }
+  else { topAttendEl.innerHTML = topAttend.map((x,i)=>`
+    <div class="student-row" style="cursor:default">
+      <div style="font-size:24px;width:36px;text-align:center;flex-shrink:0">${MEDALS[i]}</div>
+      <div style="flex:1">
+        <div class="student-name-main">${x.name}</div>
+        <div class="student-meta-line">${x.uniqueDays} يوم حضور من ${totalHalaqaDays}</div>
+      </div>
+      <div style="font-size:15px;font-weight:700;color:var(--green)">${x.attendPct}%</div>
+    </div>`).join(''); }
+
+  // جدول تفصيلي مرتب بنسبة الحضور
+  const sorted = [...per].sort((a,b)=>b.attendPct-a.attendPct);
+  const el = document.getElementById('student-stats-list');
+  if (!sorted.length) { el.innerHTML='<div class="empty-state">لا يوجد بيانات بعد</div>'; return; }
+
+  // progress bar color
+  function barColor(pct) {
+    if (pct >= 80) return 'var(--green)';
+    if (pct >= 50) return 'var(--gold)';
+    return 'var(--red)';
+  }
+
+  el.innerHTML = sorted.map(x=>`
+    <div style="padding:12px 0; border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div class="student-name-main">${x.name}</div>
+        <div style="font-size:13px;font-weight:700;color:${barColor(x.attendPct)}">${x.attendPct}%</div>
+      </div>
+      <div style="background:var(--border);border-radius:4px;height:6px;margin-bottom:6px">
+        <div style="background:${barColor(x.attendPct)};height:6px;border-radius:4px;width:${x.attendPct}%;transition:width 0.4s"></div>
+      </div>
+      <div class="student-meta-line">${x.uniqueDays}/${totalHalaqaDays} يوم · ${x.ayat} آية · متوسط ${x.avg}%</div>
+    </div>`).join('');
+}
+
+
+/* ---- Nav ---- */
+function showScreen(name,btn) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(name==='log') renderLog();
+  if(name==='stats') renderStats();
+  if(name==='students') renderStudentList();
+  // show FAB only on students screen
+  const fab = document.getElementById('fab-add-student');
+  if(fab) fab.classList.toggle('visible', name==='students');
+}
+
+// كل 10 درجات = نص نجمة (0→0, 10→0.5, 20→1, ..., 100→5)
+function scoreToHalfStars(score) {
+  const s = Math.min(100, Math.max(0, parseInt(score)||0));
+  return Math.round(s / 10) * 0.5; // 0 to 5 in 0.5 steps
+}
+
+function scoreToStars(score) {
+  return Math.floor(scoreToHalfStars(score));
+}
+
+function renderStarsHTML(score) {
+  const half = scoreToHalfStars(score); // e.g. 3.5
+  const full = Math.floor(half);
+  const hasHalf = (half % 1) !== 0;
+  const empty = 5 - full - (hasHalf ? 1 : 0);
+  return '★'.repeat(full) + (hasHalf ? '½' : '') + '☆'.repeat(empty);
+}
+
+function scoreName(score) {
+  const s = parseInt(score);
+  if (isNaN(s)||s===0) return '';
+  if (s >= 85) return 'ممتاز';
+  if (s >= 75) return 'جيد جداً';
+  if (s >= 65) return 'جيد';
+  if (s >= 50) return 'مقبول';
+  return 'إعادة';
+}
+
+function scoreLabel(score) {
+  const s = parseInt(score);
+  if (isNaN(s) || s === 0) return '—';
+  return s + '/100  ' + renderStarsHTML(s) + '  ' + scoreName(s);
+}
+
+function onScoreInput(type) {
+  const el = document.getElementById('score-'+type);
+  const val = Math.min(100, Math.max(0, parseInt(el.value)||0));
+  // update display label
+  const disp = document.getElementById('score-'+type+'-display');
+  if (disp) disp.textContent = scoreLabel(val);
+  // store raw score
+  const madiRow = madiRows.find(r=>r.id===type);
+  if (madiRow) madiRow.score = val;
+  else starScores[type] = val;
+}
+
+function setStar(type,val) {
+  const madiRow = madiRows.find(r=>r.id===type);
+  if (madiRow) madiRow.stars = val;
+  else if (starVals.hasOwnProperty(type)) starVals[type]=val;
+  else starVals[type] = val;
+  document.querySelectorAll(`#stars-${type} .star-btn`).forEach((b,i)=>b.classList.toggle('on',i<val));
+  const lbl=document.getElementById('lbl-'+type);
+  if(lbl) lbl.textContent=STAR_LABELS[val]||'—';
+}
+
+function toggleTajweed() {
+  document.getElementById('tajweed-fields').style.display=document.getElementById('tajweed-toggle').checked?'block':'none';
+}
+
+let waPhone = '';
+
+function showWhatsAppPrompt(rec, sObj) {
+  const stars = n => '★'.repeat(n) + '☆'.repeat(5-n);
+  const dateStr = new Date(rec.date).toLocaleDateString('ar-EG', {weekday:'long', day:'numeric', month:'long'});
+  const phoneType = sObj.phoneType || 'ولي الأمر';
+  const nl = '\n';
+
+  let msg = 'السلام عليكم ورحمة الله وبركاته 🌿' + nl;
+  msg += phoneType + ' الطالب/ة *' + rec.student + '*' + nl + nl;
+  msg += '📅 تقرير جلسة ' + dateStr + nl;
+  msg += '─'.repeat(28) + nl + nl;
+
+  // اللوح الجديد
+  if (rec.newLoh && rec.newLoh.sura) {
+    msg += '📝 *اللوح الجديد*' + nl;
+    msg += 'سورة ' + rec.newLoh.sura + ' (' + rec.newLoh.from + '–' + rec.newLoh.to + ')' + nl;
+  }
+  if (rec.loh && rec.loh.score) {
+    msg += '⭐ تقييم اللوح: ' + rec.loh.score + '/100 ' + renderStarsHTML(rec.loh.score) + ' ' + scoreName(rec.loh.score) + nl;
+  }
+  msg += nl;
+
+  // الماضي الجديد
+  if (rec.newMadi && rec.newMadi.length) {
+    msg += '📝 *الماضي الجديد*' + nl;
+    rec.newMadi.forEach(function(m) { msg += 'سورة ' + m.sura + ' (' + m.from + '–' + m.to + ')' + nl; });
+  }
+  if (rec.madi && rec.madi.score) {
+    msg += '⭐ تقييم الماضي: ' + rec.madi.score + '/100 ' + renderStarsHTML(rec.madi.score) + ' ' + scoreName(rec.madi.score) + nl;
+  }
+  msg += nl;
+
+  if (rec.tajweed && rec.tajweed.sura) {
+    msg += '📐 *مراجعة التجويد*' + nl;
+    msg += 'سورة ' + rec.tajweed.sura + ' (' + rec.tajweed.from + '–' + rec.tajweed.to + ') ';
+    msg += rec.tajweed.score ? rec.tajweed.score + '/100 ' + renderStarsHTML(rec.tajweed.score) : stars(rec.tajweed.stars);
+    msg += nl;
+    if (rec.tajweed.note) msg += 'ملاحظة: ' + rec.tajweed.note + nl;
+    msg += nl;
+  }
+
+  if (rec.note) msg += '💬 *ملاحظة:* ' + rec.note + nl + nl;
+  msg += 'جزاكم الله خيراً 🤲';
+
+  document.getElementById('wa-preview').textContent = msg;
+  waPhone = (sObj.phonePrimary || sObj.phoneMom || '').replace(/[^0-9]/g, '');
+  if (waPhone.startsWith('0')) waPhone = '2' + waPhone;
+  document.getElementById('wa-modal').classList.add('open');
+}
+
+function sendWhatsApp() {
+  const msg = document.getElementById('wa-preview').textContent;
+  const url = `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`;
+  window.open(url, '_blank');
+  document.getElementById('wa-modal').classList.remove('open');
+}
+
+function closeWaModal(e) {
+  if (e.target === document.getElementById('wa-modal'))
+    document.getElementById('wa-modal').classList.remove('open');
+}
+
+function showToast() {
+  const t=document.getElementById('toast');
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+init();
+</script>
+</body>
+</html>
