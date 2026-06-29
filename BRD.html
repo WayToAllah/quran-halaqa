@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تحليل ومستند متطلبات — تطبيق متابعة حفظ القرآن</title>
+<style>
+  :root{
+    --green:#1a6b3a; --green-light:#e8f5ee; --gold:#c49a1a; --gold-light:#fdf7e3;
+    --text:#1a1a1a; --muted:#5a5a5a; --bg:#ffffff; --line:#e2e2e2;
+    --red:#c0392b; --red-light:#fdecea; --blue:#1565c0; --blue-light:#e8f1fb;
+    --amber:#b8860b; --amber-light:#fdf6e3;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,'Segoe UI',Tahoma,Arial,sans-serif;background:#f4f4f2;color:var(--text);line-height:1.85;padding:0}
+  .page{max-width:860px;margin:0 auto;background:var(--bg);padding:48px 40px 60px;box-shadow:0 1px 4px rgba(0,0,0,0.08)}
+  h1{font-size:28px;color:var(--green);margin-bottom:6px;font-weight:800}
+  .subtitle{color:var(--muted);font-size:15px;margin-bottom:4px}
+  .meta{color:#999;font-size:13px;margin-bottom:32px;border-bottom:2px solid var(--green);padding-bottom:20px}
+  h2{font-size:22px;color:var(--green);margin:38px 0 14px;padding-right:12px;border-right:4px solid var(--gold)}
+  h3{font-size:17px;color:var(--text);margin:22px 0 10px;font-weight:700}
+  p{margin-bottom:12px;color:#2a2a2a}
+  ul,ol{margin:0 24px 16px;padding-right:8px}
+  li{margin-bottom:8px}
+  .tag{display:inline-block;font-size:12px;font-weight:700;padding:2px 10px;border-radius:20px;margin-left:6px}
+  .tag-crit{background:#fdeaea;color:var(--red)}
+  .tag-high{background:#fff3e0;color:#e65100}
+  .tag-med{background:#fff8e1;color:var(--amber)}
+  .tag-low{background:#eef5ff;color:var(--blue)}
+  .tag-done{background:var(--green-light);color:var(--green)}
+  .box{border-radius:10px;padding:16px 20px;margin:16px 0;border-right:4px solid}
+  .box-red{background:#fdf3f3;border-color:var(--red)}
+  .box-amber{background:var(--amber-light);border-color:var(--amber)}
+  .box-blue{background:var(--blue-light);border-color:var(--blue)}
+  .box-green{background:var(--green-light);border-color:var(--green)}
+  .box h4{font-size:15px;margin-bottom:6px;font-weight:800}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}
+  th{background:var(--green);color:white;padding:10px 12px;text-align:right;font-weight:600}
+  td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:nth-child(even){background:#fafafa}
+  code{background:#f0f0f0;padding:1px 6px;border-radius:4px;font-family:'Courier New',monospace;font-size:13px;color:#c0392b;direction:ltr;display:inline-block}
+  .num{display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;background:var(--green);color:white;border-radius:50%;font-size:13px;font-weight:700;margin-left:8px}
+  .toc{background:#fafafa;border:1px solid var(--line);border-radius:10px;padding:18px 24px;margin-bottom:30px}
+  .toc h3{margin-top:0}
+  .toc ol{margin-bottom:0}
+  .toc a{color:var(--green);text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+  .priority-legend{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 24px}
+  .footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:#999;font-size:13px;text-align:center}
+  @media print{body{background:white}.page{box-shadow:none;max-width:100%}}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>📖 تطبيق متابعة حفظ القرآن</h1>
+<div class="subtitle">تحليل فني شامل + مستند متطلبات العمل (BRD)</div>
+<div class="meta">الإصدار 1.0 · تحليل بتاريخ ٢٩ يونيو ٢٠٢٦ · إعداد: مراجعة هندسية للكود</div>
+
+<div class="toc">
+<h3>المحتويات</h3>
+<ol>
+<li><a href="#overview">نظرة عامة على النظام</a></li>
+<li><a href="#bugs">المشاكل والأخطاء المكتشفة</a></li>
+<li><a href="#improvements">اقتراحات لتحسين الجودة</a></li>
+<li><a href="#ui">تحسينات واجهة المستخدم</a></li>
+<li><a href="#brd">مستند متطلبات العمل (BRD)</a></li>
+<li><a href="#roadmap">خارطة الطريق المقترحة</a></li>
+</ol>
+</div>
+
+<!-- ============ 1. OVERVIEW ============ -->
+<h2 id="overview">١. نظرة عامة على النظام</h2>
+<p>تطبيق ويب لمتابعة حلقة تحفيظ قرآن (~٥٠ طالب)، مبني كملف <code>index.html</code> واحد بدون أدوات بناء. يعمل على الموبايل بشكل أساسي.</p>
+
+<h3>البنية التقنية</h3>
+<table>
+<tr><th>المكوّن</th><th>التقنية</th><th>الدور</th></tr>
+<tr><td>الواجهة</td><td>HTML + CSS + JS خام</td><td>كل المنطق في ملف واحد</td></tr>
+<tr><td>التخزين المحلي</td><td>localStorage</td><td>المصدر الأساسي للبيانات</td></tr>
+<tr><td>قاعدة البيانات</td><td>Firebase Realtime DB</td><td>نسخ احتياطي (كتابة فقط)</td></tr>
+<tr><td>المزامنة</td><td>Google Apps Script</td><td>تصدير لجداول Google</td></tr>
+<tr><td>الاستضافة</td><td>GitHub Pages</td><td>نشر مجاني</td></tr>
+</table>
+
+<h3>منطق العمل الأساسي</h3>
+<p>كل جلسة تخزّن <strong>أمرين معاً</strong>:</p>
+<ul>
+<li><strong>تقييم المهمة السابقة</strong> (التي سُمّعت اليوم) — في <code>loh.score</code> و <code>madi.score</code></li>
+<li><strong>المهمة الجديدة</strong> (للجلسة القادمة) — في <code>newLoh</code> و <code>newMadi</code></li>
+</ul>
+<p>عند اختيار الطالب، يُحمّل التطبيق تلقائياً <code>newLoh/newMadi</code> من آخر جلسة كبنود للتقييم اليوم. هذا التصميم ذكي لكنه مصدر معظم المشاكل (الخلط بين الحقلين).</p>
+
+<!-- ============ 2. BUGS ============ -->
+<h2 id="bugs">٢. المشاكل والأخطاء المكتشفة</h2>
+
+<div class="priority-legend">
+<span class="tag tag-crit">حرجة</span>
+<span class="tag tag-high">عالية</span>
+<span class="tag tag-med">متوسطة</span>
+<span class="tag tag-low">منخفضة</span>
+<span class="tag tag-done">تم إصلاحها</span>
+</div>
+
+<div class="box box-green">
+<h4>✅ أُصلحت خلال هذه الجلسة</h4>
+<ul style="margin-bottom:0">
+<li><strong>دوال Firebase مفقودة</strong> — كانت <code>saveRecordToFirebase</code> تُستدعى دون تعريف، فيتعطّل الحفظ بالكامل بصمت (لا توست، لا واتساب).</li>
+<li><strong>عدّاد الآيات في الإحصاءات</strong> — كان يقرأ من <code>loh.from/to</code> الفارغة بدل <code>newLoh</code>، فالإحصاءات كانت صفرية.</li>
+<li><strong>اكتشاف آخر جلسة</strong> — كان الترتيب بالتاريخ/المعرّف غير دقيق فيجيب بيانات قديمة.</li>
+<li><strong>عرض النجوم</strong> — كان SVG يظهر كنص خام؛ استُبدل بطبقات CSS موثوقة.</li>
+<li><strong>السور بدون آيات</strong> — كانت تعرض <code>(–)</code>؛ الآن الاسم فقط.</li>
+</ul>
+</div>
+
+<h3>أخطاء ما زالت قائمة</h3>
+
+<div class="box box-red">
+<h4><span class="num">1</span>لا توجد قراءة من Firebase <span class="tag tag-crit">حرجة</span></h4>
+<p style="margin-bottom:0">التطبيق يكتب في Firebase لكنه لا يقرأ منه أبداً. المصدر الوحيد للبيانات هو <code>localStorage</code> المحلي. <strong>النتيجة:</strong> لو فتحت التطبيق من جهاز آخر أو مسحت الكاش، تختفي كل البيانات. الجهازان لا يتزامنان رغم وجود Firebase. هذا يُفقد الغرض من قاعدة البيانات.</p>
+</div>
+
+<div class="box box-red">
+<h4><span class="num">2</span>تكرار سجلّات Firebase <span class="tag tag-high">عالية</span></h4>
+<p style="margin-bottom:0"><code>saveRecordToFirebase</code> تستخدم <code>push()</code> دائماً، فكل تعديل يُنشئ نسخة جديدة بدل تحديث الموجود. مع الوقت تمتلئ القاعدة بسجلّات مكرّرة. كذلك لا يوجد ربط بين <code>id</code> المحلي ومفتاح Firebase.</p>
+</div>
+
+<div class="box box-amber">
+<h4><span class="num">3</span>لا يمكن تعديل أو حذف جلسة <span class="tag tag-high">عالية</span></h4>
+<p style="margin-bottom:0">بعد حفظ الجلسة لا توجد طريقة لتصحيح خطأ (درجة غلط، سورة غلط). السجل للعرض فقط. لا بد من مسح localStorage يدوياً.</p>
+</div>
+
+<div class="box box-amber">
+<h4><span class="num">4</span>لا يوجد تسجيل حضور بدون تقييم <span class="tag tag-med">متوسطة</span></h4>
+<p style="margin-bottom:0">بنية <code>attendance_only</code> موجودة في البيانات المستوردة، لكن لا توجد واجهة لتسجيل «حضور فقط» لطالب لم يُسمّع اليوم. هذا يكسر حساب نسبة الحضور للطلاب الحاضرين غير المُسمّعين.</p>
+</div>
+
+<div class="box box-amber">
+<h4><span class="num">5</span>تواريخ مثبّتة في الكود <span class="tag tag-med">متوسطة</span></h4>
+<p style="margin-bottom:0">استبعاد <code>2026-06-04</code> من حساب الأيام مكتوب يدوياً داخل الكود. أي تعديل مستقبلي على أيام الحلقة يتطلب تعديل الكود نفسه.</p>
+</div>
+
+<div class="box box-blue">
+<h4><span class="num">6</span>أمان مفاتيح Firebase <span class="tag tag-med">متوسطة</span></h4>
+<p style="margin-bottom:0">مفاتيح Firebase ظاهرة في الكود (وهذا طبيعي للويب)، لكن <strong>قواعد الأمان</strong> في Firebase يجب أن تكون مضبوطة، وإلا أي شخص يملك الرابط يقدر يقرأ/يكتب/يمسح كل البيانات. يُنصح بإضافة مصادقة (Authentication).</p>
+</div>
+
+<div class="box box-blue">
+<h4><span class="num">7</span>أسماء طلاب مكررة كمعرّف <span class="tag tag-low">منخفضة</span></h4>
+<p style="margin-bottom:0">الطالب يُعرّف بالاسم النصّي فقط. لو وُجد طالبان بنفس الاسم، تختلط بياناتهما. الأفضل معرّف فريد لكل طالب (<code>studentId</code>).</p>
+</div>
+
+<div class="box box-blue">
+<h4><span class="num">8</span>لا يوجد بحث/فلترة في السجل <span class="tag tag-low">منخفضة</span></h4>
+<p style="margin-bottom:0">السجل يعرض آخر ٤٠ جلسة فقط بدون بحث باسم الطالب أو فلترة بالتاريخ. مع تراكم البيانات يصعب الوصول لجلسة معيّنة.</p>
+</div>
+
+<!-- ============ 3. IMPROVEMENTS ============ -->
+<h2 id="improvements">٣. اقتراحات لتحسين الجودة</h2>
+
+<h3>أ. موثوقية البيانات (الأهم)</h3>
+<ul>
+<li><strong>تفعيل القراءة من Firebase عند الإقلاع</strong> مع دمج ذكي مع localStorage — يحل مشكلة تعدد الأجهزة.</li>
+<li><strong>ربط كل سجل بمفتاح Firebase</strong> وتحديثه بـ <code>set()</code> بدل <code>push()</code> المتكرر.</li>
+<li><strong>زر تصدير/استيراد نسخة احتياطية</strong> (JSON) — حماية إضافية ضد فقدان البيانات.</li>
+</ul>
+
+<h3>ب. تجربة المستخدم</h3>
+<ul>
+<li><strong>تعديل وحذف الجلسات</strong> من السجل (ضغطة مطوّلة أو زر تحرير).</li>
+<li><strong>وضع «حضور فقط» سريع</strong> لتسجيل الحاضرين بنقرة واحدة.</li>
+<li><strong>تسجيل جماعي</strong> — شاشة تعرض كل الطلاب لتحديد الحضور دفعة واحدة في بداية الحلقة.</li>
+<li><strong>بحث وفلترة</strong> في السجل والإحصاءات.</li>
+</ul>
+
+<h3>ج. جودة الكود</h3>
+<ul>
+<li><strong>تقسيم الملف</strong> إلى <code>app.js</code> + <code>styles.css</code> + <code>index.html</code> لتسهيل الصيانة (الملف الآن ١٣٠٠+ سطر).</li>
+<li><strong>توحيد منطق «السورة + المدى»</strong> في دالة واحدة (متكرر في ٤+ أماكن).</li>
+<li><strong>إزالة الكود الميت</strong> (<code>buildSuraOptions</code> فارغة، <code>starVals</code> غير مستخدمة فعلياً، نظام نجوم قديم).</li>
+<li><strong>معالجة الأخطاء</strong> حول كل عمليات localStorage وFirebase.</li>
+</ul>
+
+<!-- ============ 4. UI ============ -->
+<h2 id="ui">٤. تحسينات واجهة المستخدم</h2>
+<p>الواجهة الحالية نظيفة ومنظمة، لكن يمكن رفعها لمستوى احترافي:</p>
+<table>
+<tr><th>العنصر</th><th>الحالي</th><th>المقترح</th></tr>
+<tr><td>الهيدر</td><td>أخضر مسطّح</td><td>تدرّج لوني خفيف + ظل ناعم</td></tr>
+<tr><td>البطاقات</td><td>حدود رفيعة</td><td>ظلال أنعم + مسافات أوسع للتنفّس</td></tr>
+<tr><td>الأزرار</td><td>لون ثابت</td><td>حالات تفاعلية (ضغط، تحميل) واضحة</td></tr>
+<tr><td>التقييم</td><td>إدخال رقم + نجوم</td><td>أزرار سريعة (ممتاز/جيد) + نجوم تفاعلية</td></tr>
+<tr><td>الإحصاءات</td><td>أرقام وبطاقات</td><td>رسوم بيانية بصرية (تقدّم، اتجاهات)</td></tr>
+<tr><td>الوضع الليلي</td><td>تلقائي فقط</td><td>زر تبديل يدوي</td></tr>
+</table>
+
+<div class="box box-green">
+<h4>🎨 سأقوم بتطبيق نسخة محسّنة من الواجهة</h4>
+<p style="margin-bottom:0">سأرفع مستوى التصميم البصري (ألوان، ظلال، مسافات، تفاعلات) مع الحفاظ على نفس المنطق والوظائف، في تحديث منفصل بعد موافقتك.</p>
+</div>
+
+<!-- ============ 5. BRD ============ -->
+<h2 id="brd">٥. مستند متطلبات العمل (BRD)</h2>
+
+<h3>٥.١ الهدف من المشروع</h3>
+<p>توفير أداة رقمية بسيطة وموثوقة لمحفّظ القرآن لمتابعة تقدّم ~٥٠ طالباً في الحفظ (اللوح والماضي)، تقييم الأداء، تتبّع الحضور، وإرسال تقارير لأولياء الأمور عبر واتساب.</p>
+
+<h3>٥.٢ أصحاب المصلحة</h3>
+<table>
+<tr><th>الطرف</th><th>الدور</th><th>الاحتياج الأساسي</th></tr>
+<tr><td>المحفّظ</td><td>المستخدم الرئيسي</td><td>تسجيل سريع، متابعة دقيقة</td></tr>
+<tr><td>ولي الأمر</td><td>متلقّي التقارير</td><td>تقرير واضح ومنتظم عن ابنه</td></tr>
+<tr><td>الطالب</td><td>المستفيد</td><td>متابعة عادلة ومحفّزة</td></tr>
+</table>
+
+<h3>٥.٣ المتطلبات الوظيفية</h3>
+<table>
+<tr><th>الرقم</th><th>المتطلب</th><th>الأولوية</th><th>الحالة</th></tr>
+<tr><td>FR-01</td><td>إضافة/تعديل/حذف بيانات الطلاب</td><td>عالية</td><td>✅ مكتمل</td></tr>
+<tr><td>FR-02</td><td>تسجيل جلسة: تقييم سابق + مهمة جديدة</td><td>عالية</td><td>✅ مكتمل</td></tr>
+<tr><td>FR-03</td><td>تحميل المهمة السابقة تلقائياً للتقييم</td><td>عالية</td><td>✅ مكتمل</td></tr>
+<tr><td>FR-04</td><td>التحقق من صحة أرقام الآيات حسب السورة</td><td>عالية</td><td>✅ مكتمل</td></tr>
+<tr><td>FR-05</td><td>نظام تقييم (درجة + نجوم بصرية)</td><td>متوسطة</td><td>✅ مكتمل</td></tr>
+<tr><td>FR-06</td><td>إرسال تقرير واتساب لولي الأمر</td><td>عالية</td><td>✅ مكتمل</td></tr>
+<tr><td>FR-07</td><td>سجل الجلسات السابقة</td><td>متوسطة</td><td>✅ مكتمل</td></tr>
+<tr><td>FR-08</td><td>إحصاءات: حضور، آيات، متوسطات، متصدّرون</td><td>متوسطة</td><td>✅ مكتمل</td></tr>
+<tr><td>FR-09</td><td>مزامنة فعلية بين الأجهزة (قراءة Firebase)</td><td>عالية</td><td>❌ مطلوب</td></tr>
+<tr><td>FR-10</td><td>تعديل/حذف جلسة بعد حفظها</td><td>عالية</td><td>❌ مطلوب</td></tr>
+<tr><td>FR-11</td><td>تسجيل حضور جماعي سريع</td><td>متوسطة</td><td>❌ مطلوب</td></tr>
+<tr><td>FR-12</td><td>تصدير البيانات (Excel/CSV/JSON)</td><td>متوسطة</td><td>❌ مطلوب</td></tr>
+<tr><td>FR-13</td><td>مصادقة دخول (حماية البيانات)</td><td>عالية</td><td>❌ مطلوب</td></tr>
+<tr><td>FR-14</td><td>بحث وفلترة في السجل</td><td>منخفضة</td><td>❌ مطلوب</td></tr>
+</table>
+
+<h3>٥.٤ المتطلبات غير الوظيفية</h3>
+<table>
+<tr><th>الفئة</th><th>المتطلب</th></tr>
+<tr><td>الأداء</td><td>تحميل أقل من ثانيتين، استجابة فورية على الموبايل</td></tr>
+<tr><td>الموثوقية</td><td>عدم فقدان البيانات؛ نسخ احتياطي تلقائي</td></tr>
+<tr><td>سهولة الاستخدام</td><td>واجهة عربية RTL، تسجيل جلسة في أقل من دقيقة</td></tr>
+<tr><td>التوافق</td><td>كل المتصفحات الحديثة، iOS وAndroid</td></tr>
+<tr><td>الأمان</td><td>حماية بيانات الطلاب وأرقام التواصل</td></tr>
+<tr><td>دون اتصال</td><td>العمل بدون إنترنت (localStorage) مع مزامنة عند العودة</td></tr>
+</table>
+
+<h3>٥.٥ خارج النطاق (حالياً)</h3>
+<ul>
+<li>تطبيق جوال أصلي (Native App)</li>
+<li>حسابات متعددة للمحفّظين بصلاحيات مختلفة</li>
+<li>دفع رسوم أو إدارة مالية</li>
+<li>تكامل مع منصات تعليمية خارجية</li>
+</ul>
+
+<!-- ============ 6. ROADMAP ============ -->
+<h2 id="roadmap">٦. خارطة الطريق المقترحة</h2>
+<table>
+<tr><th>المرحلة</th><th>المحتوى</th><th>الأثر</th></tr>
+<tr><td><strong>١ — عاجل</strong></td><td>قراءة Firebase + منع التكرار + نسخة احتياطية JSON</td><td>إنقاذ البيانات والمزامنة</td></tr>
+<tr><td><strong>٢ — قريب</strong></td><td>تعديل/حذف الجلسات + حضور جماعي سريع</td><td>مرونة يومية للمحفّظ</td></tr>
+<tr><td><strong>٣ — متوسط</strong></td><td>تحسين الواجهة + رسوم بيانية + بحث وفلترة</td><td>تجربة احترافية</td></tr>
+<tr><td><strong>٤ — لاحق</strong></td><td>مصادقة دخول + تصدير Excel + معرّفات فريدة</td><td>أمان وتوسّع</td></tr>
+</table>
+
+<div class="box box-green" style="margin-top:30px">
+<h4>الخلاصة</h4>
+<p style="margin-bottom:0">التطبيق في حالة جيدة وظيفياً بعد إصلاحات اليوم. الأولوية القصوى الآن هي <strong>موثوقية البيانات</strong> (القراءة من Firebase ومنع التكرار)، يليها <strong>مرونة التعديل</strong> (تحرير/حذف الجلسات). هذه الخطوتان تحوّلان التطبيق من «أداة شخصية على جهاز واحد» إلى «نظام موثوق متعدّد الأجهزة».</p>
+</div>
+
+<div class="footer">
+تطبيق متابعة حفظ القرآن · تحليل فني ومستند متطلبات · ٢٩ يونيو ٢٠٢٦
+</div>
+
+</div>
+</body>
+</html>
