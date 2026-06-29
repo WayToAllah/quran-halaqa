@@ -144,82 +144,6 @@
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script>
-const firebaseConfig = {
-  apiKey: "AIzaSyCLzsd-tyAPKoS6HQ-Kw6LEwaxPSibbKSg",
-  authDomain: "quran-app-abe52.firebaseapp.com",
-  databaseURL: "https://quran-app-abe52-default-rtdb.firebaseio.com",
-  projectId: "quran-app-abe52",
-  storageBucket: "quran-app-abe52.firebasestorage.app",
-  messagingSenderId: "484959710944",
-  appId: "1:484959710944:web:454059b1f2136c0d73aa85"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-
-function saveRecordToFirebase(rec) {
-  try {
-    const key = 'rec_' + rec.id;
-    db.ref('records/' + key).set(rec);
-  } catch(e) { console.warn('Firebase record save failed:', e); }
-}
-
-function saveStudentToFirebase(student) {
-  try {
-    db.ref('students').orderByChild('name').equalTo(student.name)
-      .once('value', snap => {
-        if (snap.exists()) {
-          const key = Object.keys(snap.val())[0];
-          db.ref('students/' + key).set(student);
-        } else {
-          db.ref('students').push(student);
-        }
-      });
-  } catch(e) { console.warn('Firebase student save failed:', e); }
-}
-
-function loadFromFirebase() {
-  // Load records from Firebase and merge with localStorage
-  db.ref('records').once('value', snap => {
-    if (!snap.exists()) return;
-    const fbRecords = Object.values(snap.val() || {});
-    const existingIds = new Set(records.map(r => String(r.id)));
-    let added = 0;
-    fbRecords.forEach(r => {
-      if (!existingIds.has(String(r.id))) {
-        records.push(r);
-        added++;
-      }
-    });
-    if (added > 0) {
-      saveData();
-      renderLog();
-      renderStats();
-      console.log('Loaded ' + added + ' records from Firebase');
-    }
-  });
-
-  // Load students from Firebase — Firebase is source of truth
-  db.ref('students').once('value', snap => {
-    if (!snap.exists()) {
-      // No students in Firebase yet → push all local students up
-      students.forEach(s => saveStudentToFirebase(s));
-      console.log('Pushed ' + students.length + ' students to Firebase');
-      return;
-    }
-    const fbStudents = Object.values(snap.val() || {}).filter(s => s && s.name);
-    if (fbStudents.length > 0) {
-      // Replace local students with Firebase data
-      students = fbStudents;
-      saveData();
-      renderStudentSelect();
-      renderStudentList();
-      updateHeader();
-      console.log('Synced ' + fbStudents.length + ' students from Firebase');
-    }
-  });
-}
-</script>
 </head>
 <body>
 
@@ -238,14 +162,9 @@ function loadFromFirebase() {
     <input type="date" id="session-date">
   </div>
   <div class="card">
-    <div class="field" style="position:relative">
+    <div class="field">
       <label>الطالب</label>
-      <input type="text" id="student-search" placeholder="ابحث عن طالب..." autocomplete="off"
-        oninput="filterStudents()" onfocus="showStudentDropdown()" onblur="hideStudentDropdown()"
-        style="padding-left:32px">
-      <span style="position:absolute;right:12px;top:34px;font-size:15px;pointer-events:none">🔍</span>
-      <input type="hidden" id="student-select">
-      <div id="student-dropdown" style="display:none;position:absolute;top:100%;right:0;left:0;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius-sm);z-index:100;max-height:240px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.18);margin-top:2px"></div>
+      <select id="student-select" onchange="onStudentChange()"><option value="">— اختر طالباً —</option></select>
     </div>
   </div>
 
@@ -579,53 +498,6 @@ function saveData() {
   localStorage.setItem('qr_records', JSON.stringify(records));
 }
 
-// ترقية السنة الدراسية كل أول أكتوبر
-const GRADES = [
-  'الروضة الأولى',
-  'الروضة الثانية',
-  'الصف الأول الابتدائي',
-  'الصف الثاني الابتدائي',
-  'الصف الثالث الابتدائي',
-  'الصف الرابع الابتدائي',
-  'الصف الخامس الابتدائي',
-  'الصف السادس الابتدائي',
-  'الصف الأول الإعدادي',
-  'الصف الثاني الإعدادي',
-  'الصف الثالث الإعدادي',
-  'الصف الأول الثانوي',
-  'الصف الثاني الثانوي',
-  'الصف الثالث الثانوي',
-];
-
-function promoteGradesIfNeeded() {
-  const now = new Date();
-  const yearKey = 'qr_grade_promoted_' + now.getFullYear();
-  // run only on or after Oct 1 of current year, and only once per year
-  if (now.getMonth() < 9) return; // month is 0-indexed, 9 = October
-  if (localStorage.getItem(yearKey)) return;
-
-  let changed = 0;
-  students = students.map(s => {
-    const idx = GRADES.indexOf(s.grade);
-    if (idx === -1 || idx === GRADES.length - 1) return s; // not found or last grade
-    const promoted = { ...s, grade: GRADES[idx + 1] };
-    saveStudentToFirebase(promoted);
-    changed++;
-    return promoted;
-  });
-
-  if (changed > 0) {
-    saveData();
-    renderStudentList();
-    renderStudentSelect();
-    console.log('Promoted ' + changed + ' students to next grade');
-    localStorage.setItem(yearKey, '1');
-    showToast('🎓 تم ترقية ' + changed + ' طالب للسنة الدراسية الجديدة');
-  } else {
-    localStorage.setItem(yearKey, '1');
-  }
-}
-
 // السور مرتبة عكسياً (الناس أولاً)
 const SURAS_REVERSED = [...SURAS].reverse();
 
@@ -789,6 +661,7 @@ function getMadiData() {
 
 function onStudentChange() {
   const name = document.getElementById('student-select').value;
+  if (!name) { document.getElementById('prev-task-card').style.display='none'; return; }
   // find last non-attendance-only record for this student
   const recs = records.filter(r=>r.student===name && !r.attendance_only).sort((a,b)=>a.date>b.date?-1:1);
   const last = recs[0];
@@ -829,8 +702,6 @@ function init() {
   renderStudentSelect();
   renderStudentList();
   updateHeader();
-  loadFromFirebase();
-  setTimeout(promoteGradesIfNeeded, 2000); // run after Firebase loads
 }
 
 function updateHeader() {
@@ -841,62 +712,11 @@ function updateHeader() {
 function getStudentName(s) { return typeof s === 'string' ? s : s.name; }
 
 function renderStudentSelect() {
-  // just re-render dropdown if open
-  const dd = document.getElementById('student-dropdown');
-  if (dd && dd.style.display === 'block') filterStudents();
-}
-
-let studentHideTimer = null;
-
-function filterStudents() {
-  const query = document.getElementById('student-search').value.trim();
-  const filtered = query
-    ? students.filter(s => getStudentName(s).includes(query))
-    : students;
-  renderStudentDropdown(filtered);
-  showStudentDropdown();
-  // clear selection if user is typing
-  document.getElementById('student-select').value = '';
-}
-
-function renderStudentDropdown(list) {
-  const dd = document.getElementById('student-dropdown');
-  if (!list.length) {
-    dd.innerHTML = '<div style="padding:12px 14px;color:var(--text-hint);font-size:14px">لا توجد نتائج</div>';
-    return;
-  }
-  dd.innerHTML = list.map(s => {
-    const name = getStudentName(s);
-    const initials = name.trim().split(' ').slice(0,2).map(w=>w[0]).join('');
-    return `<div onmousedown="selectStudent('${name.replace(/'/g,"\\'")}')
-" style="padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);font-size:14px" 
-      onmouseover="this.style.background='var(--green-light)'" onmouseout="this.style.background=''">
-      <div style="width:30px;height:30px;border-radius:50%;background:var(--green-light);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${initials}</div>
-      <span>${name}</span>
-    </div>`;
-  }).join('');
-}
-
-function selectStudent(name) {
-  document.getElementById('student-search').value = name;
-  document.getElementById('student-select').value = name;
-  document.getElementById('student-dropdown').style.display = 'none';
-  onStudentChange();
-}
-
-function showStudentDropdown() {
-  clearTimeout(studentHideTimer);
-  const dd = document.getElementById('student-dropdown');
-  const query = document.getElementById('student-search').value.trim();
-  const filtered = query ? students.filter(s=>getStudentName(s).includes(query)) : students;
-  renderStudentDropdown(filtered);
-  dd.style.display = 'block';
-}
-
-function hideStudentDropdown() {
-  studentHideTimer = setTimeout(() => {
-    document.getElementById('student-dropdown').style.display = 'none';
-  }, 200);
+  const sel = document.getElementById('student-select');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— اختر طالباً —</option>' +
+    students.map(s => { const n=getStudentName(s); return `<option value="${n}">${n}</option>`; }).join('');
+  if (students.find(s=>getStudentName(s)===cur)) sel.value = cur;
 }
 
 function renderStudentList() {
@@ -1083,9 +903,7 @@ function saveRecord() {
 }
 
 function resetForm() {
-  // clear student search
-  const ss = document.getElementById('student-search'); if(ss) ss.value='';
-  document.getElementById('student-select').value = '';
+  // clear text inputs safely
   ['loh-from','loh-to','tajweed-from','tajweed-to','tajweed-note','general-note'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
@@ -1281,12 +1099,33 @@ function scoreToStars(score) {
   return Math.floor(scoreToHalfStars(score));
 }
 
-function renderStarsHTML(score) {
-  const half = scoreToHalfStars(score); // e.g. 3.5
+function starsText(score) {
+  const half = scoreToHalfStars(score);
   const full = Math.floor(half);
   const hasHalf = (half % 1) !== 0;
   const empty = 5 - full - (hasHalf ? 1 : 0);
   return '★'.repeat(full) + (hasHalf ? '½' : '') + '☆'.repeat(empty);
+}
+
+function renderStarsHTML(score) {
+  const half = scoreToHalfStars(score); // e.g. 3.5
+  const full = Math.floor(half);
+  const hasHalf = (half % 1) !== 0;
+  const total = 5;
+  const uid = 'sg' + Math.random().toString(36).slice(2,7);
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${total*18}" height="16" viewBox="0 0 ${total*18} 16" style="vertical-align:middle;display:inline-block">`;
+  svg += `<defs><linearGradient id="${uid}-h" x1="0" x2="1" y1="0" y2="0"><stop offset="50%" stop-color="#c49a1a"/><stop offset="50%" stop-color="#ddd"/></linearGradient></defs>`;
+  for (let i = 0; i < total; i++) {
+    const x = i * 18;
+    let fill;
+    if (i < full) fill = '#c49a1a';
+    else if (i === full && hasHalf) fill = `url(#${uid}-h)`;
+    else fill = '#ddd';
+    // star path centered in 18×16 box
+    svg += `<polygon points="9,1 11.5,6.5 17.5,7.3 13,11.5 14.2,17.5 9,14.5 3.8,17.5 5,11.5 0.5,7.3 6.5,6.5" transform="translate(${x},0) scale(0.88)" fill="${fill}"/>`;
+  }
+  svg += '</svg>';
+  return svg;
 }
 
 function scoreName(score) {
@@ -1335,48 +1174,39 @@ let waPhone = '';
 
 function showWhatsAppPrompt(rec, sObj) {
   const stars = n => '★'.repeat(n) + '☆'.repeat(5-n);
-  const dateStr = new Date(rec.date).toLocaleDateString('ar-EG', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  const dateStr = new Date(rec.date).toLocaleDateString('ar-EG', {weekday:'long', day:'numeric', month:'long'});
   const phoneType = sObj.phoneType || 'ولي الأمر';
   const nl = '\n';
 
-  // helper: show sura with ayat range only if both from and to are filled
-  function suraText(sura, from, to) {
-    if (from && to) return 'سورة ' + sura + ' (من آية ' + from + ' إلى ' + to + ')';
-    return 'سورة ' + sura;
-  }
-
-  // get first name only
-  const firstName = rec.student.trim().split(' ')[0];
-
   let msg = 'السلام عليكم ورحمة الله وبركاته 🌿' + nl;
-  msg += phoneType + ' الطالب/ة *' + firstName + '*' + nl;
-  msg += '📅 ' + dateStr + nl;
+  msg += phoneType + ' الطالب/ة *' + rec.student + '*' + nl + nl;
+  msg += '📅 تقرير جلسة ' + dateStr + nl;
   msg += '─'.repeat(28) + nl + nl;
 
   // اللوح الجديد
   if (rec.newLoh && rec.newLoh.sura) {
     msg += '📝 *اللوح الجديد*' + nl;
-    msg += suraText(rec.newLoh.sura, rec.newLoh.from, rec.newLoh.to) + nl;
+    msg += 'سورة ' + rec.newLoh.sura + ' (' + rec.newLoh.from + '–' + rec.newLoh.to + ')' + nl;
   }
   if (rec.loh && rec.loh.score) {
-    msg += '⭐ تقييم اللوح: ' + rec.loh.score + '/100 ' + renderStarsHTML(rec.loh.score) + ' ' + scoreName(rec.loh.score) + nl;
+    msg += '⭐ تقييم اللوح: ' + rec.loh.score + '/100 ' + starsText(rec.loh.score) + ' ' + scoreName(rec.loh.score) + nl;
   }
   msg += nl;
 
   // الماضي الجديد
   if (rec.newMadi && rec.newMadi.length) {
     msg += '📝 *الماضي الجديد*' + nl;
-    rec.newMadi.forEach(function(m) { msg += suraText(m.sura, m.from, m.to) + nl; });
+    rec.newMadi.forEach(function(m) { msg += 'سورة ' + m.sura + ' (' + m.from + '–' + m.to + ')' + nl; });
   }
   if (rec.madi && rec.madi.score) {
-    msg += '⭐ تقييم الماضي: ' + rec.madi.score + '/100 ' + renderStarsHTML(rec.madi.score) + ' ' + scoreName(rec.madi.score) + nl;
+    msg += '⭐ تقييم الماضي: ' + rec.madi.score + '/100 ' + starsText(rec.madi.score) + ' ' + scoreName(rec.madi.score) + nl;
   }
   msg += nl;
 
   if (rec.tajweed && rec.tajweed.sura) {
     msg += '📐 *مراجعة التجويد*' + nl;
-    msg += suraText(rec.tajweed.sura, rec.tajweed.from, rec.tajweed.to) + ' ';
-    msg += rec.tajweed.score ? rec.tajweed.score + '/100 ' + renderStarsHTML(rec.tajweed.score) : stars(rec.tajweed.stars);
+    msg += 'سورة ' + rec.tajweed.sura + ' (' + rec.tajweed.from + '–' + rec.tajweed.to + ') ';
+    msg += rec.tajweed.score ? rec.tajweed.score + '/100 ' + starsText(rec.tajweed.score) : stars(rec.tajweed.stars);
     msg += nl;
     if (rec.tajweed.note) msg += 'ملاحظة: ' + rec.tajweed.note + nl;
     msg += nl;
@@ -1403,11 +1233,10 @@ function closeWaModal(e) {
     document.getElementById('wa-modal').classList.remove('open');
 }
 
-function showToast(msg) {
+function showToast() {
   const t=document.getElementById('toast');
-  t.textContent = msg || '✓ تم الحفظ بنجاح';
   t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'),2800);
+  setTimeout(()=>t.classList.remove('show'),2200);
 }
 
 init();
