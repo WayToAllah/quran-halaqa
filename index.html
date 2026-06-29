@@ -701,16 +701,21 @@ function onStudentChange() {
   const dateStr = new Date(last.date).toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'});
   document.getElementById('prev-task-date').textContent = 'من جلسة ' + dateStr;
 
+  // helper: format sura + optional range
+  function fmtSura(sura, from, to) {
+    if (!sura) return '—';
+    return 'سورة ' + sura + (from && to ? ' (' + from + '–' + to + ')' : from ? ' (من ' + from + ')' : '');
+  }
+
   // loh info
-  document.getElementById('prev-loh-info').textContent = last.newLoh
-    ? 'سورة ' + last.newLoh.sura + ' (' + last.newLoh.from + '–' + last.newLoh.to + ')'
-    : last.loh && last.loh.sura ? 'سورة ' + last.loh.sura + ' (' + last.loh.from + '–' + last.loh.to + ')' : '—';
+  const lohSrc = last.newLoh && last.newLoh.sura ? last.newLoh : (last.loh && last.loh.sura ? last.loh : null);
+  document.getElementById('prev-loh-info').textContent = lohSrc ? fmtSura(lohSrc.sura, lohSrc.from, lohSrc.to) : '—';
 
   // madi info
   const madiArr = last.newMadi || (last.madi ? (Array.isArray(last.madi)?last.madi:[last.madi]) : []);
   const madiFiltered = madiArr.filter(m=>m.sura);
   document.getElementById('prev-madi-info').textContent = madiFiltered.length
-    ? madiFiltered.map(m=>'سورة '+m.sura+' ('+m.from+'–'+m.to+')').join(' + ')
+    ? madiFiltered.map(m => fmtSura(m.sura, m.from, m.to)).join(' + ')
     : '—';
 
   document.getElementById('prev-madi-section').style.display = madiFiltered.length ? 'block' : 'none';
