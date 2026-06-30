@@ -487,7 +487,15 @@ function applyRemoteSnapshot(onFirstSync) {
   db.ref('records').on('value', snap => {
     try {
       const remote = snap.val() || {};
-      const arr = Object.values(remote).filter(r => r && r.id != null);
+      const deletedIds = getDeletedIds();
+      let arr = Object.values(remote).filter(r => r && r.id != null && !deletedIds.has(String(r.id)));
+      // if anything we'd locally deleted is still present remotely, the delete write
+      // never landed (offline/race) — re-issue it now that we're connected again.
+      Object.values(remote).forEach(r => {
+        if (r && r.id != null && deletedIds.has(String(r.id))) {
+          db.ref('records/' + fbKey(r.id)).remove();
+        }
+      });
       if (arr.length || firstRecords) { // accept empty only as a real "no data yet" state on first load
         records = arr;
         saveData();
