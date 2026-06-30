@@ -475,43 +475,60 @@ function deleteStudentFromFirebase(name) {
   } catch(e) { console.warn('Firebase student delete error:', e); }
 }
 
-// Read everything from Firebase once at startup, merge into local data, then re-render.
+// Firebase is the source of truth once connected. We attach LIVE listeners (.on)
+// so every open device updates in real time — including deletions, which a
+// merge-only approach can never reflect (a missing key doesn't "merge away" a local item).
+let liveSyncStarted = false;
+
+function applyRemoteSnapshot(onFirstSync) {
+  let firstRecords = true, firstStudents = true;
+  const maybeFirstDone = () => { if (firstRecords===false && firstStudents===false && onFirstSync) { onFirstSync(); onFirstSync = null; } };
+
+  db.ref('records').on('value', snap => {
+    try {
+      const remote = snap.val() || {};
+      const arr = Object.values(remote).filter(r => r && r.id != null);
+      if (arr.length || firstRecords) { // accept empty only as a real "no data yet" state on first load
+        records = arr;
+        saveData();
+        refreshVisibleScreens();
+      }
+    } catch(e) { console.warn('records listener failed', e); }
+    firstRecords = false; maybeFirstDone();
+  }, err => { console.warn('Firebase records listener error', err); firstRecords = false; maybeFirstDone(); });
+
+  db.ref('students').on('value', snap => {
+    try {
+      const remote = snap.val() || {};
+      const arr = Object.values(remote).filter(s => s && s.name);
+      if (arr.length) { // never wipe local students if remote briefly looks empty
+        students = arr;
+        saveData();
+        refreshVisibleScreens();
+      }
+    } catch(e) { console.warn('students listener failed', e); }
+    firstStudents = false; maybeFirstDone();
+  }, err => { console.warn('Firebase students listener error', err); firstStudents = false; maybeFirstDone(); });
+}
+
+function refreshVisibleScreens() {
+  const curStudent = document.getElementById('student-select') ? document.getElementById('student-select').value : '';
+  renderStudentSelect();
+  if (curStudent) document.getElementById('student-select').value = curStudent;
+  renderStudentList();
+  updateHeader();
+  const active = document.querySelector('.screen.active');
+  if (active) {
+    if (active.id === 'screen-log') renderLog();
+    else if (active.id === 'screen-stats') renderStats();
+  }
+  if (curStudent) onStudentChange();
+}
+
 function syncFromFirebase(onDone) {
-  let pending = 2;
-  const finish = () => { if (--pending === 0 && onDone) onDone(); };
-
-  // ---- records ----
-  db.ref('records').once('value', snap => {
-    try {
-      const remote = snap.val() || {};
-      const localById = {};
-      records.forEach(r => { localById[String(r.id)] = r; });
-      Object.values(remote).forEach(r => {
-        if (!r || r.id == null) return;
-        localById[String(r.id)] = r; // remote wins on conflict (last synced)
-      });
-      records = Object.values(localById);
-      saveData();
-    } catch(e) { console.warn('merge records failed', e); }
-    finish();
-  }, err => { console.warn('Firebase read records failed', err); finish(); });
-
-  // ---- students ----
-  db.ref('students').once('value', snap => {
-    try {
-      const remote = snap.val() || {};
-      const byName = {};
-      students.forEach(s => { byName[getStudentName(s)] = s; });
-      Object.values(remote).forEach(s => {
-        if (!s || !s.name) return;
-        byName[s.name] = s; // remote wins
-      });
-      const merged = Object.values(byName);
-      if (merged.length) students = merged;
-      saveData();
-    } catch(e) { console.warn('merge students failed', e); }
-    finish();
-  }, err => { console.warn('Firebase read students failed', err); finish(); });
+  if (liveSyncStarted) { if (onDone) onDone(); return; }
+  liveSyncStarted = true;
+  applyRemoteSnapshot(onDone);
 }
 
 const STAR_LABELS = ['','ضعيف','مقبول','جيد','جيد جداً','ممتاز'];
@@ -827,24 +844,10 @@ function init() {
   renderStudentList();
   updateHeader();
 
-  // Pull latest from Firebase, then refresh everything visible
+  // Start live sync — every connected device now updates in real time (including deletions)
   const sub = document.getElementById('header-sub');
   if (sub) sub.textContent = 'جاري المزامنة…';
-  syncFromFirebase(() => {
-    const curStudent = document.getElementById('student-select').value;
-    renderStudentSelect();
-    if (curStudent) document.getElementById('student-select').value = curStudent;
-    renderStudentList();
-    updateHeader();
-    // refresh whichever screen is active
-    const active = document.querySelector('.screen.active');
-    if (active) {
-      if (active.id === 'screen-log') renderLog();
-      else if (active.id === 'screen-stats') renderStats();
-    }
-    // refresh prev-task card if a student is selected
-    if (curStudent) onStudentChange();
-  });
+  syncFromFirebase(refreshVisibleScreens);
 }
 
 function updateHeader() {
