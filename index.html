@@ -165,6 +165,9 @@
   .stars-pct { font-size:14px; font-weight:800; color:#fff; background:rgba(255,255,255,0.2); padding:3px 10px; border-radius:20px; flex-shrink:0; }
   .stars-card-footer { margin-top:18px; font-size:12px; opacity:0.88; position:relative; }
   .attend-badge { font-size:13px; margin-right:4px; }
+  .attend-badge.attend-badge-num { font-size:10px; font-weight:800; padding:2px 6px; border-radius:9px; background:var(--gold-light); color:#7a5f00; vertical-align:middle; }
+  .leader-rank.num { font-size:14px; font-weight:800; color:var(--text-muted); }
+  .stars-rank.num-rank { font-size:14px; font-weight:800; }
 
   select option { direction:rtl; }
   .fab { position:fixed; left:16px; bottom:94px; width:56px; height:56px; border-radius:18px; background:linear-gradient(135deg,var(--green),var(--green-deep)); color:white; font-size:28px; border:none; cursor:pointer; display:none; align-items:center; justify-content:center; box-shadow:0 6px 18px rgba(21,97,58,0.36); z-index:60; line-height:1; transition:transform 0.15s; }
@@ -902,16 +905,43 @@ function getAttendanceRanking(limit) {
     const attendPct = totalHalaqaDays > 0 ? Math.min(100, Math.round(uniqueDays/totalHalaqaDays*100)) : 0;
     return {name, uniqueDays, attendPct};
   }).filter(Boolean);
-  per.sort((a,b)=>b.attendPct-a.attendPct||b.uniqueDays-a.uniqueDays);
-  return { totalHalaqaDays, list: limit ? per.slice(0,limit) : per };
+  // ترتيب تنازلي؛ الأيام الفريدة والاسم معيار ثانوي للترتيب البصري فقط (مش للمركز)
+  per.sort((a,b)=> b.attendPct-a.attendPct || b.uniqueDays-a.uniqueDays || a.name.localeCompare(b.name,'ar'));
+  // حساب المركز: الطلاب اللي عندهم نفس نسبة الحضور ياخدوا نفس المركز (ترتيب تنافسي قياسي)
+  let rank = 0, prevPct = null;
+  per.forEach((x, idx) => {
+    if (x.attendPct !== prevPct) { rank = idx + 1; prevPct = x.attendPct; }
+    x.rank = rank;
+  });
+  // عند وجود حد أقصى: بناخد كل الطلاب اللي مركزهم ضمن الحد، حتى لو ده معناه تضمين متعادلين زيادة عن العدد المطلوب
+  const list = limit ? per.filter(x => x.rank <= limit) : per;
+  return { totalHalaqaDays, list };
+}
+
+function rankBadgeHTML(rank) {
+  if (rank === 1) return '👑';
+  if (rank === 2) return '🥈';
+  if (rank === 3) return '🥉';
+  return String(rank);
+}
+
+function rankClass(rank) {
+  if (rank === 1) return 'gold';
+  if (rank === 2) return 'silver';
+  if (rank === 3) return 'bronze';
+  return 'num';
+}
+
+function attendBadgeHTML(rank) {
+  if (rank <= 3) return `<span class="attend-badge" title="المركز ${rank} في الحضور">${rankBadgeHTML(rank)}</span>`;
+  return `<span class="attend-badge attend-badge-num" title="المركز ${rank} في الحضور">#${rank}</span>`;
 }
 
 function renderStudentList() {
   const el = document.getElementById('students-list');
   if (!students.length) { el.innerHTML = '<div class="empty-state">لا يوجد طلاب بعد</div>'; return; }
-  const topBadges = {};
-  const RANK_BADGES = ['👑','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
-  getAttendanceRanking(10).list.forEach((x,i)=>{ topBadges[x.name] = RANK_BADGES[i]; });
+  const topRanks = {};
+  getAttendanceRanking(15).list.forEach(x => { topRanks[x.name] = x.rank; });
   el.innerHTML = students.map((s,i) => {
     const name = getStudentName(s);
     const age = s.age ? s.age + ' سنة' : '';
@@ -924,7 +954,7 @@ function renderStudentList() {
     const phoneType = s.phoneType || (s.phoneMom ? 'أم' : 'أب');
     const phoneMom = primary ? `<span style="font-size:11px;color:var(--text-hint)">${phoneType}: ${primary}</span>` : '';
     const phoneDad = (s.phoneSecondary||s.phoneDad) ? `<span style="font-size:11px;color:var(--text-hint);margin-right:8px">ثانوي: ${s.phoneSecondary||s.phoneDad}</span>` : '';
-    const badge = topBadges[name] ? `<span class="attend-badge" title="من الأكثر حضوراً">${topBadges[name]}</span>` : '';
+    const badge = topRanks[name] ? attendBadgeHTML(topRanks[name]) : '';
     return `<div class="student-row">
       <div class="student-avatar">${initials}</div>
       <div class="student-info" onclick="openStudentModal('${s.id}')">
@@ -1293,19 +1323,17 @@ function renderStats() {
       <div style="font-size:16px;font-weight:700;color:var(--gold)">${x.ayat}</div>
     </div>`).join(''); }
 
-  // top 10 أكثر حضوراً
-  const topAttend = [...per].sort((a,b)=>b.attendPct-a.attendPct||b.uniqueDays-a.uniqueDays).slice(0,10);
+  // أعلى 15 حضوراً (مع مشاركة نفس المركز عند تساوي النسبة)
+  const topAttend = getAttendanceRanking(15).list;
   const topAttendEl = document.getElementById('top-attend-list');
   if (!topAttend.length) { topAttendEl.innerHTML='<div class="empty-state">لا يوجد بيانات</div>'; }
   else {
-    const RANK_CLASS2=['gold','silver','bronze'];
-    const RANK_ICONS=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
-    topAttendEl.innerHTML = topAttend.map((x,i)=>`
+    topAttendEl.innerHTML = topAttend.map(x=>`
     <div class="leader-card">
-      <div class="leader-rank ${RANK_CLASS2[i]||''}">${RANK_ICONS[i]}</div>
+      <div class="leader-rank ${rankClass(x.rank)}">${rankBadgeHTML(x.rank)}</div>
       <div style="flex:1">
         <div class="student-name-main">${x.name}</div>
-        <div class="student-meta-line">${x.uniqueDays} يوم حضور من ${totalHalaqaDays}</div>
+        <div class="student-meta-line">المركز ${x.rank} · ${x.uniqueDays} يوم حضور من ${totalHalaqaDays}</div>
       </div>
       <div style="font-size:16px;font-weight:700;color:var(--green)">${x.attendPct}%</div>
     </div>`).join('');
@@ -1592,13 +1620,12 @@ function closeWaModal(e) {
 
 /* ---- نجوم الحضور ---- */
 function openStarsCard() {
-  const { list, totalHalaqaDays } = getAttendanceRanking(10);
+  const { list, totalHalaqaDays } = getAttendanceRanking(15);
   if (!list.length) { alert('لا يوجد بيانات حضور كافية بعد'); return; }
   const monthLabel = new Date().toLocaleDateString('ar-EG', {month:'long', year:'numeric'});
-  const RANKS = ['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
-  const rowsHtml = list.map((x,i)=>`
+  const rowsHtml = list.map(x=>`
     <div class="stars-row-item">
-      <div class="stars-rank">${RANKS[i]}</div>
+      <div class="stars-rank">${rankBadgeHTML(x.rank)}</div>
       <div class="stars-name">${x.name}</div>
       <div class="stars-pct">${x.attendPct}%</div>
     </div>`).join('');
@@ -1618,11 +1645,10 @@ function closeStarsModal(e) {
 
 function shareStarsWhatsApp() {
   if (!starsCardData) return;
-  const RANKS = ['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
   let msg = 'السلام عليكم ورحمة الله وبركاته 🌿\n';
   msg += '🌟 *نجوم الحضور* — ' + starsCardData.monthLabel + '\n';
   msg += '─'.repeat(18) + '\n\n';
-  starsCardData.list.forEach((x,i)=>{ msg += RANKS[i] + ' ' + x.name + ' — ' + x.attendPct + '%\n'; });
+  starsCardData.list.forEach(x=>{ msg += rankBadgeHTML(x.rank) + ' ' + x.name + ' — ' + x.attendPct + '%\n'; });
   msg += '\nجزاكم الله خيراً 🤲';
   const url = 'https://wa.me/?text=' + encodeURIComponent(msg);
   window.open(url, '_blank');
