@@ -426,18 +426,11 @@
         <input type="text" id="modal-school" placeholder="اسم المدرسة">
       </div>
       <div class="field">
-        <label>📱 رقم التواصل الأساسي</label>
-        <div style="display:flex;gap:8px">
-          <select id="modal-phone-type" style="width:110px;font-size:14px;padding:10px 8px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);font-family:inherit;appearance:none;flex-shrink:0">
-            <option value="أم">أم</option>
-            <option value="أب">أب</option>
-            <option value="ولي أمر">ولي أمر</option>
-          </select>
-          <input type="tel" id="modal-phone-primary" placeholder="01XXXXXXXXX" dir="ltr" style="flex:1">
-        </div>
+        <label>📱 رقم الواتساب</label>
+        <input type="tel" id="modal-phone-primary" placeholder="01XXXXXXXXX" dir="ltr">
       </div>
       <div class="field">
-        <label>📱 رقم ثانوي <span style="color:var(--text-hint);font-size:11px">اختياري</span></label>
+        <label>📱 رقم الشخص المتابع <span style="color:var(--text-hint);font-size:11px">اختياري</span></label>
         <input type="tel" id="modal-phone-secondary" placeholder="01XXXXXXXXX" dir="ltr">
       </div>
     </div>
@@ -1000,9 +993,8 @@ function renderStudentList() {
     const count = records.filter(r=>r.student===name).length;
     const initials = name.trim().split(' ').slice(0,2).map(w=>w[0]).join('');
     const primary = s.phonePrimary || s.phoneMom || '';
-    const phoneType = s.phoneType || (s.phoneMom ? 'أم' : 'أب');
-    const phoneMom = primary ? `<span style="font-size:11px;color:var(--text-hint)">${phoneType}: ${primary}</span>` : '';
-    const phoneDad = (s.phoneSecondary||s.phoneDad) ? `<span style="font-size:11px;color:var(--text-hint);margin-right:8px">ثانوي: ${s.phoneSecondary||s.phoneDad}</span>` : '';
+    const phoneMom = primary ? `<span style="font-size:11px;color:var(--text-hint)">واتساب: ${primary}</span>` : '';
+    const phoneDad = (s.phoneSecondary||s.phoneDad) ? `<span style="font-size:11px;color:var(--text-hint);margin-right:8px">متابع: ${s.phoneSecondary||s.phoneDad}</span>` : '';
     const badge = topRanks[name] ? attendBadgeHTML(topRanks[name]) : '';
     return `<div class="student-row">
       <div class="student-avatar">${initials}</div>
@@ -1031,12 +1023,10 @@ function openStudentModal(id) {
     document.getElementById('modal-age').value = s.age || '';
     document.getElementById('modal-grade').value = s.grade || '';
     document.getElementById('modal-school').value = s.school || '';
-    document.getElementById('modal-phone-type').value = s.phoneType || 'أم';
     document.getElementById('modal-phone-primary').value = s.phonePrimary || s.phoneMom || '';
     document.getElementById('modal-phone-secondary').value = s.phoneSecondary || s.phoneDad || '';
   } else {
     ['modal-name','modal-age','modal-school','modal-phone-primary','modal-phone-secondary'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('modal-phone-type').value = 'أم';
     document.getElementById('modal-grade').value = '';
   }
   modal.classList.add('open');
@@ -1062,7 +1052,6 @@ function saveStudentModal() {
     age: document.getElementById('modal-age').value || '',
     grade: document.getElementById('modal-grade').value || '',
     school: document.getElementById('modal-school').value.trim(),
-    phoneType: document.getElementById('modal-phone-type').value,
     phonePrimary: document.getElementById('modal-phone-primary').value.trim(),
     phoneSecondary: document.getElementById('modal-phone-secondary').value.trim(),
   };
