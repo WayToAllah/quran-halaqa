@@ -127,6 +127,30 @@
   .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 14px; text-align:center; box-shadow:var(--shadow-sm); }
   .stat-num { font-size:28px; font-weight:800; color:var(--green); letter-spacing:-0.02em; }
   .stat-lbl { font-size:12px; color:var(--text-muted); margin-top:4px; font-weight:500; }
+  .stat-icon { font-size:17px; margin-bottom:5px; opacity:0.85; }
+  .chart-wrap { padding:4px 0 0; }
+  .bar-chart { display:flex; align-items:flex-end; gap:6px; height:112px; padding:0 2px; overflow-x:auto; }
+  .bar-chart .bar-col { flex:1; min-width:26px; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; gap:6px; }
+  .bar-chart .bar { width:100%; max-width:22px; border-radius:6px 6px 3px 3px; background:linear-gradient(180deg,var(--gold-soft),var(--gold)); min-height:4px; transition:height 0.5s ease; }
+  .bar-chart .bar-label { font-size:10px; color:var(--text-hint); white-space:nowrap; }
+  .bar-chart .bar-value { font-size:11px; color:var(--text-muted); font-weight:700; }
+  .dist-row { display:flex; align-items:center; gap:10px; margin-bottom:11px; }
+  .dist-row:last-child { margin-bottom:0; }
+  .dist-label { font-size:12px; color:var(--text-muted); width:62px; flex-shrink:0; font-weight:500; }
+  .dist-track { flex:1; background:var(--bg); border-radius:6px; height:10px; overflow:hidden; }
+  .dist-fill { height:100%; border-radius:6px; transition:width 0.5s ease; }
+  .dist-count { font-size:12px; color:var(--text-hint); width:24px; text-align:left; flex-shrink:0; }
+  .leader-card { display:flex; align-items:center; gap:12px; padding:11px 0; border-bottom:1px solid var(--border); }
+  .leader-card:last-child { border-bottom:none; }
+  .leader-rank { width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; background:var(--bg); }
+  .leader-rank.gold { background:linear-gradient(135deg,#f6e0a0,#d4a82c); }
+  .leader-rank.silver { background:linear-gradient(135deg,#e6eae7,#b8bfba); }
+  .leader-rank.bronze { background:linear-gradient(135deg,#e8bd97,#b87840); }
+  .stats-search { width:100%; padding:10px 12px; border:1px solid var(--border-strong); border-radius:var(--radius-sm); background:var(--bg); font-size:14px; font-family:inherit; margin-bottom:10px; color:var(--text); }
+  .stats-search:focus { outline:none; border-color:var(--green); background:var(--surface); }
+  .sort-tabs { display:flex; gap:6px; margin-bottom:12px; overflow-x:auto; padding-bottom:2px; }
+  .sort-tab { flex-shrink:0; padding:7px 14px; border-radius:20px; border:1px solid var(--border-strong); background:var(--bg); font-size:12px; color:var(--text-muted); cursor:pointer; font-family:inherit; white-space:nowrap; }
+  .sort-tab.active { background:var(--green); color:white; border-color:var(--green); font-weight:600; }
 
   select option { direction:rtl; }
   .fab { position:fixed; left:16px; bottom:94px; width:56px; height:56px; border-radius:18px; background:linear-gradient(135deg,var(--green),var(--green-deep)); color:white; font-size:28px; border:none; cursor:pointer; display:none; align-items:center; justify-content:center; box-shadow:0 6px 18px rgba(21,97,58,0.36); z-index:60; line-height:1; transition:transform 0.15s; }
@@ -316,6 +340,17 @@
 <!-- Stats screen -->
 <div id="screen-stats" class="screen">
   <div class="stat-grid" id="stat-grid"></div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title"><div class="dot" style="background:var(--gold)"></div> 📈 النشاط الأسبوعي</div>
+    <div class="chart-wrap" id="weekly-chart"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title"><div class="dot" style="background:#7a5fb8"></div> 🎯 توزيع مستويات التقييم</div>
+    <div id="score-distribution"></div>
+  </div>
+
   <div class="card" style="margin-bottom:12px">
     <div class="card-title"><div class="dot" style="background:#c49a1a"></div> 🏆 الأكثر تسميعاً للآيات</div>
     <div id="top-ayat-list"></div>
@@ -326,6 +361,13 @@
   </div>
   <div class="card">
     <div class="card-title"><div class="dot"></div> تفصيل الطلاب</div>
+    <input type="text" class="stats-search" id="stats-search" placeholder="🔍 ابحث عن طالب..." oninput="renderStudentStatsList()">
+    <div class="sort-tabs" id="stats-sort-tabs">
+      <button class="sort-tab active" data-sort="attend" onclick="setStatsSort('attend',this)">الحضور</button>
+      <button class="sort-tab" data-sort="ayat" onclick="setStatsSort('ayat',this)">الآيات</button>
+      <button class="sort-tab" data-sort="avg" onclick="setStatsSort('avg',this)">التقييم</button>
+      <button class="sort-tab" data-sort="name" onclick="setStatsSort('name',this)">الاسم</button>
+    </div>
     <div id="student-stats-list"></div>
   </div>
 </div>
@@ -597,6 +639,7 @@ const SURAS = [
 
 
 let students = [], records = [], starVals = {loh:0, tajweed:0}, starScores = {loh:0, tajweed:0, 'prev-loh':0, 'prev-madi':0};
+let statsPer = [], statsTotalDays = 0, statsSortKey = 'attend';
 let madiRows = []; // [{id, stars}]
 let editingRecordId = null; // when set, saveRecord updates this record instead of creating new
 let madiRowCount = 0;
@@ -1148,12 +1191,15 @@ function renderStats() {
   const totalHalaqaDays = new Set(records.map(r=>r.date).filter(d => d && d !== '2026-06-04')).size;
 
   document.getElementById('stat-grid').innerHTML = `
-    <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-lbl">جلسة مسجلة</div></div>
-    <div class="stat-card"><div class="stat-num">${uniq}</div><div class="stat-lbl">طالب نشط</div></div>
-    <div class="stat-card"><div class="stat-num">${totalAyat.toLocaleString()}</div><div class="stat-lbl">إجمالي الآيات</div></div>
-    <div class="stat-card"><div class="stat-num">${avgL}%</div><div class="stat-lbl">متوسط اللوح</div></div>
-    <div class="stat-card"><div class="stat-num">${lohAyat.toLocaleString()}</div><div class="stat-lbl">آيات لوح</div></div>
-    <div class="stat-card"><div class="stat-num">${madiAyat.toLocaleString()}</div><div class="stat-lbl">آيات ماضي</div></div>`;
+    <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-num">${total}</div><div class="stat-lbl">جلسة مسجلة</div></div>
+    <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-num">${uniq}</div><div class="stat-lbl">طالب نشط</div></div>
+    <div class="stat-card"><div class="stat-icon">📖</div><div class="stat-num">${totalAyat.toLocaleString()}</div><div class="stat-lbl">إجمالي الآيات</div></div>
+    <div class="stat-card"><div class="stat-icon">⭐</div><div class="stat-num">${avgL}%</div><div class="stat-lbl">متوسط اللوح</div></div>
+    <div class="stat-card"><div class="stat-icon">📝</div><div class="stat-num">${lohAyat.toLocaleString()}</div><div class="stat-lbl">آيات لوح</div></div>
+    <div class="stat-card"><div class="stat-icon">🔄</div><div class="stat-num">${madiAyat.toLocaleString()}</div><div class="stat-lbl">آيات ماضي</div></div>`;
+
+  renderWeeklyChart();
+  renderScoreDistribution();
 
   // بيانات كل طالب
   const per = students.map(s=>{
@@ -1180,43 +1226,119 @@ function renderStats() {
   const MEDALS = ['🥇','🥈','🥉'];
   const topAyatEl = document.getElementById('top-ayat-list');
   if (!topAyat.length) { topAyatEl.innerHTML='<div class="empty-state">لا يوجد بيانات</div>'; }
-  else { topAyatEl.innerHTML = topAyat.map((x,i)=>`
-    <div class="student-row" style="cursor:default">
-      <div style="font-size:24px;width:36px;text-align:center;flex-shrink:0">${MEDALS[i]}</div>
+  else { const RANK_CLASS=['gold','silver','bronze']; topAyatEl.innerHTML = topAyat.map((x,i)=>`
+    <div class="leader-card">
+      <div class="leader-rank ${RANK_CLASS[i]}">${MEDALS[i]}</div>
       <div style="flex:1">
         <div class="student-name-main">${x.name}</div>
         <div class="student-meta-line">${x.ayat} آية مسمّعة · ${x.count} جلسة</div>
       </div>
-      <div style="font-size:15px;font-weight:600;color:var(--gold)">${x.ayat}</div>
+      <div style="font-size:16px;font-weight:700;color:var(--gold)">${x.ayat}</div>
     </div>`).join(''); }
 
   // top 3 أكثر حضوراً
   const topAttend = [...per].sort((a,b)=>b.attendPct-a.attendPct||b.uniqueDays-a.uniqueDays).slice(0,3);
   const topAttendEl = document.getElementById('top-attend-list');
   if (!topAttend.length) { topAttendEl.innerHTML='<div class="empty-state">لا يوجد بيانات</div>'; }
-  else { topAttendEl.innerHTML = topAttend.map((x,i)=>`
-    <div class="student-row" style="cursor:default">
-      <div style="font-size:24px;width:36px;text-align:center;flex-shrink:0">${MEDALS[i]}</div>
+  else { const RANK_CLASS2=['gold','silver','bronze']; topAttendEl.innerHTML = topAttend.map((x,i)=>`
+    <div class="leader-card">
+      <div class="leader-rank ${RANK_CLASS2[i]}">${MEDALS[i]}</div>
       <div style="flex:1">
         <div class="student-name-main">${x.name}</div>
         <div class="student-meta-line">${x.uniqueDays} يوم حضور من ${totalHalaqaDays}</div>
       </div>
-      <div style="font-size:15px;font-weight:700;color:var(--green)">${x.attendPct}%</div>
+      <div style="font-size:16px;font-weight:700;color:var(--green)">${x.attendPct}%</div>
     </div>`).join(''); }
 
-  // جدول تفصيلي مرتب بنسبة الحضور
-  const sorted = [...per].sort((a,b)=>b.attendPct-a.attendPct);
-  const el = document.getElementById('student-stats-list');
-  if (!sorted.length) { el.innerHTML='<div class="empty-state">لا يوجد بيانات بعد</div>'; return; }
+  // تخزين بيانات الطلاب عالمياً للبحث والترتيب
+  statsPer = per;
+  statsTotalDays = totalHalaqaDays;
+  renderStudentStatsList();
+}
 
-  // progress bar color
+function getWeekStart(dateStr) {
+  const d = new Date(dateStr+'T00:00:00');
+  const day = d.getDay();
+  d.setDate(d.getDate()-day);
+  return d.toISOString().slice(0,10);
+}
+
+function renderWeeklyChart() {
+  const el = document.getElementById('weekly-chart');
+  const dated = records.filter(r=>r.date);
+  if (!dated.length) { el.innerHTML = '<div class="empty-state">لا يوجد بيانات</div>'; return; }
+  const counts = {};
+  dated.forEach(r => { const wk = getWeekStart(r.date); counts[wk] = (counts[wk]||0) + 1; });
+  const weeks = Object.keys(counts).sort().slice(-8);
+  const max = Math.max(...weeks.map(w=>counts[w]), 1);
+  el.innerHTML = '<div class="bar-chart">' + weeks.map(w=>{
+    const val = counts[w];
+    const h = Math.max(6, Math.round(val/max*100));
+    const d = new Date(w+'T00:00:00');
+    const lbl = d.toLocaleDateString('ar-EG',{day:'numeric',month:'numeric'});
+    return `<div class="bar-col">
+      <div class="bar-value">${val}</div>
+      <div class="bar" style="height:${h}%"></div>
+      <div class="bar-label">${lbl}</div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+function renderScoreDistribution() {
+  const el = document.getElementById('score-distribution');
+  const order = ['ممتاز','جيد جداً','جيد','مقبول','إعادة'];
+  const colors = {'ممتاز':'var(--green)','جيد جداً':'#3d8f5f','جيد':'var(--gold)','مقبول':'#d4901e','إعادة':'var(--red)'};
+  const buckets = {'ممتاز':0,'جيد جداً':0,'جيد':0,'مقبول':0,'إعادة':0};
+  let total = 0;
+  records.forEach(r=>{
+    [r.loh, r.madi, r.tajweed].forEach(obj=>{
+      if (obj && obj.score) {
+        const name = scoreName(obj.score);
+        if (name && buckets.hasOwnProperty(name)) { buckets[name]++; total++; }
+      }
+    });
+  });
+  if (!total) { el.innerHTML = '<div class="empty-state">لا يوجد تقييمات مسجلة بعد</div>'; return; }
+  el.innerHTML = order.map(label=>{
+    const count = buckets[label];
+    const pct = total ? Math.round(count/total*100) : 0;
+    return `<div class="dist-row">
+      <div class="dist-label">${label}</div>
+      <div class="dist-track"><div class="dist-fill" style="width:${pct}%;background:${colors[label]}"></div></div>
+      <div class="dist-count">${count}</div>
+    </div>`;
+  }).join('');
+}
+
+function setStatsSort(key, btn) {
+  statsSortKey = key;
+  document.querySelectorAll('#stats-sort-tabs .sort-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderStudentStatsList();
+}
+
+function renderStudentStatsList() {
+  const el = document.getElementById('student-stats-list');
+  if (!el) return;
+  const searchEl = document.getElementById('stats-search');
+  const q = searchEl ? searchEl.value.trim() : '';
+  let list = statsPer.filter(x => !q || x.name.includes(q));
+  const sortFns = {
+    attend: (a,b)=>b.attendPct-a.attendPct,
+    ayat: (a,b)=>b.ayat-a.ayat,
+    avg: (a,b)=>b.avg-a.avg,
+    name: (a,b)=>a.name.localeCompare(b.name,'ar')
+  };
+  list = [...list].sort(sortFns[statsSortKey] || sortFns.attend);
+  if (!list.length) { el.innerHTML = '<div class="empty-state">لا يوجد بيانات مطابقة</div>'; return; }
+
   function barColor(pct) {
     if (pct >= 80) return 'var(--green)';
     if (pct >= 50) return 'var(--gold)';
     return 'var(--red)';
   }
 
-  el.innerHTML = sorted.map(x=>`
+  el.innerHTML = list.map(x=>`
     <div style="padding:12px 0; border-bottom:1px solid var(--border)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <div class="student-name-main">${x.name}</div>
@@ -1225,7 +1347,7 @@ function renderStats() {
       <div style="background:var(--border);border-radius:4px;height:6px;margin-bottom:6px">
         <div style="background:${barColor(x.attendPct)};height:6px;border-radius:4px;width:${x.attendPct}%;transition:width 0.4s"></div>
       </div>
-      <div class="student-meta-line">${x.uniqueDays}/${totalHalaqaDays} يوم · ${x.ayat} آية · متوسط ${x.avg}%</div>
+      <div class="student-meta-line">${x.uniqueDays}/${statsTotalDays} يوم · ${x.ayat} آية · متوسط ${x.avg}%</div>
     </div>`).join('');
 }
 
