@@ -1321,6 +1321,13 @@ let waPhone = '';
 
 function ayahRange(from, to) { return (from && to) ? ' (' + from + '–' + to + ')' : from ? ' (من ' + from + ')' : ''; }
 
+// Joins multiple sura entries Arabic-style: "الناس والفلق" / "الناس، الفلق، والإخلاص"
+function joinSuraNames(list) {
+  const parts = list.map(m => m.sura + ayahRange(m.from, m.to));
+  if (parts.length === 1) return parts[0];
+  return parts.slice(0, -1).join('، ') + ' و' + parts[parts.length - 1];
+}
+
 function showWhatsAppPrompt(rec, sObj) {
   const stars = n => '★'.repeat(n) + '☆'.repeat(5-n);
   const dateStr = new Date(rec.date).toLocaleDateString('ar-EG', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
@@ -1343,20 +1350,18 @@ function showWhatsAppPrompt(rec, sObj) {
   if (todayLoh || todayMadi || (rec.loh && rec.loh.score) || (rec.madi && rec.madi.score)) {
     msg += '📖 *ما تم تسميعه اليوم*' + nl;
     if (todayLoh) {
-      msg += '• لوح: سورة ' + todayLoh.sura + ayahRange(todayLoh.from, todayLoh.to);
+      msg += '• اللوح: ' + todayLoh.sura + ayahRange(todayLoh.from, todayLoh.to);
       if (rec.loh && rec.loh.score) msg += '  ←  ' + rec.loh.score + '/100 ' + starsText(rec.loh.score) + ' ' + scoreName(rec.loh.score);
       msg += nl;
     } else if (rec.loh && rec.loh.score) {
-      msg += '• لوح: ' + rec.loh.score + '/100 ' + starsText(rec.loh.score) + ' ' + scoreName(rec.loh.score) + nl;
+      msg += '• اللوح: ' + rec.loh.score + '/100 ' + starsText(rec.loh.score) + ' ' + scoreName(rec.loh.score) + nl;
     }
     if (todayMadi) {
-      todayMadi.forEach(function(m) {
-        msg += '• ماضي: سورة ' + m.sura + ayahRange(m.from, m.to);
-        if (rec.madi && rec.madi.score) msg += '  ←  ' + rec.madi.score + '/100 ' + starsText(rec.madi.score) + ' ' + scoreName(rec.madi.score);
-        msg += nl;
-      });
+      msg += '• الماضي: ' + joinSuraNames(todayMadi);
+      if (rec.madi && rec.madi.score) msg += '  ←  ' + rec.madi.score + '/100 ' + starsText(rec.madi.score) + ' ' + scoreName(rec.madi.score);
+      msg += nl;
     } else if (rec.madi && rec.madi.score) {
-      msg += '• ماضي: ' + rec.madi.score + '/100 ' + starsText(rec.madi.score) + ' ' + scoreName(rec.madi.score) + nl;
+      msg += '• الماضي: ' + rec.madi.score + '/100 ' + starsText(rec.madi.score) + ' ' + scoreName(rec.madi.score) + nl;
     }
     msg += nl;
   }
@@ -1364,7 +1369,7 @@ function showWhatsAppPrompt(rec, sObj) {
   // التجويد
   if (rec.tajweed && rec.tajweed.sura) {
     msg += '📐 *التجويد*' + nl;
-    msg += '• سورة ' + rec.tajweed.sura + ' (' + rec.tajweed.from + '–' + rec.tajweed.to + ')';
+    msg += '• ' + rec.tajweed.sura + ' (' + rec.tajweed.from + '–' + rec.tajweed.to + ')';
     msg += rec.tajweed.score ? '  ←  ' + rec.tajweed.score + '/100 ' + starsText(rec.tajweed.score) + ' ' + scoreName(rec.tajweed.score) : '  ' + stars(rec.tajweed.stars);
     msg += nl;
     if (rec.tajweed.note) msg += '• ملاحظة: ' + rec.tajweed.note + nl;
@@ -1376,12 +1381,10 @@ function showWhatsAppPrompt(rec, sObj) {
   if (hasNewTask) {
     msg += '📝 *المهمة الجديدة للجلسة القادمة*' + nl;
     if (rec.newLoh && rec.newLoh.sura) {
-      msg += '• لوح: سورة ' + rec.newLoh.sura + ayahRange(rec.newLoh.from, rec.newLoh.to) + nl;
+      msg += '• اللوح: ' + rec.newLoh.sura + ayahRange(rec.newLoh.from, rec.newLoh.to) + nl;
     }
     if (rec.newMadi && rec.newMadi.length) {
-      rec.newMadi.forEach(function(m) {
-        msg += '• ماضي: سورة ' + m.sura + ayahRange(m.from, m.to) + nl;
-      });
+      msg += '• الماضي: ' + joinSuraNames(rec.newMadi) + nl;
     }
     msg += nl;
   }
