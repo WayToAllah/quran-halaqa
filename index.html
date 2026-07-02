@@ -910,8 +910,8 @@ function renderStudentList() {
   const el = document.getElementById('students-list');
   if (!students.length) { el.innerHTML = '<div class="empty-state">لا يوجد طلاب بعد</div>'; return; }
   const topBadges = {};
-  const RANK_BADGES = ['👑','🥈','🥉'];
-  getAttendanceRanking(3).list.forEach((x,i)=>{ topBadges[x.name] = RANK_BADGES[i]; });
+  const RANK_BADGES = ['👑','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
+  getAttendanceRanking(10).list.forEach((x,i)=>{ topBadges[x.name] = RANK_BADGES[i]; });
   el.innerHTML = students.map((s,i) => {
     const name = getStudentName(s);
     const age = s.age ? s.age + ' سنة' : '';
@@ -1293,19 +1293,23 @@ function renderStats() {
       <div style="font-size:16px;font-weight:700;color:var(--gold)">${x.ayat}</div>
     </div>`).join(''); }
 
-  // top 3 أكثر حضوراً
-  const topAttend = [...per].sort((a,b)=>b.attendPct-a.attendPct||b.uniqueDays-a.uniqueDays).slice(0,3);
+  // top 10 أكثر حضوراً
+  const topAttend = [...per].sort((a,b)=>b.attendPct-a.attendPct||b.uniqueDays-a.uniqueDays).slice(0,10);
   const topAttendEl = document.getElementById('top-attend-list');
   if (!topAttend.length) { topAttendEl.innerHTML='<div class="empty-state">لا يوجد بيانات</div>'; }
-  else { const RANK_CLASS2=['gold','silver','bronze']; topAttendEl.innerHTML = topAttend.map((x,i)=>`
+  else {
+    const RANK_CLASS2=['gold','silver','bronze'];
+    const RANK_ICONS=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
+    topAttendEl.innerHTML = topAttend.map((x,i)=>`
     <div class="leader-card">
-      <div class="leader-rank ${RANK_CLASS2[i]}">${MEDALS[i]}</div>
+      <div class="leader-rank ${RANK_CLASS2[i]||''}">${RANK_ICONS[i]}</div>
       <div style="flex:1">
         <div class="student-name-main">${x.name}</div>
         <div class="student-meta-line">${x.uniqueDays} يوم حضور من ${totalHalaqaDays}</div>
       </div>
       <div style="font-size:16px;font-weight:700;color:var(--green)">${x.attendPct}%</div>
-    </div>`).join(''); }
+    </div>`).join('');
+  }
 
   // تخزين بيانات الطلاب عالمياً للبحث والترتيب
   statsPer = per;
@@ -1588,10 +1592,10 @@ function closeWaModal(e) {
 
 /* ---- نجوم الحضور ---- */
 function openStarsCard() {
-  const { list, totalHalaqaDays } = getAttendanceRanking(5);
+  const { list, totalHalaqaDays } = getAttendanceRanking(10);
   if (!list.length) { alert('لا يوجد بيانات حضور كافية بعد'); return; }
   const monthLabel = new Date().toLocaleDateString('ar-EG', {month:'long', year:'numeric'});
-  const RANKS = ['🥇','🥈','🥉','🏅','🏅'];
+  const RANKS = ['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
   const rowsHtml = list.map((x,i)=>`
     <div class="stars-row-item">
       <div class="stars-rank">${RANKS[i]}</div>
@@ -1614,7 +1618,7 @@ function closeStarsModal(e) {
 
 function shareStarsWhatsApp() {
   if (!starsCardData) return;
-  const RANKS = ['🥇','🥈','🥉','🏅','🏅'];
+  const RANKS = ['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
   let msg = 'السلام عليكم ورحمة الله وبركاته 🌿\n';
   msg += '🌟 *نجوم الحضور* — ' + starsCardData.monthLabel + '\n';
   msg += '─'.repeat(18) + '\n\n';
