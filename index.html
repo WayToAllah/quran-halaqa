@@ -907,12 +907,12 @@ function getAttendanceRanking(minPct) {
   }).filter(Boolean);
   // ترتيب تنازلي؛ الأيام الفريدة والاسم معيار ثانوي للترتيب البصري فقط (مش للمركز)
   per.sort((a,b)=> b.attendPct-a.attendPct || b.uniqueDays-a.uniqueDays || a.name.localeCompare(b.name,'ar'));
-  // حساب المركز: الطلاب اللي عندهم نفس نسبة الحضور ياخدوا نفس المركز (ترتيب تنافسي قياسي)
-  let rank = 0, prevPct = null;
-  per.forEach((x, idx) => {
-    if (x.attendPct !== prevPct) { rank = idx + 1; prevPct = x.attendPct; }
-    x.rank = rank;
-  });
+  // كل نسبة حضور مختلفة (مثلاً 100% ، 80% ، ...) بتاخد مركز تسلسلي واحد (1، 2، 3...)
+  // وكل الطلاب اللي عندهم نفس النسبة بياخدوا نفس المركز، من غير قفز في الأرقام
+  const uniquePcts = [...new Set(per.map(x=>x.attendPct))].sort((a,b)=>b-a);
+  const rankByPct = {};
+  uniquePcts.forEach((pct, i) => { rankByPct[pct] = i + 1; });
+  per.forEach(x => { x.rank = rankByPct[x.attendPct]; });
   // كل الطلاب اللي نسبة حضورهم أكبر من أو تساوي الحد الأدنى المطلوب
   const list = (minPct !== undefined && minPct !== null) ? per.filter(x => x.attendPct >= minPct) : per;
   return { totalHalaqaDays, list };
