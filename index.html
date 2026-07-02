@@ -895,7 +895,7 @@ function renderStudentSelect() {
   if (students.find(s=>getStudentName(s)===cur)) sel.value = cur;
 }
 
-function getAttendanceRanking(limit) {
+function getAttendanceRanking(minPct) {
   const totalHalaqaDays = new Set(records.map(r=>r.date).filter(d => d && d !== '2026-06-04')).size;
   const per = students.map(s=>{
     const name = getStudentName(s);
@@ -913,8 +913,8 @@ function getAttendanceRanking(limit) {
     if (x.attendPct !== prevPct) { rank = idx + 1; prevPct = x.attendPct; }
     x.rank = rank;
   });
-  // عند وجود حد أقصى: بناخد كل الطلاب اللي مركزهم ضمن الحد، حتى لو ده معناه تضمين متعادلين زيادة عن العدد المطلوب
-  const list = limit ? per.filter(x => x.rank <= limit) : per;
+  // كل الطلاب اللي نسبة حضورهم أكبر من أو تساوي الحد الأدنى المطلوب
+  const list = (minPct !== undefined && minPct !== null) ? per.filter(x => x.attendPct >= minPct) : per;
   return { totalHalaqaDays, list };
 }
 
@@ -941,7 +941,7 @@ function renderStudentList() {
   const el = document.getElementById('students-list');
   if (!students.length) { el.innerHTML = '<div class="empty-state">لا يوجد طلاب بعد</div>'; return; }
   const topRanks = {};
-  getAttendanceRanking(15).list.forEach(x => { topRanks[x.name] = x.rank; });
+  getAttendanceRanking(70).list.forEach(x => { topRanks[x.name] = x.rank; });
   el.innerHTML = students.map((s,i) => {
     const name = getStudentName(s);
     const age = s.age ? s.age + ' سنة' : '';
@@ -1324,7 +1324,7 @@ function renderStats() {
     </div>`).join(''); }
 
   // أعلى 15 حضوراً (مع مشاركة نفس المركز عند تساوي النسبة)
-  const topAttend = getAttendanceRanking(15).list;
+  const topAttend = getAttendanceRanking(70).list;
   const topAttendEl = document.getElementById('top-attend-list');
   if (!topAttend.length) { topAttendEl.innerHTML='<div class="empty-state">لا يوجد بيانات</div>'; }
   else {
@@ -1620,8 +1620,8 @@ function closeWaModal(e) {
 
 /* ---- نجوم الحضور ---- */
 function openStarsCard() {
-  const { list, totalHalaqaDays } = getAttendanceRanking(15);
-  if (!list.length) { alert('لا يوجد بيانات حضور كافية بعد'); return; }
+  const { list, totalHalaqaDays } = getAttendanceRanking(70);
+  if (!list.length) { alert('لا يوجد طلاب بنسبة حضور 70% أو أكثر بعد'); return; }
   const monthLabel = new Date().toLocaleDateString('ar-EG', {month:'long', year:'numeric'});
   const rowsHtml = list.map(x=>`
     <div class="stars-row-item">
