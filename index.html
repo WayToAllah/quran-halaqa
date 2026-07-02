@@ -462,6 +462,16 @@ function fbKey(id) { return String(id).replace(/[.#$\[\]\/]/g, '_'); }
 
 function genId(prefix) { return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2,7); }
 
+// Sortable creation time embedded in the record id (r_<ms>_.. for real sessions, r_YYYYMMDD_.. for attendance).
+function recTime(r) { const m = String(r && r.id).match(/^r_(\d+)/); return m ? Number(m[1]) : 0; }
+
+// Newest first: latest date, then latest creation time on same-day ties.
+function byNewest(a, b) {
+  const da = a.date || '', dbb = b.date || '';
+  if (da !== dbb) return da < dbb ? 1 : -1;
+  return recTime(b) - recTime(a);
+}
+
 // ---- Students ----
 function saveStudentToFirebase(student) {
   if (!db) { alert('لا يوجد اتصال بقاعدة البيانات. تأكد من الإنترنت.'); return Promise.reject(); }
@@ -1019,7 +1029,7 @@ function resetForm() {
 function renderLog() {
   const el = document.getElementById('log-list');
   if (!records.length) { el.innerHTML='<div class="empty-state"><div class="big">📝</div>لا يوجد جلسات مسجلة بعد</div>'; return; }
-  const sorted = [...records].reverse().slice(0,40);
+  const sorted = [...records].sort(byNewest).slice(0,40);
   el.innerHTML = sorted.map(r => {
     const stars = n => '★'.repeat(n)+'☆'.repeat(5-n);
     const starsScore = s => s ? renderStarsHTML(s) : '';
