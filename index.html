@@ -1259,11 +1259,10 @@ function scoreToStars(score) {
 }
 
 function starsText(score) {
-  const half = scoreToHalfStars(score);
-  const full = Math.floor(half);
-  const hasHalf = (half % 1) !== 0;
-  const empty = 5 - full - (hasHalf ? 1 : 0);
-  return '★'.repeat(full) + (hasHalf ? '⯨' : '') + '☆'.repeat(Math.max(0,empty));
+  // WhatsApp fonts render the half-star glyph (⯨) inconsistently/wrong on many phones,
+  // so round to the nearest whole star for message text instead.
+  const full = Math.round(scoreToHalfStars(score));
+  return '★'.repeat(full) + '☆'.repeat(Math.max(0, 5 - full));
 }
 
 // Visual filled stars: gold layer clipped over grey layer, snapped to half-stars
@@ -1335,7 +1334,7 @@ function showWhatsAppPrompt(rec, sObj) {
   let msg = 'السلام عليكم ورحمة الله وبركاته 🌿' + nl + nl;
   msg += '📅 *تقييم ' + rec.student.split(' ')[0] + ' اليوم*' + nl;
   msg += dateStr + nl;
-  msg += '─'.repeat(30) + nl + nl;
+  msg += '─'.repeat(18) + nl + nl;
 
   // ما تم تسميعه اليوم (من الجلسة السابقة newLoh/newMadi)
   const todayLoh = prevRec && prevRec.newLoh && prevRec.newLoh.sura ? prevRec.newLoh : null;
