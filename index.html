@@ -745,13 +745,9 @@ function getMadiData() {
 function onStudentChange() {
   const name = document.getElementById('student-select').value;
   if (!name) { document.getElementById('prev-task-card').style.display='none'; return; }
-  // find last non-attendance-only record for this student
-  // find the most recent session: prefer latest by date, then by insertion order (last pushed wins on tie)
+  // find the most recent session by actual date + creation time (same robust rule used across the app)
   const recs = records.filter(r=>r.student===name && !r.attendance_only);
-  let last = null;
-  for (let i = 0; i < recs.length; i++) {
-    if (!last || recs[i].date >= last.date) last = recs[i]; // >= so later insertion on same date wins
-  }
+  const last = recs.length ? [...recs].sort(byNewest)[0] : null;
   if (!last) { document.getElementById('prev-task-card').style.display='none'; return; }
 
   document.getElementById('prev-task-card').style.display='block';
@@ -1335,7 +1331,7 @@ function showWhatsAppPrompt(rec, sObj) {
 
   // get the previous session to know what was recited today
   const prevRecs = records.filter(r => r.student === rec.student && !r.attendance_only && r.id !== rec.id)
-                          .sort((a,b) => a.date > b.date ? -1 : 1);
+                          .sort(byNewest);
   const prevRec = prevRecs[0];
 
   let msg = 'السلام عليكم ورحمة الله وبركاته 🌿' + nl + nl;
