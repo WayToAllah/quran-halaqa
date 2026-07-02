@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>تحديث بيانات الطالب — متابعة حفظ القرآن</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  :root {
+    --green:#1a6b3a; --green-light:#e8f5ee; --gold:#c49a1a; --gold-light:#fdf7e3;
+    --text:#1a1a1a; --text-muted:#6b6b6b; --text-hint:#a0a0a0;
+    --bg:#f7f7f5; --surface:#ffffff;
+    --border:rgba(0,0,0,0.1); --border-strong:rgba(0,0,0,0.18);
+    --radius:12px; --radius-sm:8px; --red:#d93025;
+  }
+  body { font-family:-apple-system,'Segoe UI',Tahoma,Arial,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:0 0 40px; }
+  .header { background:var(--green); color:white; padding:22px 20px 18px; text-align:center; }
+  .header-icon { font-size:30px; margin-bottom:6px; }
+  .header h1 { font-size:17px; font-weight:600; }
+  .header-sub { font-size:12px; opacity:0.85; margin-top:4px; line-height:1.6; }
+  .wrap { padding:16px; max-width:480px; margin:0 auto; }
+  .card { background:var(--surface); border-radius:var(--radius); border:1px solid var(--border); padding:16px; margin-bottom:12px; }
+  .card-title { font-size:12px; font-weight:600; color:var(--green); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+  .card-title .dot { width:6px; height:6px; border-radius:50%; background:var(--green); }
+  .field { margin-bottom:12px; }
+  .field:last-child { margin-bottom:0; }
+  .field label { display:block; font-size:13px; color:var(--text-muted); margin-bottom:5px; }
+  .field input, .field select { width:100%; font-size:15px; padding:11px 12px; border:1px solid var(--border-strong); border-radius:var(--radius-sm); background:var(--bg); color:var(--text); font-family:inherit; appearance:none; -webkit-appearance:none; }
+  .field input:focus, .field select:focus { outline:none; border-color:var(--green); background:white; }
+  .field input:disabled { opacity:0.6; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  select option { direction:rtl; }
+  .save-btn { width:100%; padding:15px; background:var(--green); color:white; border:none; border-radius:var(--radius); font-size:16px; font-weight:600; cursor:pointer; font-family:inherit; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .save-btn:disabled { opacity:0.5; }
+  .save-btn:active:not(:disabled) { opacity:0.85; }
+  .hint { font-size:12px; color:var(--text-hint); margin-top:10px; text-align:center; line-height:1.7; }
+  .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(10px); background:var(--green); color:white; padding:12px 24px; border-radius:30px; font-size:14px; opacity:0; transition:opacity 0.3s,transform 0.3s; pointer-events:none; white-space:nowrap; z-index:300; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  .toast.error { background:var(--red); }
+  .status-msg { text-align:center; padding:30px 10px; color:var(--text-hint); font-size:14px; }
+  @media (prefers-color-scheme:dark) {
+    :root { --text:#f0f0f0; --text-muted:#aaa; --text-hint:#666; --bg:#111; --surface:#1c1c1e; --border:rgba(255,255,255,0.1); --border-strong:rgba(255,255,255,0.18); --green-light:#0e2a1a; }
+    .field input,.field select { color-scheme:dark; }
+  }
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">📖</div>
+  <h1>تحديث بيانات الطالب</h1>
+  <div class="header-sub">من فضلكم اختاروا اسم ابنكم/ابنتكم وحدّثوا البيانات<br>سيتم الحفظ مباشرة في سجل الحلقة</div>
+</div>
+
+<div class="wrap">
+  <div class="card">
+    <div class="card-title"><div class="dot"></div> اختر الطالب</div>
+    <div class="field">
+      <label>الاسم</label>
+      <select id="student-select" onchange="onStudentChange()">
+        <option value="">جاري التحميل...</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="form-section" style="display:none">
+    <div class="card">
+      <div class="card-title"><div class="dot"></div> بيانات الطالب</div>
+      <div class="field">
+        <label>الاسم الكامل</label>
+        <input type="text" id="f-name" placeholder="اسم الطالب">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>السن</label>
+          <input type="number" id="f-age" placeholder="مثلاً 10" min="4" max="25">
+        </div>
+        <div class="field">
+          <label>السنة الدراسية</label>
+          <select id="f-grade">
+            <option value="">— اختر —</option>
+            <option>رياض أطفال</option>
+            <option>الصف الأول الابتدائي</option>
+            <option>الصف الثاني الابتدائي</option>
+            <option>الصف الثالث الابتدائي</option>
+            <option>الصف الرابع الابتدائي</option>
+            <option>الصف الخامس الابتدائي</option>
+            <option>الصف السادس الابتدائي</option>
+            <option>الصف الأول الإعدادي</option>
+            <option>الصف الثاني الإعدادي</option>
+            <option>الصف الثالث الإعدادي</option>
+            <option>الصف الأول الثانوي</option>
+            <option>الصف الثاني الثانوي</option>
+            <option>الصف الثالث الثانوي</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>المدرسة</label>
+        <input type="text" id="f-school" placeholder="اسم المدرسة">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><div class="dot" style="background:#c49a1a"></div> رقم التواصل</div>
+      <div class="field">
+        <label>📱 رقم الواتساب</label>
+        <input type="tel" id="f-phone-primary" placeholder="01XXXXXXXXX" dir="ltr">
+        <div style="font-size:11px;color:var(--text-hint);margin-top:4px">يفضل أن يكون رقم الشخص المشرف والمتابع للطفل</div>
+      </div>
+      <div class="field">
+        <label>📱 الرقم الثانوي <span style="color:var(--text-hint);font-size:11px">اختياري</span></label>
+        <input type="tel" id="f-phone-secondary" placeholder="01XXXXXXXXX" dir="ltr">
+      </div>
+    </div>
+
+    <button class="save-btn" id="save-btn" onclick="saveStudent()">💾 حفظ البيانات</button>
+    <div class="hint">سيتم استخدام هذه البيانات لإرسال تقارير تقدّم ابنكم/ابنتكم عبر واتساب</div>
+  </div>
+</div>
+
+<div class="toast" id="toast">✓ تم الحفظ بنجاح</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCLzsd-tyAPKoS6HQ-Kw6LEwaxPSibbKSg",
+  authDomain: "quran-app-abe52.firebaseapp.com",
+  databaseURL: "https://quran-app-abe52-default-rtdb.firebaseio.com",
+  projectId: "quran-app-abe52",
+  storageBucket: "quran-app-abe52.firebasestorage.app",
+  messagingSenderId: "484959710944",
+  appId: "1:484959710944:web:454059b1f2136c0d73aa85"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let studentsData = {}; // name -> {key, ...fields}
+
+function loadStudents() {
+  db.ref('students').once('value').then(snap => {
+    const sel = document.getElementById('student-select');
+    studentsData = {};
+    const val = snap.val() || {};
+    const names = [];
+    Object.keys(val).forEach(key => {
+      const s = val[key];
+      const name = typeof s === 'string' ? s : s.name;
+      if (!name) return;
+      studentsData[name] = { key, ...(typeof s === 'string' ? {name:s} : s) };
+      names.push(name);
+    });
+    names.sort((a,b)=>a.localeCompare(b,'ar'));
+    if (!names.length) {
+      sel.innerHTML = '<option value="">لا يوجد طلاب مسجلون</option>';
+      return;
+    }
+    sel.innerHTML = '<option value="">— اختر اسم الطالب —</option>' +
+      names.map(n => `<option value="${n}">${n}</option>`).join('');
+  }).catch(() => {
+    document.getElementById('student-select').innerHTML = '<option value="">تعذر تحميل البيانات، حاول لاحقاً</option>';
+  });
+}
+
+function onStudentChange() {
+  const name = document.getElementById('student-select').value;
+  const section = document.getElementById('form-section');
+  if (!name) { section.style.display = 'none'; return; }
+  const s = studentsData[name] || {};
+  document.getElementById('f-name').value = name;
+  document.getElementById('f-age').value = s.age || '';
+  document.getElementById('f-grade').value = s.grade || '';
+  document.getElementById('f-school').value = s.school || '';
+  document.getElementById('f-phone-primary').value = s.phonePrimary || s.phoneMom || '';
+  document.getElementById('f-phone-secondary').value = s.phoneSecondary || s.phoneDad || '';
+  section.style.display = 'block';
+}
+
+function saveStudent() {
+  const selectedName = document.getElementById('student-select').value;
+  if (!selectedName) return;
+  const newName = document.getElementById('f-name').value.trim();
+  if (!newName) { document.getElementById('f-name').focus(); return; }
+
+  const existing = studentsData[selectedName];
+  const nameChanged = existing && newName !== selectedName;
+
+  // avoid merging into another existing student by accident
+  if (nameChanged && studentsData[newName]) {
+    showToast('يوجد طالب آخر بنفس هذا الاسم بالفعل', true);
+    return;
+  }
+
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true;
+  btn.textContent = 'جاري الحفظ...';
+
+  const obj = {
+    name: newName,
+    age: document.getElementById('f-age').value || '',
+    grade: document.getElementById('f-grade').value || '',
+    school: document.getElementById('f-school').value.trim(),
+    phonePrimary: document.getElementById('f-phone-primary').value.trim(),
+    phoneSecondary: document.getElementById('f-phone-secondary').value.trim(),
+  };
+
+  const ref = existing && existing.key ? db.ref('students/' + existing.key) : db.ref('students').push().ref;
+
+  ref.set(obj).then(() => {
+    if (!nameChanged) return Promise.resolve();
+    // cascade the name change to this student's past session records
+    return db.ref('records').once('value').then(snap => {
+      const val = snap.val() || {};
+      const updates = {};
+      Object.keys(val).forEach(key => {
+        if (val[key] && val[key].student === selectedName) {
+          updates['records/' + key + '/student'] = newName;
+        }
+      });
+      if (Object.keys(updates).length) return db.ref().update(updates);
+    });
+  }).then(() => {
+    showToast('✓ تم حفظ البيانات بنجاح', false);
+    btn.disabled = false;
+    btn.textContent = '💾 حفظ البيانات';
+    loadStudents();
+  }).catch(() => {
+    showToast('حدث خطأ، حاول مرة أخرى', true);
+    btn.disabled = false;
+    btn.textContent = '💾 حفظ البيانات';
+  });
+}
+
+function showToast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.toggle('error', !!isError);
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+loadStudents();
+</script>
+</body>
+</html>
