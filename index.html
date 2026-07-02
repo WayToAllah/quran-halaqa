@@ -1346,7 +1346,10 @@ function renderStats() {
     const name = getStudentName(s);
     const recs = records.filter(r=>r.student===name);
     if (!recs.length) return null;
-    const avg = Math.round(recs.filter(r=>r.loh.score).reduce((a,r,_,arr)=>a+r.loh.score/arr.length,0)) || Math.round(recs.reduce((a,r)=>a+r.loh.stars,0)/recs.length*20);
+    const scoredLohRecs = recs.filter(r=>r.loh&&r.loh.score);
+    const avg = scoredLohRecs.length
+      ? Math.round(scoredLohRecs.reduce((a,r)=>a+r.loh.score,0)/scoredLohRecs.length)
+      : Math.round(recs.reduce((a,r)=>a+(r.loh?r.loh.stars:0),0)/recs.length*20);
     const ayat = recs.reduce((a,r)=> {
       let sum = a;
       const lohArr2 = r.newLoh ? (Array.isArray(r.newLoh) ? r.newLoh : [r.newLoh]) : (r.loh && r.loh.sura ? [r.loh] : []);
