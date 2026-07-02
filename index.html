@@ -258,26 +258,8 @@
   <!-- المهمة الجديدة -->
   <div class="card">
     <div class="card-title"><div class="dot"></div> 📝 المهمة الجديدة — اللوح</div>
-    <div class="row3">
-      <div class="field sura-field">
-        <label>السورة</label>
-        <input type="text" id="loh-sura-input" placeholder="اكتب اسم السورة..." autocomplete="off" oninput="filterSuras('loh')" onfocus="showDropdown('loh')" onblur="hideDropdown('loh')">
-        <input type="hidden" id="loh-sura">
-        <div class="sura-dropdown" id="loh-sura-dropdown"></div>
-      </div>
-      <div class="field">
-        <label>من آية</label>
-        <input type="number" id="loh-from" placeholder="١" min="1" oninput="validateAyah('loh')">
-        <div class="field-error" id="err-loh-from"></div>
-      </div>
-      <div class="field">
-        <label>إلى آية</label>
-        <input type="number" id="loh-to" placeholder="١٠" min="1" oninput="validateAyah('loh')">
-        <div class="field-error" id="err-loh-to"></div>
-      </div>
-    </div>
-    <div class="ayah-hint" id="hint-loh"></div>
-
+    <div id="loh-rows"></div>
+    <button type="button" class="add-madi-btn" onclick="addLohRow()">+ إضافة سورة</button>
   </div>
   <div class="card">
     <div class="card-title"><div class="dot" style="background:#888"></div> 📝 المهمة الجديدة — الماضي</div>
@@ -683,8 +665,10 @@ let students = [], records = [], starVals = {loh:0, tajweed:0}, starScores = {lo
 let statsPer = [], statsTotalDays = 0, statsSortKey = 'attend';
 let starsCardData = null;
 let madiRows = []; // [{id, stars}]
+let lohRows = []; // [{id}]
 let editingRecordId = null; // when set, saveRecord updates this record instead of creating new
 let madiRowCount = 0;
+let lohRowCount = 0;
 const suraMap = {};
 SURAS.forEach(([n,c]) => suraMap[n]=c);
 
@@ -827,6 +811,68 @@ function getMadiData() {
   })).filter(m => m.sura);
 }
 
+function makeLohRowId() { return 'loh-row-' + (++lohRowCount); }
+
+function addLohRow(data) {
+  const id = makeLohRowId();
+  const idx = lohRows.length;
+  lohRows.push({id});
+  const container = document.getElementById('loh-rows');
+  const div = document.createElement('div');
+  div.className = 'madi-row';
+  div.id = id;
+  const label = idx === 0 ? 'السورة الأولى' : 'سورة ' + (idx + 1);
+  div.innerHTML = `
+    <div class="madi-row-header">
+      <span class="madi-row-title">${label}</span>
+      ${idx > 0 ? `<button type="button" class="remove-madi-btn" onclick="removeLohRow('${id}')">✕</button>` : ''}
+    </div>
+    <div class="row3">
+      <div class="field sura-field">
+        <label>السورة</label>
+        <input type="text" id="${id}-sura-input" placeholder="اكتب اسم السورة..." autocomplete="off"
+          oninput="filterSuras('${id}')" onfocus="showDropdown('${id}')" onblur="hideDropdown('${id}')">
+        <input type="hidden" id="${id}-sura" value="${data ? data.sura||'' : ''}">
+        <div class="sura-dropdown" id="${id}-sura-dropdown"></div>
+      </div>
+      <div class="field">
+        <label>من آية</label>
+        <input type="number" id="${id}-from" placeholder="١" min="1" value="${data ? data.from||'' : ''}" oninput="validateAyah('${id}')">
+        <div class="field-error" id="err-${id}-from"></div>
+      </div>
+      <div class="field">
+        <label>إلى آية</label>
+        <input type="number" id="${id}-to" placeholder="١٠" min="1" value="${data ? data.to||'' : ''}" oninput="validateAyah('${id}')">
+        <div class="field-error" id="err-${id}-to"></div>
+      </div>
+    </div>
+    <div class="ayah-hint" id="hint-${id}"></div>`;
+  container.appendChild(div);
+  if (data && data.sura) {
+    document.getElementById(id+'-sura-input').value = data.sura;
+    onSuraChange(id);
+  }
+}
+
+function removeLohRow(id) {
+  const idx = lohRows.findIndex(r=>r.id===id);
+  if (idx > 0) { lohRows.splice(idx,1); document.getElementById(id).remove(); }
+}
+
+function resetLohRows() {
+  lohRows = []; lohRowCount = 0;
+  document.getElementById('loh-rows').innerHTML = '';
+  addLohRow();
+}
+
+function getLohData() {
+  return lohRows.map(({id}) => ({
+    sura: document.getElementById(id+'-sura').value,
+    from: document.getElementById(id+'-from').value,
+    to: document.getElementById(id+'-to').value
+  })).filter(l => l.sura);
+}
+
 function onStudentChange() {
   const name = document.getElementById('student-select').value;
   if (!name) { document.getElementById('prev-task-card').style.display='none'; return; }
@@ -846,8 +892,11 @@ function onStudentChange() {
   }
 
   // loh info
-  const lohSrc = last.newLoh && last.newLoh.sura ? last.newLoh : (last.loh && last.loh.sura ? last.loh : null);
-  document.getElementById('prev-loh-info').textContent = lohSrc ? fmtSura(lohSrc.sura, lohSrc.from, lohSrc.to) : '—';
+  const lohArr = last.newLoh ? (Array.isArray(last.newLoh) ? last.newLoh : [last.newLoh]) : (last.loh && last.loh.sura ? [last.loh] : []);
+  const lohFiltered = lohArr.filter(l=>l && l.sura);
+  document.getElementById('prev-loh-info').textContent = lohFiltered.length
+    ? lohFiltered.map(l => fmtSura(l.sura, l.from, l.to)).join(' + ')
+    : '—';
 
   // madi info
   const madiArr = last.newMadi || (last.madi ? (Array.isArray(last.madi)?last.madi:[last.madi]) : []);
@@ -869,6 +918,7 @@ function onStudentChange() {
 function init() {
   buildSuraOptions();
   addMadiRow();
+  addLohRow();
   document.getElementById('session-date').value = new Date().toISOString().slice(0,10);
 
   const sub = document.getElementById('header-sub');
@@ -1085,8 +1135,8 @@ function clearErrors(prefix) {
 function saveRecord() {
   const student = document.getElementById('student-select').value;
   if (!student) { alert('اختر طالباً أولاً'); return; }
-  if (!validateAyah('loh') || !validateAyah('madi')) { alert('يوجد خطأ في أرقام الآيات'); return; }
-  const lohSura = document.getElementById('loh-sura').value;
+  const lohOk = lohRows.every(row => validateAyah(row.id));
+  if (!lohOk) { alert('يوجد خطأ في أرقام آيات اللوح'); return; }
   const isEditing = editingRecordId !== null;
   const existing = isEditing ? records.find(r => String(r.id) === String(editingRecordId)) : null;
   const sObj = students.find(s => getStudentName(s) === student);
@@ -1097,7 +1147,7 @@ function saveRecord() {
     student,
     loh: { score: starScores['prev-loh']||0, stars: scoreToStars(starScores['prev-loh']||0) },
     madi: { score: starScores['prev-madi']||0, stars: scoreToStars(starScores['prev-madi']||0) },
-    newLoh: lohSura ? { sura:lohSura, from:document.getElementById('loh-from').value, to:document.getElementById('loh-to').value } : null,
+    newLoh: getLohData().map(l=>({sura:l.sura,from:l.from,to:l.to})),
     newMadi: getMadiData().map(m=>({sura:m.sura,from:m.from,to:m.to})),
     note: document.getElementById('general-note').value.trim()
   };
@@ -1119,16 +1169,15 @@ function saveRecord() {
 
 function resetForm() {
   // clear text inputs safely
-  ['loh-from','loh-to','tajweed-from','tajweed-to','tajweed-note','general-note'].forEach(id=>{
+  ['tajweed-from','tajweed-to','tajweed-note','general-note'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
   // clear sura inputs
-  ['loh-sura','tajweed-sura'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
-  ['loh-sura-input','tajweed-sura-input'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
+  ['tajweed-sura'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
+  ['tajweed-sura-input'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
   // clear hints
-  ['hint-loh','hint-tajweed'].forEach(id=>{const el=document.getElementById(id); if(el) el.textContent='';});
+  ['hint-tajweed'].forEach(id=>{const el=document.getElementById(id); if(el) el.textContent='';});
   // clear errors
-  clearErrors('loh');
   if(document.getElementById('tajweed-from')) clearErrors('tajweed');
   // reset scores
   starVals = {loh:0, tajweed:0};
@@ -1146,6 +1195,8 @@ function resetForm() {
   document.getElementById('tajweed-fields').style.display='none';
   // reset madi rows
   resetMadiRows();
+  // reset loh rows
+  resetLohRows();
   // hide prev card
   document.getElementById('prev-task-card').style.display='none';
   document.getElementById('student-select').value='';
@@ -1175,7 +1226,13 @@ function renderLog() {
     const dateStr = r.date ? new Date(r.date).toLocaleDateString('ar-EG',{day:'numeric',month:'short'}) : r.date;
     return `<div class="log-entry">
       <div class="log-header"><span class="log-student">${r.student}</span><div style="display:flex;align-items:center;gap:8px"><span class="log-date">${dateStr}</span>${actions}</div></div>
-      ${r.newLoh&&r.newLoh.sura ? `<div class="log-line"><span>📝</span> لوح جديد: ${r.newLoh.sura} (${r.newLoh.from||'?'}–${r.newLoh.to||'?'})</div>` : (r.loh&&r.loh.sura ? `<div class="log-line"><span>📖</span> لوح: ${r.loh.sura} (${r.loh.from||'?'}–${r.loh.to||'?'}) ${r.loh.score?r.loh.score+'/100 '+renderStarsHTML(r.loh.score)+' '+scoreName(r.loh.score):''}</div>` : '')}
+      ${(() => {
+        const lohArr = r.newLoh ? (Array.isArray(r.newLoh) ? r.newLoh : [r.newLoh]) : [];
+        const filtered = lohArr.filter(l=>l && l.sura);
+        if (filtered.length) return filtered.map(l=>`<div class="log-line"><span>📝</span> لوح جديد: ${l.sura} (${l.from||'?'}–${l.to||'?'})</div>`).join('');
+        if (r.loh && r.loh.sura) return `<div class="log-line"><span>📖</span> لوح: ${r.loh.sura} (${r.loh.from||'?'}–${r.loh.to||'?'}) ${r.loh.score?r.loh.score+'/100 '+renderStarsHTML(r.loh.score)+' '+scoreName(r.loh.score):''}</div>`;
+        return '';
+      })()}
       ${r.loh&&r.loh.score ? `<div class="log-line"><span>⭐</span> تقييم اللوح: ${r.loh.score}/100 ${renderStarsHTML(r.loh.score)} ${scoreName(r.loh.score)}</div>` : ''}
       ${Array.isArray(r.madi)
         ? r.madi.map(m=>`<div class="log-line"><span>🔄</span> ماضي: ${m.sura} (${m.from||'?'}–${m.to||'?'}) ${m.score ? m.score+'/100 '+renderStarsHTML(m.score)+' '+scoreName(m.score) : stars(m.stars)}</div>`).join('')
@@ -1210,14 +1267,10 @@ function editRecord(id) {
   // prev-task evaluation scores
   if (r.loh && r.loh.score) { document.getElementById('score-prev-loh').value = r.loh.score; onScoreInput('prev-loh'); }
   if (r.madi && r.madi.score) { document.getElementById('score-prev-madi').value = r.madi.score; onScoreInput('prev-madi'); }
-  // new task: loh
-  if (r.newLoh && r.newLoh.sura) {
-    document.getElementById('loh-sura-input').value = r.newLoh.sura;
-    document.getElementById('loh-sura').value = r.newLoh.sura;
-    onSuraChange('loh');
-    document.getElementById('loh-from').value = r.newLoh.from || '';
-    document.getElementById('loh-to').value = r.newLoh.to || '';
-  }
+  // new task: loh rows
+  document.getElementById('loh-rows').innerHTML = ''; lohRows = []; lohRowCount = 0;
+  const lohArr = r.newLoh ? (Array.isArray(r.newLoh) ? r.newLoh.filter(l=>l&&l.sura) : (r.newLoh.sura ? [r.newLoh] : [])) : [];
+  if (lohArr.length) { lohArr.forEach(l => addLohRow(l)); } else { addLohRow(); }
   // new task: madi rows
   resetMadiRows();
   const madiArr = (r.newMadi && r.newMadi.length) ? r.newMadi : [];
@@ -1266,8 +1319,8 @@ function renderStats() {
   let lohAyat = 0, madiAyat = 0, tajweedAyat = 0;
   records.forEach(r => {
     // ayat live in newLoh/newMadi (the assigned task); fall back to legacy loh/madi if present
-    const lohObj = (r.newLoh && r.newLoh.sura) ? r.newLoh : (r.loh && r.loh.sura ? r.loh : null);
-    if (lohObj) lohAyat += countAyat(lohObj.from, lohObj.to);
+    const lohArr = r.newLoh ? (Array.isArray(r.newLoh) ? r.newLoh : [r.newLoh]) : (r.loh && r.loh.sura ? [r.loh] : []);
+    lohArr.forEach(l => { if (l && l.sura) lohAyat += countAyat(l.from, l.to); });
     const madiArr = (r.newMadi && r.newMadi.length) ? r.newMadi : (Array.isArray(r.madi) ? r.madi : (r.madi && r.madi.sura ? [r.madi] : []));
     madiArr.forEach(m=>{ if (m && m.sura) madiAyat += countAyat(m.from, m.to); });
     if (r.tajweed && r.tajweed.sura) tajweedAyat += countAyat(r.tajweed.from, r.tajweed.to);
@@ -1296,8 +1349,8 @@ function renderStats() {
     const avg = Math.round(recs.filter(r=>r.loh.score).reduce((a,r,_,arr)=>a+r.loh.score/arr.length,0)) || Math.round(recs.reduce((a,r)=>a+r.loh.stars,0)/recs.length*20);
     const ayat = recs.reduce((a,r)=> {
       let sum = a;
-      const lohObj = (r.newLoh && r.newLoh.sura) ? r.newLoh : (r.loh && r.loh.sura ? r.loh : null);
-      if (lohObj) sum += countAyat(lohObj.from, lohObj.to);
+      const lohArr2 = r.newLoh ? (Array.isArray(r.newLoh) ? r.newLoh : [r.newLoh]) : (r.loh && r.loh.sura ? [r.loh] : []);
+      lohArr2.forEach(l => { if (l && l.sura) sum += countAyat(l.from, l.to); });
       const madiArr = (r.newMadi && r.newMadi.length) ? r.newMadi : (Array.isArray(r.madi) ? r.madi : (r.madi && r.madi.sura ? [r.madi] : []));
       madiArr.forEach(m=>{ if (m && m.sura) sum += countAyat(m.from, m.to); });
       return sum;
@@ -1551,13 +1604,14 @@ function showWhatsAppPrompt(rec, sObj) {
   msg += '─'.repeat(18) + nl + nl;
 
   // ما تم تسميعه اليوم (من الجلسة السابقة newLoh/newMadi)
-  const todayLoh = prevRec && prevRec.newLoh && prevRec.newLoh.sura ? prevRec.newLoh : null;
+  const prevLohArr = prevRec ? (prevRec.newLoh ? (Array.isArray(prevRec.newLoh) ? prevRec.newLoh : [prevRec.newLoh]) : []) : [];
+  const todayLoh = prevLohArr.filter(l=>l && l.sura).length ? prevLohArr.filter(l=>l && l.sura) : null;
   const todayMadi = prevRec && prevRec.newMadi && prevRec.newMadi.filter(m=>m.sura).length ? prevRec.newMadi.filter(m=>m.sura) : null;
 
   if (todayLoh || todayMadi || (rec.loh && rec.loh.score) || (rec.madi && rec.madi.score)) {
     msg += '📖 *ما تم تسميعه اليوم*' + nl;
     if (todayLoh) {
-      msg += '• اللوح: ' + todayLoh.sura + ayahRange(todayLoh.from, todayLoh.to);
+      msg += '• اللوح: ' + joinSuraNames(todayLoh);
       if (rec.loh && rec.loh.score) msg += '  ←  ' + rec.loh.score + '/100 ' + starsText(rec.loh.score) + ' ' + scoreName(rec.loh.score);
       msg += nl;
     } else if (rec.loh && rec.loh.score) {
@@ -1584,11 +1638,12 @@ function showWhatsAppPrompt(rec, sObj) {
   }
 
   // المهمة الجديدة
-  const hasNewTask = (rec.newLoh && rec.newLoh.sura) || (rec.newMadi && rec.newMadi.length);
+  const newLohArr = rec.newLoh ? (Array.isArray(rec.newLoh) ? rec.newLoh.filter(l=>l&&l.sura) : (rec.newLoh.sura ? [rec.newLoh] : [])) : [];
+  const hasNewTask = newLohArr.length || (rec.newMadi && rec.newMadi.length);
   if (hasNewTask) {
     msg += '📝 *المهمة الجديدة للجلسة القادمة*' + nl;
-    if (rec.newLoh && rec.newLoh.sura) {
-      msg += '• اللوح: ' + rec.newLoh.sura + ayahRange(rec.newLoh.from, rec.newLoh.to) + nl;
+    if (newLohArr.length) {
+      msg += '• اللوح: ' + joinSuraNames(newLohArr) + nl;
     }
     if (rec.newMadi && rec.newMadi.length) {
       msg += '• الماضي: ' + joinSuraNames(rec.newMadi) + nl;
