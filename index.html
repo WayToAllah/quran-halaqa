@@ -151,6 +151,20 @@
   .sort-tabs { display:flex; gap:6px; margin-bottom:12px; overflow-x:auto; padding-bottom:2px; }
   .sort-tab { flex-shrink:0; padding:7px 14px; border-radius:20px; border:1px solid var(--border-strong); background:var(--bg); font-size:12px; color:var(--text-muted); cursor:pointer; font-family:inherit; white-space:nowrap; }
   .sort-tab.active { background:var(--green); color:white; border-color:var(--green); font-weight:600; }
+  .stars-trigger-btn { background:var(--gold-light); color:#7a5f00; border:1px solid var(--gold-soft); border-radius:20px; padding:6px 12px; font-size:11px; font-weight:600; cursor:pointer; font-family:inherit; flex-shrink:0; }
+  .stars-trigger-btn:active { opacity:0.85; }
+  .stars-card-visual { background:linear-gradient(160deg,var(--green-deep),var(--green) 60%,var(--gold-soft)); border-radius:18px; padding:26px 20px; text-align:center; color:#fff; position:relative; overflow:hidden; }
+  .stars-card-visual::before { content:''; position:absolute; top:-40px; right:-40px; width:140px; height:140px; border-radius:50%; background:rgba(255,255,255,0.08); }
+  .stars-card-visual::after { content:''; position:absolute; bottom:-50px; left:-30px; width:160px; height:160px; border-radius:50%; background:rgba(255,255,255,0.06); }
+  .stars-card-title { font-size:20px; font-weight:800; margin-bottom:4px; position:relative; }
+  .stars-card-sub { font-size:13px; opacity:0.88; margin-bottom:18px; position:relative; }
+  .stars-list { display:flex; flex-direction:column; gap:10px; position:relative; }
+  .stars-row-item { display:flex; align-items:center; gap:10px; background:rgba(255,255,255,0.14); border-radius:12px; padding:10px 14px; }
+  .stars-rank { font-size:20px; width:28px; text-align:center; flex-shrink:0; }
+  .stars-name { flex:1; font-size:14px; font-weight:600; text-align:right; }
+  .stars-pct { font-size:14px; font-weight:800; color:#fff; background:rgba(255,255,255,0.2); padding:3px 10px; border-radius:20px; flex-shrink:0; }
+  .stars-card-footer { margin-top:18px; font-size:12px; opacity:0.88; position:relative; }
+  .attend-badge { font-size:13px; margin-right:4px; }
 
   select option { direction:rtl; }
   .fab { position:fixed; left:16px; bottom:94px; width:56px; height:56px; border-radius:18px; background:linear-gradient(135deg,var(--green),var(--green-deep)); color:white; font-size:28px; border:none; cursor:pointer; display:none; align-items:center; justify-content:center; box-shadow:0 6px 18px rgba(21,97,58,0.36); z-index:60; line-height:1; transition:transform 0.15s; }
@@ -185,6 +199,7 @@
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
@@ -356,7 +371,10 @@
     <div id="top-ayat-list"></div>
   </div>
   <div class="card" style="margin-bottom:12px">
-    <div class="card-title"><div class="dot" style="background:#2d8a50"></div> ✅ الأكثر حضوراً</div>
+    <div class="card-title" style="justify-content:space-between">
+      <span style="display:flex;align-items:center;gap:7px"><div class="dot" style="background:#2d8a50"></div> ✅ الأكثر حضوراً</span>
+      <button class="stars-trigger-btn" onclick="openStarsCard()">🌟 نجوم الحضور</button>
+    </div>
     <div id="top-attend-list"></div>
   </div>
   <div class="card">
@@ -466,6 +484,26 @@
     </div>
   </div>
 </div>
+<!-- Stars/Attendance-champions modal -->
+<div class="modal-overlay" id="stars-modal" onclick="closeStarsModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <span class="modal-title">🌟 نجوم الحضور</span>
+      <button class="modal-close" onclick="document.getElementById('stars-modal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="stars-card-visual" id="stars-card-visual">
+        <div id="stars-card-body"></div>
+      </div>
+    </div>
+    <div class="modal-footer" style="flex-wrap:wrap">
+      <button class="btn-secondary" onclick="downloadStarsCard()">💾 حفظ كصورة</button>
+      <button class="btn-primary" style="background:#25D366" onclick="shareStarsWhatsApp()">📲 مشاركة واتساب</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast">✓ تم الحفظ بنجاح</div>
 
 <script>
@@ -640,6 +678,7 @@ const SURAS = [
 
 let students = [], records = [], starVals = {loh:0, tajweed:0}, starScores = {loh:0, tajweed:0, 'prev-loh':0, 'prev-madi':0};
 let statsPer = [], statsTotalDays = 0, statsSortKey = 'attend';
+let starsCardData = null;
 let madiRows = []; // [{id, stars}]
 let editingRecordId = null; // when set, saveRecord updates this record instead of creating new
 let madiRowCount = 0;
@@ -853,9 +892,26 @@ function renderStudentSelect() {
   if (students.find(s=>getStudentName(s)===cur)) sel.value = cur;
 }
 
+function getAttendanceRanking(limit) {
+  const totalHalaqaDays = new Set(records.map(r=>r.date).filter(d => d && d !== '2026-06-04')).size;
+  const per = students.map(s=>{
+    const name = getStudentName(s);
+    const recs = records.filter(r=>r.student===name);
+    if (!recs.length) return null;
+    const uniqueDays = new Set(recs.map(r=>r.date)).size;
+    const attendPct = totalHalaqaDays > 0 ? Math.min(100, Math.round(uniqueDays/totalHalaqaDays*100)) : 0;
+    return {name, uniqueDays, attendPct};
+  }).filter(Boolean);
+  per.sort((a,b)=>b.attendPct-a.attendPct||b.uniqueDays-a.uniqueDays);
+  return { totalHalaqaDays, list: limit ? per.slice(0,limit) : per };
+}
+
 function renderStudentList() {
   const el = document.getElementById('students-list');
   if (!students.length) { el.innerHTML = '<div class="empty-state">لا يوجد طلاب بعد</div>'; return; }
+  const topBadges = {};
+  const RANK_BADGES = ['👑','🥈','🥉'];
+  getAttendanceRanking(3).list.forEach((x,i)=>{ topBadges[x.name] = RANK_BADGES[i]; });
   el.innerHTML = students.map((s,i) => {
     const name = getStudentName(s);
     const age = s.age ? s.age + ' سنة' : '';
@@ -868,10 +924,11 @@ function renderStudentList() {
     const phoneType = s.phoneType || (s.phoneMom ? 'أم' : 'أب');
     const phoneMom = primary ? `<span style="font-size:11px;color:var(--text-hint)">${phoneType}: ${primary}</span>` : '';
     const phoneDad = (s.phoneSecondary||s.phoneDad) ? `<span style="font-size:11px;color:var(--text-hint);margin-right:8px">ثانوي: ${s.phoneSecondary||s.phoneDad}</span>` : '';
+    const badge = topBadges[name] ? `<span class="attend-badge" title="من الأكثر حضوراً">${topBadges[name]}</span>` : '';
     return `<div class="student-row">
       <div class="student-avatar">${initials}</div>
       <div class="student-info" onclick="openStudentModal('${s.id}')">
-        <div class="student-name-main">${name}</div>
+        <div class="student-name-main">${name} ${badge}</div>
         ${meta ? `<div class="student-meta-line">${meta}</div>` : ''}
         <div style="margin-top:2px">${phoneMom}${phoneDad}</div>
         <div class="student-meta-line">${count} جلسة مسجلة</div>
@@ -1527,6 +1584,56 @@ function sendWhatsApp() {
 function closeWaModal(e) {
   if (e.target === document.getElementById('wa-modal'))
     document.getElementById('wa-modal').classList.remove('open');
+}
+
+/* ---- نجوم الحضور ---- */
+function openStarsCard() {
+  const { list, totalHalaqaDays } = getAttendanceRanking(5);
+  if (!list.length) { alert('لا يوجد بيانات حضور كافية بعد'); return; }
+  const monthLabel = new Date().toLocaleDateString('ar-EG', {month:'long', year:'numeric'});
+  const RANKS = ['🥇','🥈','🥉','🏅','🏅'];
+  const rowsHtml = list.map((x,i)=>`
+    <div class="stars-row-item">
+      <div class="stars-rank">${RANKS[i]}</div>
+      <div class="stars-name">${x.name}</div>
+      <div class="stars-pct">${x.attendPct}%</div>
+    </div>`).join('');
+  document.getElementById('stars-card-body').innerHTML = `
+    <div class="stars-card-title">🌟 نجوم الحضور</div>
+    <div class="stars-card-sub">${monthLabel} · من إجمالي ${totalHalaqaDays} يوم</div>
+    <div class="stars-list">${rowsHtml}</div>
+    <div class="stars-card-footer">جزاكم الله خيراً 🤲</div>`;
+  starsCardData = { list, monthLabel };
+  document.getElementById('stars-modal').classList.add('open');
+}
+
+function closeStarsModal(e) {
+  if (!e || e.target === document.getElementById('stars-modal'))
+    document.getElementById('stars-modal').classList.remove('open');
+}
+
+function shareStarsWhatsApp() {
+  if (!starsCardData) return;
+  const RANKS = ['🥇','🥈','🥉','🏅','🏅'];
+  let msg = 'السلام عليكم ورحمة الله وبركاته 🌿\n';
+  msg += '🌟 *نجوم الحضور* — ' + starsCardData.monthLabel + '\n';
+  msg += '─'.repeat(18) + '\n\n';
+  starsCardData.list.forEach((x,i)=>{ msg += RANKS[i] + ' ' + x.name + ' — ' + x.attendPct + '%\n'; });
+  msg += '\nجزاكم الله خيراً 🤲';
+  const url = 'https://wa.me/?text=' + encodeURIComponent(msg);
+  window.open(url, '_blank');
+}
+
+async function downloadStarsCard() {
+  const node = document.getElementById('stars-card-visual');
+  if (!node || typeof html2canvas === 'undefined') { alert('تعذر إنشاء الصورة، تأكد من الاتصال بالإنترنت'); return; }
+  try {
+    const canvas = await html2canvas(node, { scale:2, backgroundColor:null, useCORS:true });
+    const link = document.createElement('a');
+    link.download = 'نجوم-الحضور.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch(e) { console.warn(e); alert('تعذر حفظ الصورة'); }
 }
 
 function showToast(msg) {
