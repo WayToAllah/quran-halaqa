@@ -45,6 +45,7 @@
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 </head>
 <body>
 
@@ -136,6 +137,11 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
+// Escape any value before injecting it into innerHTML.
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
 let studentsData = {}; // name -> {key, ...fields}
 
 function loadStudents() {
@@ -157,7 +163,7 @@ function loadStudents() {
       return;
     }
     sel.innerHTML = '<option value="">— اختر اسم الطالب —</option>' +
-      names.map(n => `<option value="${n}">${n}</option>`).join('');
+      names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
   }).catch(() => {
     document.getElementById('student-select').innerHTML = '<option value="">تعذر تحميل البيانات، حاول لاحقاً</option>';
   });
@@ -240,7 +246,11 @@ function showToast(msg, isError) {
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 
-loadStudents();
+firebase.auth().signInAnonymously()
+  .then(() => loadStudents())
+  .catch(() => {
+    document.getElementById('student-select').innerHTML = '<option value="">تعذر الاتصال، تأكد من الإنترنت وأعد المحاولة</option>';
+  });
 </script>
 </body>
 </html>
