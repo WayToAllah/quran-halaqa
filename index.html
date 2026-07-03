@@ -195,6 +195,18 @@
   .sura-count { font-size:11px; color:var(--text-hint); }
   .sura-item:hover, .sura-item.active { background:var(--green-light); color:var(--green); }
   .sura-item .sura-count { font-size:12px; color:var(--text-hint); }
+  .login-screen { position:fixed; inset:0; z-index:9999; background:linear-gradient(160deg,var(--green-deep),var(--green)); display:flex; align-items:center; justify-content:center; padding:24px; }
+  .login-screen.hidden { display:none; }
+  .login-card { background:var(--surface); border-radius:20px; padding:32px 24px; width:100%; max-width:360px; text-align:center; box-shadow:var(--shadow-lg); }
+  .login-icon { font-size:40px; margin-bottom:6px; }
+  .login-title { font-size:19px; font-weight:700; color:var(--text); margin-bottom:4px; }
+  .login-sub { font-size:13px; color:var(--text-muted); margin-bottom:20px; }
+  #login-form { text-align:right; }
+  #login-form .field { margin-bottom:14px; }
+  .login-error { font-size:13px; color:var(--red); margin-bottom:10px; min-height:0; display:none; }
+  .login-error.show { display:block; }
+  .login-link { display:block; width:100%; background:none; border:none; color:var(--green); font-size:13px; margin-top:12px; cursor:pointer; font-family:inherit; text-decoration:underline; }
+
   @media (prefers-color-scheme:dark) {
     :root { --text:#eef2ef; --text-muted:#9fb0a6; --text-hint:#6a7872; --bg:#10140f; --surface:#1a1f1b; --green-tint:#161d18; --border:rgba(255,255,255,0.08); --border-strong:rgba(255,255,255,0.16); --green-light:#15301f; }
     .field input,.field select,.field textarea { color-scheme:dark; }
@@ -207,16 +219,40 @@
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
+<!-- Login gate — shown until an authenticated admin session exists -->
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="login-icon">📖</div>
+    <h1 class="login-title">متابعة حفظ القرآن</h1>
+    <p class="login-sub" id="login-status">جاري التحقق من الجلسة…</p>
+    <form id="login-form" style="display:none" onsubmit="return handleLogin(event)">
+      <div class="field">
+        <label>البريد الإلكتروني</label>
+        <input type="email" id="login-email" autocomplete="username" required dir="ltr" style="text-align:left">
+      </div>
+      <div class="field">
+        <label>كلمة السر</label>
+        <input type="password" id="login-password" autocomplete="current-password" required dir="ltr" style="text-align:left">
+      </div>
+      <div class="login-error" id="login-error"></div>
+      <button type="submit" class="save-btn" id="login-submit-btn" style="margin-top:4px">دخول</button>
+      <button type="button" class="login-link" onclick="handleResetPassword()">نسيت كلمة السر؟</button>
+    </form>
+  </div>
+</div>
+
 <div class="header">
   <div class="header-icon">📖</div>
-  <div>
+  <div style="flex:1">
     <h1>متابعة حفظ القرآن</h1>
     <div class="header-sub" id="header-sub">جاري التحميل...</div>
   </div>
+  <button id="logout-btn" onclick="logout()" title="تسجيل الخروج" style="display:none;background:rgba(255,255,255,0.14);border:none;color:white;width:34px;height:34px;border-radius:50%;font-size:15px;cursor:pointer;flex-shrink:0">🚪</button>
 </div>
 
 <!-- Record screen -->
@@ -508,6 +544,90 @@ try {
   firebaseReady = true;
 } catch (e) {
   console.error('Firebase init failed:', e);
+}
+
+// ============================================================================
+//  AUTH GATE — the app (including all Firebase listeners below) only starts
+//  after a signed-in admin session is confirmed. See login-screen markup.
+// ============================================================================
+let appStarted = false;
+
+function setLoginError(msg) {
+  const el = document.getElementById('login-error');
+  if (!msg) { el.classList.remove('show'); el.textContent = ''; return; }
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+function authErrorMessage(err) {
+  switch (err && err.code) {
+    case 'auth/invalid-email': return 'صيغة البريد الإلكتروني غير صحيحة';
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential': return 'البريد الإلكتروني أو كلمة السر غير صحيحة';
+    case 'auth/too-many-requests': return 'محاولات كثيرة جداً، حاول بعد قليل';
+    case 'auth/network-request-failed': return 'لا يوجد اتصال بالإنترنت';
+    default: return 'حدث خطأ، حاول مرة أخرى';
+  }
+}
+
+function handleLogin(event) {
+  event.preventDefault();
+  if (!firebaseReady) { setLoginError('تعذّر الاتصال بالخادم'); return false; }
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const btn = document.getElementById('login-submit-btn');
+  setLoginError('');
+  btn.disabled = true; btn.textContent = 'جاري الدخول…';
+  firebase.auth().signInWithEmailAndPassword(email, password)
+    .catch(err => {
+      setLoginError(authErrorMessage(err));
+      btn.disabled = false; btn.textContent = 'دخول';
+    });
+  return false;
+}
+
+function handleResetPassword() {
+  const email = document.getElementById('login-email').value.trim();
+  if (!email) { setLoginError('اكتب بريدك الإلكتروني أولاً ثم اضغط "نسيت كلمة السر؟"'); return; }
+  setLoginError('');
+  firebase.auth().sendPasswordResetEmail(email)
+    .then(() => setLoginError('✓ تم إرسال رابط إعادة التعيين إلى بريدك الإلكتروني'))
+    .catch(err => setLoginError(authErrorMessage(err)));
+}
+
+function logout() {
+  if (!confirm('تسجيل الخروج؟')) return;
+  firebase.auth().signOut();
+}
+
+function showLoginScreen(statusMsg) {
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('login-status').textContent = statusMsg || 'سجّل دخولك للمتابعة';
+  document.getElementById('login-form').style.display = statusMsg ? 'none' : 'block';
+  const btn = document.getElementById('login-submit-btn');
+  if (btn) { btn.disabled = false; btn.textContent = 'دخول'; }
+  document.getElementById('logout-btn').style.display = 'none';
+}
+
+function hideLoginScreen() {
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('logout-btn').style.display = '';
+}
+
+if (firebaseReady) {
+  firebase.auth().onAuthStateChanged(user => {
+    if (user) {
+      hideLoginScreen();
+      if (!appStarted) { appStarted = true; init(); }
+    } else {
+      showLoginScreen();
+      // if the user logs out mid-session, stop showing stale data underneath the gate
+      appStarted = false;
+    }
+  });
+} else {
+  showLoginScreen('تعذّر الاتصال بالخادم — تأكد من الإنترنت وأعد التحميل');
 }
 // Firebase Realtime DB queues writes made while offline and flushes them on reconnect.
 
@@ -1752,7 +1872,6 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-init();
 </script>
 </body>
 </html>
