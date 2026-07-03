@@ -265,7 +265,7 @@
   <div class="card">
     <div class="field">
       <label>الطالب</label>
-      <select id="student-select" onchange="onStudentChange()"><option value="">— اختر طالباً —</option></select>
+      <select id="student-select" onchange="onStudentSelectManualChange()"><option value="">— اختر طالباً —</option></select>
     </div>
   </div>
 
@@ -823,6 +823,13 @@ function refreshVisibleScreens() {
 
 const STAR_LABELS = ['','ضعيف','مقبول','جيد','جيد جداً','ممتاز'];
 
+// M1: single source of truth for halaqa days that don't count toward
+// attendance totals (was hardcoded separately in two places).
+const EXCLUDED_HALAQA_DATES = ['2026-06-04'];
+// M9: minimum attendance % to earn a "نجم الحضور" badge (was hardcoded
+// separately as three different literal `70` arguments).
+const ATTENDANCE_BADGE_THRESHOLD = 70;
+
 // Escape any value before injecting it into innerHTML — closes the stored-XSS
 // hole where student names / notes / phone numbers (editable via parent-form.html
 // or directly in Firebase) could otherwise run as HTML/JS in the admin's browser.
@@ -1088,6 +1095,24 @@ function getLohData() {
   })).filter(l => l.sura);
 }
 
+// M5: the dropdown's onchange goes through here (not straight to onStudentChange)
+// so we can detect the admin picking a *different* student while mid-edit of an
+// existing session. Without this, saving would silently reassign that old
+// session to the newly-picked student instead of the one it actually belongs to.
+function onStudentSelectManualChange() {
+  if (editingRecordId !== null) {
+    const editingRec = records.find(r => String(r.id) === String(editingRecordId));
+    const newName = document.getElementById('student-select').value;
+    if (editingRec && displayStudentName(editingRec) !== newName) {
+      editingRecordId = null;
+      const btn = document.querySelector('#screen-record .save-btn');
+      if (btn) btn.innerHTML = '💾 حفظ الجلسة';
+      showToast('↩️ تم الخروج من وضع التعديل — دي جلسة جديدة دلوقتي');
+    }
+  }
+  onStudentChange();
+}
+
 function onStudentChange() {
   const name = document.getElementById('student-select').value;
   if (!name) { document.getElementById('prev-task-card').style.display='none'; return; }
@@ -1162,7 +1187,7 @@ function renderStudentSelect() {
 }
 
 function getAttendanceRanking(minPct) {
-  const totalHalaqaDays = new Set(records.map(r=>r.date).filter(d => d && d !== '2026-06-04')).size;
+  const totalHalaqaDays = new Set(records.map(r=>r.date).filter(d => d && !EXCLUDED_HALAQA_DATES.includes(d))).size;
   const per = students.map(s=>{
     const name = getStudentName(s);
     const recs = recordsForStudent(s);
@@ -1207,7 +1232,7 @@ function renderStudentList() {
   const el = document.getElementById('students-list');
   if (!students.length) { el.innerHTML = '<div class="empty-state">لا يوجد طلاب بعد</div>'; return; }
   const topRanks = {};
-  getAttendanceRanking(70).list.forEach(x => { topRanks[x.name] = x.rank; });
+  getAttendanceRanking(ATTENDANCE_BADGE_THRESHOLD).list.forEach(x => { topRanks[x.name] = x.rank; });
   el.innerHTML = students.map((s,i) => {
     const name = getStudentName(s);
     const age = s.age ? s.age + ' سنة' : '';
@@ -1279,7 +1304,11 @@ function saveStudentModal() {
     phonePrimary: document.getElementById('modal-phone-primary').value.trim(),
     phoneSecondary: document.getElementById('modal-phone-secondary').value.trim(),
   };
-  if (!existing && students.find(s => getStudentName(s) === name)) { alert('الاسم موجود بالفعل'); return; }
+  // M6: duplicate-name check used to only run when adding a NEW student —
+  // renaming an existing one to match another student's name went through
+  // silently. Exclude the student being edited from the comparison so a
+  // no-op rename (same name) still passes.
+  if (students.find(s => getStudentName(s) === name && s.id !== obj.id)) { alert('الاسم موجود بالفعل'); return; }
 
   const btn = document.querySelector('#student-modal .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'جاري الحفظ…'; }
@@ -1413,7 +1442,7 @@ function saveRecord() {
   // H3: lock the button immediately so a double-tap can't fire this twice
   // while the first save is still in flight.
   savingRecord = true;
-  const btn = document.querySelector('.save-btn');
+  const btn = document.querySelector('#screen-record .save-btn');
   const originalLabel = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.style.opacity = '0.7'; btn.innerHTML = '⏳ جاري الحفظ…'; }
 
@@ -1567,7 +1596,7 @@ function editRecord(id) {
   // note
   document.getElementById('general-note').value = r.note || '';
   // change save button label
-  const btn = document.querySelector('.save-btn');
+  const btn = document.querySelector('#screen-record .save-btn');
   if (btn) btn.innerHTML = '💾 تحديث الجلسة';
   window.scrollTo(0, 0);
   showToast('✏️ وضع التعديل');
@@ -1584,7 +1613,6 @@ function countAyat(from, to) {
 function renderStats() {
   const total = records.length;
   const uniq = [...new Set(records.map(r=>r.studentId || r.student))].length;
-  const withTj = records.filter(r=>r.tajweed).length;
   const scoredRecs = records.filter(r=>hasScore(r.loh));
   const avgL = scoredRecs.length ? Math.round(scoredRecs.reduce((a,r)=>a+r.loh.score,0)/scoredRecs.length) : (total ? Math.round(records.reduce((a,r)=>a+(r.loh?r.loh.stars:0),0)/total*20) : 0);
 
@@ -1601,7 +1629,7 @@ function renderStats() {
   const totalAyat = lohAyat + madiAyat + tajweedAyat;
 
   // إجمالي أيام الحلقة = الأيام الفريدة اللي اتسجل فيها أي طالب
-  const totalHalaqaDays = new Set(records.map(r=>r.date).filter(d => d && d !== '2026-06-04')).size;
+  const totalHalaqaDays = new Set(records.map(r=>r.date).filter(d => d && !EXCLUDED_HALAQA_DATES.includes(d))).size;
 
   document.getElementById('stat-grid').innerHTML = `
     <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-num">${total}</div><div class="stat-lbl">جلسة مسجلة</div></div>
@@ -1653,7 +1681,7 @@ function renderStats() {
     </div>`).join(''); }
 
   // أعلى 15 حضوراً (مع مشاركة نفس المركز عند تساوي النسبة)
-  const topAttend = getAttendanceRanking(70).list;
+  const topAttend = getAttendanceRanking(ATTENDANCE_BADGE_THRESHOLD).list;
   const topAttendEl = document.getElementById('top-attend-list');
   if (!topAttend.length) { topAttendEl.innerHTML='<div class="empty-state">لا يوجد بيانات</div>'; }
   else {
@@ -1869,8 +1897,10 @@ function showWhatsAppPrompt(rec, sObj) {
   const dateStr = new Date(rec.date).toLocaleDateString('ar-EG', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
   const nl = '\n';
 
-  // get the previous session to know what was recited today
-  const prevRecs = records.filter(r => studentMatch(r, sObj) && !r.attendance_only && r.id !== rec.id)
+  // get the previous session to know what was recited today. M7: byNewest(r, rec) > 0
+  // means r sorts AFTER rec (i.e. r is older) — without this guard, editing an old
+  // session could pull in a session that's actually newer than the one being edited.
+  const prevRecs = records.filter(r => studentMatch(r, sObj) && !r.attendance_only && r.id !== rec.id && byNewest(r, rec) > 0)
                           .sort(byNewest);
   const prevRec = prevRecs[0];
 
@@ -1951,7 +1981,7 @@ function closeWaModal(e) {
 
 /* ---- نجوم الحضور ---- */
 function openStarsCard() {
-  const { list, totalHalaqaDays } = getAttendanceRanking(70);
+  const { list, totalHalaqaDays } = getAttendanceRanking(ATTENDANCE_BADGE_THRESHOLD);
   if (!list.length) { alert('لا يوجد طلاب بنسبة حضور 70% أو أكثر بعد'); return; }
   const monthLabel = new Date().toLocaleDateString('ar-EG', {month:'long', year:'numeric'});
   const rowsHtml = list.map(x=>`
