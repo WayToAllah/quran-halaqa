@@ -263,9 +263,12 @@
     <input type="date" id="session-date">
   </div>
   <div class="card">
-    <div class="field">
+    <div class="field sura-field">
       <label>الطالب</label>
-      <select id="student-select" onchange="onStudentSelectManualChange()"><option value="">— اختر طالباً —</option></select>
+      <input type="text" id="student-search-input" placeholder="اكتب اسم الطالب..." autocomplete="off"
+        oninput="filterStudents()" onfocus="showStudentDropdown()" onblur="hideStudentDropdown()">
+      <input type="hidden" id="student-select" value="">
+      <div class="sura-dropdown" id="student-search-dropdown"></div>
     </div>
   </div>
 
@@ -807,10 +810,8 @@ function showConnectionError() {
 }
 
 function refreshVisibleScreens() {
-  const sel = document.getElementById('student-select');
-  const curStudent = sel ? sel.value : '';
   renderStudentSelect();
-  if (curStudent && sel) sel.value = curStudent;
+  const curStudent = document.getElementById('student-select').value;
   renderStudentList();
   updateHeader();
   const active = document.querySelector('.screen.active');
@@ -1180,10 +1181,83 @@ function getStudentName(s) { return typeof s === 'string' ? s : s.name; }
 
 function renderStudentSelect() {
   const sel = document.getElementById('student-select');
+  const input = document.getElementById('student-search-input');
   const cur = sel.value;
-  sel.innerHTML = '<option value="">— اختر طالباً —</option>' +
-    students.map(s => { const n=getStudentName(s); return `<option value="${esc(n)}">${esc(n)}</option>`; }).join('');
-  if (students.find(s=>getStudentName(s)===cur)) sel.value = cur;
+  const stillExists = students.find(s => getStudentName(s) === cur);
+  if (cur && !stillExists) {
+    // the previously-selected student was deleted — clear the selection
+    sel.value = '';
+    if (input) input.value = '';
+  } else if (input && document.activeElement !== input) {
+    // keep the visible search box in sync with the underlying value,
+    // but don't fight the admin while they're actively typing in it
+    input.value = cur;
+  }
+}
+
+// M3: searchable student picker, replacing the old native <select> with 50
+// names in it — same interaction pattern as the sura search fields above.
+let studentDropdownList = [];
+
+function studentSearchMatches(query) {
+  const list = query
+    ? students.filter(s => getStudentName(s).includes(query))
+    : [...students].sort((a, b) => getStudentName(a).localeCompare(getStudentName(b), 'ar'));
+  return list;
+}
+
+function filterStudents() {
+  const query = document.getElementById('student-search-input').value.trim();
+  studentDropdownList = studentSearchMatches(query);
+  renderStudentDropdown();
+  showStudentDropdown();
+  // clear the hidden value while typing — forces an explicit pick from the
+  // list rather than silently accepting a half-typed name as a selection.
+  document.getElementById('student-select').value = '';
+}
+
+function renderStudentDropdown() {
+  const dd = document.getElementById('student-search-dropdown');
+  if (!studentDropdownList.length) {
+    dd.innerHTML = '<div class="sura-item" style="color:var(--text-hint)">لا يوجد طالب بهذا الاسم</div>';
+    return;
+  }
+  // index-based selection (not the name embedded in the onclick string) —
+  // student names are user-editable, unlike the fixed SURAS list, so we
+  // avoid ever building a JS-string-in-HTML-attribute out of untrusted text.
+  dd.innerHTML = studentDropdownList.map((s, i) => {
+    const name = getStudentName(s);
+    const meta = s.grade || '';
+    return `<div class="sura-item" onmousedown="selectStudentByIndex(${i})">${esc(name)}${meta ? `<span class="sura-count">${esc(meta)}</span>` : ''}</div>`;
+  }).join('');
+}
+
+function selectStudentByIndex(i) {
+  const s = studentDropdownList[i];
+  if (!s) return;
+  const name = getStudentName(s);
+  document.getElementById('student-search-input').value = name;
+  document.getElementById('student-select').value = name;
+  hideStudentDropdown(true);
+  onStudentSelectManualChange();
+}
+
+function showStudentDropdown() {
+  const query = document.getElementById('student-search-input').value.trim();
+  studentDropdownList = studentSearchMatches(query);
+  renderStudentDropdown();
+  document.getElementById('student-search-dropdown').style.display = 'block';
+}
+
+let studentHideTimer = null;
+function hideStudentDropdown(immediate) {
+  if (immediate) {
+    document.getElementById('student-search-dropdown').style.display = 'none';
+  } else {
+    studentHideTimer = setTimeout(() => {
+      document.getElementById('student-search-dropdown').style.display = 'none';
+    }, 200);
+  }
 }
 
 function getAttendanceRanking(minPct) {
@@ -1501,6 +1575,7 @@ function resetForm() {
   // hide prev card
   document.getElementById('prev-task-card').style.display='none';
   document.getElementById('student-select').value='';
+  document.getElementById('student-search-input').value='';
 }
 
 /* ---- Log ---- */
@@ -1564,6 +1639,7 @@ function editRecord(id) {
   // student + date — resolve via studentId first so this still works correctly
   // even if the student was renamed after this session was recorded.
   document.getElementById('student-select').value = displayStudentName(r);
+  document.getElementById('student-search-input').value = displayStudentName(r);
   onStudentChange();
   if (r.date) document.getElementById('session-date').value = r.date;
   // prev-task evaluation scores
