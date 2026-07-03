@@ -267,6 +267,7 @@
     <label for="session-date">📅 تاريخ الجلسة</label>
     <input type="date" id="session-date">
   </div>
+  <button type="button" onclick="openAttendanceModal()" class="add-fab" style="margin-bottom:14px">✅ تسجيل حضور جماعي</button>
   <div class="card">
     <div class="field sura-field">
       <label>الطالب</label>
@@ -534,6 +535,33 @@
     </div>
   </div>
 </div>
+
+<!-- Group attendance modal -->
+<div class="modal-overlay" id="attendance-modal" onclick="closeAttendanceModalOnBg(event)" role="dialog" aria-modal="true" aria-label="تسجيل حضور جماعي">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <span class="modal-title">✅ تسجيل حضور جماعي</span>
+      <button class="modal-close" onclick="closeAttendanceModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="date-strip" style="margin-bottom:14px">
+        <label for="attendance-date">📅 التاريخ</label>
+        <input type="date" id="attendance-date" onchange="renderAttendanceChecklist()">
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:13px;color:var(--text-muted)" id="attendance-count-label">0 محدد</span>
+        <button type="button" onclick="toggleAllAttendance()" style="background:none;border:none;color:var(--green);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">تحديد الكل / إلغاء</button>
+      </div>
+      <div id="attendance-checklist" style="max-height:48vh;overflow-y:auto"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeAttendanceModal()">إلغاء</button>
+      <button class="btn-primary" id="attendance-save-btn" onclick="saveGroupAttendance()">✅ حفظ الحضور</button>
+    </div>
+  </div>
+</div>
+
 
 <div class="toast" id="toast">✓ تم الحفظ بنجاح</div>
 <div class="toast undo-toast" id="undo-toast">
@@ -1428,6 +1456,103 @@ function closeStudentModal() {
 
 function closeModalOnBg(e) {
   if (e.target === document.getElementById('student-modal')) closeStudentModal();
+}
+
+// ============================================================================
+//  U1 — Group attendance check-in. Creates attendance_only records (the same
+//  type already used by the historical import) for every checked student on
+//  the chosen date, in one batch, without walking through the full loh/madi
+//  flow for each one individually.
+// ============================================================================
+let attendanceChecked = new Set(); // student ids checked in the current modal session
+
+function studentHasRecordOnDate(s, dateStr) {
+  return records.some(r => studentMatch(r, s) && r.date === dateStr);
+}
+
+function openAttendanceModal() {
+  const dateEl = document.getElementById('attendance-date');
+  dateEl.value = document.getElementById('session-date').value || localDateStr();
+  attendanceChecked = new Set();
+  renderAttendanceChecklist();
+  document.getElementById('attendance-modal').classList.add('open');
+}
+
+function closeAttendanceModal() {
+  document.getElementById('attendance-modal').classList.remove('open');
+}
+
+function closeAttendanceModalOnBg(e) {
+  if (e.target === document.getElementById('attendance-modal')) closeAttendanceModal();
+}
+
+function renderAttendanceChecklist() {
+  const dateStr = document.getElementById('attendance-date').value;
+  const el = document.getElementById('attendance-checklist');
+  const sorted = [...students].sort((a, b) => getStudentName(a).localeCompare(getStudentName(b), 'ar'));
+  el.innerHTML = sorted.map(s => {
+    const name = getStudentName(s);
+    const already = studentHasRecordOnDate(s, dateStr);
+    const checked = attendanceChecked.has(s.id);
+    return `<label style="display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid var(--border);${already ? 'opacity:0.5' : ''}">
+      <input type="checkbox" style="width:20px;height:20px;flex-shrink:0" ${checked ? 'checked' : ''} ${already ? 'disabled' : ''}
+        onchange="toggleAttendanceStudent('${esc(s.id)}', this.checked)">
+      <span style="flex:1;font-size:14px">${esc(name)}</span>
+      ${already ? '<span style="font-size:11px;color:var(--text-hint)">مسجّل بالفعل</span>' : ''}
+    </label>`;
+  }).join('');
+  updateAttendanceCountLabel();
+}
+
+function toggleAttendanceStudent(id, isChecked) {
+  if (isChecked) attendanceChecked.add(id); else attendanceChecked.delete(id);
+  updateAttendanceCountLabel();
+}
+
+function toggleAllAttendance() {
+  const dateStr = document.getElementById('attendance-date').value;
+  const eligible = students.filter(s => !studentHasRecordOnDate(s, dateStr));
+  const allChecked = eligible.length > 0 && eligible.every(s => attendanceChecked.has(s.id));
+  attendanceChecked = allChecked ? new Set() : new Set(eligible.map(s => s.id));
+  renderAttendanceChecklist();
+}
+
+function updateAttendanceCountLabel() {
+  document.getElementById('attendance-count-label').textContent = `${attendanceChecked.size} محدد`;
+}
+
+function saveGroupAttendance() {
+  const dateStr = document.getElementById('attendance-date').value;
+  if (!dateStr) { alert('اختر التاريخ أولاً'); return; }
+  const toSave = students.filter(s => attendanceChecked.has(s.id) && !studentHasRecordOnDate(s, dateStr));
+  if (!toSave.length) { alert('اختر طالباً واحداً على الأقل'); return; }
+
+  const btn = document.getElementById('attendance-save-btn');
+  btn.disabled = true;
+  btn.textContent = 'جاري الحفظ…';
+
+  const writes = toSave.map(s => saveRecordToFirebase({
+    id: genId('att'),
+    studentId: s.id,
+    student: getStudentName(s),
+    date: dateStr,
+    attendance_only: true,
+    note: ''
+  }));
+
+  Promise.all(writes)
+    .then(() => {
+      closeAttendanceModal();
+      showToast(`✓ تم تسجيل حضور ${toSave.length} طالب`);
+    })
+    .catch(err => {
+      console.error('saveGroupAttendance failed:', err);
+      showToast('⚠️ فشل حفظ بعض السجلات — تأكد من الإنترنت', true);
+    })
+    .finally(() => {
+      btn.disabled = false;
+      btn.textContent = '✅ حفظ الحضور';
+    });
 }
 
 function saveStudentModal() {
