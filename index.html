@@ -612,6 +612,14 @@ function refreshVisibleScreens() {
 }
 
 const STAR_LABELS = ['','ضعيف','مقبول','جيد','جيد جداً','ممتاز'];
+
+// Escape any value before injecting it into innerHTML — closes the stored-XSS
+// hole where student names / notes / phone numbers (editable via parent-form.html
+// or directly in Firebase) could otherwise run as HTML/JS in the admin's browser.
+// Safe for both text nodes and quoted HTML attributes.
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzw3X51RGVsjg0IhXbD1Tbv0ZZ09bUP8jiM4ufEU3fVRw2Ow3nbQqVosvzeAQId1_zQjQ/exec';
 
 async function syncToSheets(type, payload) {
@@ -752,17 +760,17 @@ function addMadiRow(data) {
         <label>السورة</label>
         <input type="text" id="${id}-sura-input" placeholder="اكتب اسم السورة..." autocomplete="off"
           oninput="filterSuras('${id}')" onfocus="showDropdown('${id}')" onblur="hideDropdown('${id}')">
-        <input type="hidden" id="${id}-sura" value="${data ? data.sura||'' : ''}">
+        <input type="hidden" id="${id}-sura" value="${esc(data ? data.sura||'' : '')}">
         <div class="sura-dropdown" id="${id}-sura-dropdown"></div>
       </div>
       <div class="field">
         <label>من آية</label>
-        <input type="number" id="${id}-from" placeholder="١" min="1" value="${data ? data.from||'' : ''}" oninput="validateAyah('${id}')">
+        <input type="number" id="${id}-from" placeholder="١" min="1" value="${esc(data ? data.from||'' : '')}" oninput="validateAyah('${id}')">
         <div class="field-error" id="err-${id}-from"></div>
       </div>
       <div class="field">
         <label>إلى آية</label>
-        <input type="number" id="${id}-to" placeholder="٢٠" min="1" value="${data ? data.to||'' : ''}" oninput="validateAyah('${id}')">
+        <input type="number" id="${id}-to" placeholder="٢٠" min="1" value="${esc(data ? data.to||'' : '')}" oninput="validateAyah('${id}')">
         <div class="field-error" id="err-${id}-to"></div>
       </div>
     </div>
@@ -829,17 +837,17 @@ function addLohRow(data) {
         <label>السورة</label>
         <input type="text" id="${id}-sura-input" placeholder="اكتب اسم السورة..." autocomplete="off"
           oninput="filterSuras('${id}')" onfocus="showDropdown('${id}')" onblur="hideDropdown('${id}')">
-        <input type="hidden" id="${id}-sura" value="${data ? data.sura||'' : ''}">
+        <input type="hidden" id="${id}-sura" value="${esc(data ? data.sura||'' : '')}">
         <div class="sura-dropdown" id="${id}-sura-dropdown"></div>
       </div>
       <div class="field">
         <label>من آية</label>
-        <input type="number" id="${id}-from" placeholder="١" min="1" value="${data ? data.from||'' : ''}" oninput="validateAyah('${id}')">
+        <input type="number" id="${id}-from" placeholder="١" min="1" value="${esc(data ? data.from||'' : '')}" oninput="validateAyah('${id}')">
         <div class="field-error" id="err-${id}-from"></div>
       </div>
       <div class="field">
         <label>إلى آية</label>
-        <input type="number" id="${id}-to" placeholder="١٠" min="1" value="${data ? data.to||'' : ''}" oninput="validateAyah('${id}')">
+        <input type="number" id="${id}-to" placeholder="١٠" min="1" value="${esc(data ? data.to||'' : '')}" oninput="validateAyah('${id}')">
         <div class="field-error" id="err-${id}-to"></div>
       </div>
     </div>
@@ -938,7 +946,7 @@ function renderStudentSelect() {
   const sel = document.getElementById('student-select');
   const cur = sel.value;
   sel.innerHTML = '<option value="">— اختر طالباً —</option>' +
-    students.map(s => { const n=getStudentName(s); return `<option value="${n}">${n}</option>`; }).join('');
+    students.map(s => { const n=getStudentName(s); return `<option value="${esc(n)}">${esc(n)}</option>`; }).join('');
   if (students.find(s=>getStudentName(s)===cur)) sel.value = cur;
 }
 
@@ -998,20 +1006,20 @@ function renderStudentList() {
     const count = records.filter(r=>r.student===name).length;
     const initials = name.trim().split(' ').slice(0,2).map(w=>w[0]).join('');
     const primary = s.phonePrimary || s.phoneMom || '';
-    const phoneMom = primary ? `<span style="font-size:11px;color:var(--text-hint)">واتساب: ${primary}</span>` : '';
-    const phoneDad = (s.phoneSecondary||s.phoneDad) ? `<span style="font-size:11px;color:var(--text-hint);margin-right:8px">متابع: ${s.phoneSecondary||s.phoneDad}</span>` : '';
+    const phoneMom = primary ? `<span style="font-size:11px;color:var(--text-hint)">واتساب: ${esc(primary)}</span>` : '';
+    const phoneDad = (s.phoneSecondary||s.phoneDad) ? `<span style="font-size:11px;color:var(--text-hint);margin-right:8px">متابع: ${esc(s.phoneSecondary||s.phoneDad)}</span>` : '';
     const badge = topRanks[name] ? attendBadgeHTML(topRanks[name]) : '';
     return `<div class="student-row">
-      <div class="student-avatar">${initials}</div>
-      <div class="student-info" onclick="openStudentModal('${s.id}')">
-        <div class="student-name-main">${name} ${badge}</div>
-        ${meta ? `<div class="student-meta-line">${meta}</div>` : ''}
+      <div class="student-avatar">${esc(initials)}</div>
+      <div class="student-info" onclick="openStudentModal('${esc(s.id)}')">
+        <div class="student-name-main">${esc(name)} ${badge}</div>
+        ${meta ? `<div class="student-meta-line">${esc(meta)}</div>` : ''}
         <div style="margin-top:2px">${phoneMom}${phoneDad}</div>
         <div class="student-meta-line">${count} جلسة مسجلة</div>
       </div>
       <div class="student-actions">
-        <button class="icon-btn" onclick="openStudentModal('${s.id}')" aria-label="تعديل">✏️</button>
-        <button class="icon-btn danger" onclick="deleteStudent(event,'${s.id}')" aria-label="حذف">🗑</button>
+        <button class="icon-btn" onclick="openStudentModal('${esc(s.id)}')" aria-label="تعديل">✏️</button>
+        <button class="icon-btn danger" onclick="deleteStudent(event,'${esc(s.id)}')" aria-label="حذف">🗑</button>
       </div>
     </div>`;
   }).join('');
@@ -1211,27 +1219,27 @@ function renderLog() {
     if (r.attendance_only) {
       const dateStr = r.date ? new Date(r.date).toLocaleDateString('ar-EG',{day:'numeric',month:'short'}) : r.date;
       return `<div class="log-entry">
-        <div class="log-header"><span class="log-student">${r.student}</span><div style="display:flex;align-items:center;gap:8px"><span class="log-date">${dateStr}</span>${actions}</div></div>
+        <div class="log-header"><span class="log-student">${esc(r.student)}</span><div style="display:flex;align-items:center;gap:8px"><span class="log-date">${dateStr}</span>${actions}</div></div>
         <div class="log-line" style="color:var(--text-hint)"><span>✅</span> حضور فقط</div>
       </div>`;
     }
-    const tj = r.tajweed ? `<div class="log-line"><span>📐</span> تجويد: ${r.tajweed.sura||'—'} (${r.tajweed.from||'?'}–${r.tajweed.to||'?'}) ${stars(r.tajweed.stars)}${r.tajweed.note?' · '+r.tajweed.note:''}</div>` : '';
+    const tj = r.tajweed ? `<div class="log-line"><span>📐</span> تجويد: ${esc(r.tajweed.sura)||'—'} (${esc(r.tajweed.from)||'?'}–${esc(r.tajweed.to)||'?'}) ${stars(r.tajweed.stars)}${r.tajweed.note?' · '+esc(r.tajweed.note):''}</div>` : '';
     const dateStr = r.date ? new Date(r.date).toLocaleDateString('ar-EG',{day:'numeric',month:'short'}) : r.date;
     return `<div class="log-entry">
-      <div class="log-header"><span class="log-student">${r.student}</span><div style="display:flex;align-items:center;gap:8px"><span class="log-date">${dateStr}</span>${actions}</div></div>
+      <div class="log-header"><span class="log-student">${esc(r.student)}</span><div style="display:flex;align-items:center;gap:8px"><span class="log-date">${dateStr}</span>${actions}</div></div>
       ${(() => {
         const lohArr = r.newLoh ? (Array.isArray(r.newLoh) ? r.newLoh : [r.newLoh]) : [];
         const filtered = lohArr.filter(l=>l && l.sura);
-        if (filtered.length) return filtered.map(l=>`<div class="log-line"><span>📝</span> لوح جديد: ${l.sura} (${l.from||'?'}–${l.to||'?'})</div>`).join('');
-        if (r.loh && r.loh.sura) return `<div class="log-line"><span>📖</span> لوح: ${r.loh.sura} (${r.loh.from||'?'}–${r.loh.to||'?'}) ${r.loh.score?r.loh.score+'/100 '+renderStarsHTML(r.loh.score)+' '+scoreName(r.loh.score):''}</div>`;
+        if (filtered.length) return filtered.map(l=>`<div class="log-line"><span>📝</span> لوح جديد: ${esc(l.sura)} (${esc(l.from)||'?'}–${esc(l.to)||'?'})</div>`).join('');
+        if (r.loh && r.loh.sura) return `<div class="log-line"><span>📖</span> لوح: ${esc(r.loh.sura)} (${esc(r.loh.from)||'?'}–${esc(r.loh.to)||'?'}) ${r.loh.score?r.loh.score+'/100 '+renderStarsHTML(r.loh.score)+' '+scoreName(r.loh.score):''}</div>`;
         return '';
       })()}
       ${r.loh&&r.loh.score ? `<div class="log-line"><span>⭐</span> تقييم اللوح: ${r.loh.score}/100 ${renderStarsHTML(r.loh.score)} ${scoreName(r.loh.score)}</div>` : ''}
       ${Array.isArray(r.madi)
-        ? r.madi.map(m=>`<div class="log-line"><span>🔄</span> ماضي: ${m.sura} (${m.from||'?'}–${m.to||'?'}) ${m.score ? m.score+'/100 '+renderStarsHTML(m.score)+' '+scoreName(m.score) : stars(m.stars)}</div>`).join('')
-        : (r.madi&&r.madi.sura?`<div class="log-line"><span>🔄</span> ماضي: ${r.madi.sura} (${r.madi.from||'?'}–${r.madi.to||'?'}) ${stars(r.madi.stars)}</div>`:'')}
+        ? r.madi.map(m=>`<div class="log-line"><span>🔄</span> ماضي: ${esc(m.sura)} (${esc(m.from)||'?'}–${esc(m.to)||'?'}) ${m.score ? m.score+'/100 '+renderStarsHTML(m.score)+' '+scoreName(m.score) : stars(m.stars)}</div>`).join('')
+        : (r.madi&&r.madi.sura?`<div class="log-line"><span>🔄</span> ماضي: ${esc(r.madi.sura)} (${esc(r.madi.from)||'?'}–${esc(r.madi.to)||'?'}) ${stars(r.madi.stars)}</div>`:'')}
       ${tj}
-      ${r.note?`<div class="log-line" style="color:var(--text-hint);font-style:italic">💬 ${r.note}</div>`:''}
+      ${r.note?`<div class="log-line" style="color:var(--text-hint);font-style:italic">💬 ${esc(r.note)}</div>`:''}
     </div>`;
   }).join('');
 }
@@ -1366,7 +1374,7 @@ function renderStats() {
     <div class="leader-card">
       <div class="leader-rank ${RANK_CLASS[i]}">${MEDALS[i]}</div>
       <div style="flex:1">
-        <div class="student-name-main">${x.name}</div>
+        <div class="student-name-main">${esc(x.name)}</div>
         <div class="student-meta-line">${x.ayat} آية مسمّعة · ${x.count} جلسة</div>
       </div>
       <div style="font-size:16px;font-weight:700;color:var(--gold)">${x.ayat}</div>
@@ -1381,7 +1389,7 @@ function renderStats() {
     <div class="leader-card">
       <div class="leader-rank ${rankClass(x.rank)}">${rankBadgeHTML(x.rank)}</div>
       <div style="flex:1">
-        <div class="student-name-main">${x.name}</div>
+        <div class="student-name-main">${esc(x.name)}</div>
         <div class="student-meta-line">المركز ${x.rank} · ${x.uniqueDays} يوم حضور من ${totalHalaqaDays}</div>
       </div>
       <div style="font-size:16px;font-weight:700;color:var(--green)">${x.attendPct}%</div>
@@ -1479,7 +1487,7 @@ function renderStudentStatsList() {
   el.innerHTML = list.map(x=>`
     <div style="padding:12px 0; border-bottom:1px solid var(--border)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <div class="student-name-main">${x.name}</div>
+        <div class="student-name-main">${esc(x.name)}</div>
         <div style="font-size:13px;font-weight:700;color:${barColor(x.attendPct)}">${x.attendPct}%</div>
       </div>
       <div style="background:var(--border);border-radius:4px;height:6px;margin-bottom:6px">
@@ -1677,7 +1685,7 @@ function openStarsCard() {
   const rowsHtml = list.map(x=>`
     <div class="stars-row-item">
       <div class="stars-rank">${rankBadgeHTML(x.rank)}</div>
-      <div class="stars-name">${x.name}</div>
+      <div class="stars-name">${esc(x.name)}</div>
       <div class="stars-pct">${x.attendPct}%</div>
     </div>`).join('');
   document.getElementById('stars-card-body').innerHTML = `
