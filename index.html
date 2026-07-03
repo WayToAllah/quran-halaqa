@@ -6,6 +6,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="حفظ القرآن">
+<meta name="theme-color" content="#15613a">
+<meta name="description" content="تطبيق متابعة حفظ القرآن للحلقة — تسجيل الجلسات، الحضور، والتقييم">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="icon" href="./icons/favicon.png">
 <title>متابعة حفظ القرآن</title>
 <style>
   * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
@@ -1717,6 +1722,26 @@ function showToast(msg) {
   t.textContent = msg || '✓ تم الحفظ بنجاح';
   t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+// ---- PWA: register service worker for offline + installable app ----
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => {
+        // when a new version of sw.js is deployed, prompt the user to refresh
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (!newWorker) return;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
+              showToast('🔄 يتوفر تحديث جديد — أعد تحميل الصفحة');
+            }
+          });
+        });
+      })
+      .catch(err => console.warn('SW registration failed:', err));
+  });
 }
 
 init();
