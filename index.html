@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="حفظ القرآن">
@@ -46,7 +46,7 @@
   .field { margin-bottom:13px; }
   .field:last-child { margin-bottom:0; }
   .field label { display:block; font-size:13px; color:var(--text-muted); margin-bottom:6px; font-weight:500; }
-  .field input, .field select, .field textarea { width:100%; font-size:15px; padding:11px 13px; border:1.5px solid var(--border-strong); border-radius:var(--radius-sm); background:var(--green-tint); color:var(--text); font-family:inherit; appearance:none; -webkit-appearance:none; transition:border-color 0.2s, background 0.2s, box-shadow 0.2s; }
+  .field input, .field select, .field textarea { width:100%; font-size:16px; padding:11px 13px; border:1.5px solid var(--border-strong); border-radius:var(--radius-sm); background:var(--green-tint); color:var(--text); font-family:inherit; appearance:none; -webkit-appearance:none; transition:border-color 0.2s, background 0.2s, box-shadow 0.2s; }
   .field input:focus, .field select:focus, .field textarea:focus { outline:none; border-color:var(--green); background:white; box-shadow:0 0 0 3px var(--green-light); }
   .field textarea { resize:none; }
   .field input.invalid { border-color:var(--red) !important; background:#fdf0ef !important; }
@@ -127,6 +127,11 @@
   .toast { position:fixed; bottom:92px; left:50%; transform:translateX(-50%) translateY(10px); background:var(--green-deep); color:white; padding:12px 24px; border-radius:30px; font-size:14px; font-weight:600; opacity:0; transition:opacity 0.3s,transform 0.3s; pointer-events:none; white-space:nowrap; z-index:300; box-shadow:var(--shadow-lg); }
   .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
   .toast.error { background:var(--red); }
+  .undo-toast { display:flex; align-items:center; gap:16px; }
+  .undo-toast.show { pointer-events:auto; }
+  .undo-toast button { background:none; border:none; color:var(--gold-soft); font-weight:800; font-size:14px; cursor:pointer; padding:0; font-family:inherit; text-decoration:underline; }
+  .skeleton-row { height:52px; border-radius:var(--radius-sm); margin-bottom:10px; background:linear-gradient(90deg,var(--border) 25%,var(--border-strong) 37%,var(--border) 63%); background-size:400% 100%; animation:skeleton-pulse 1.4s ease-in-out infinite; }
+  @keyframes skeleton-pulse { 0%{background-position:100% 50%} 100%{background-position:0 50%} }
 
   /* Stats */
   .stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:11px; margin-bottom:13px; }
@@ -378,6 +383,9 @@
 <div id="screen-log" class="screen">
   <div class="card">
     <div class="card-title"><div class="dot"></div> آخر الجلسات</div>
+    <div class="field" style="margin-bottom:12px">
+      <input type="text" id="log-search-input" placeholder="🔍 ابحث باسم الطالب..." autocomplete="off" oninput="renderLog()">
+    </div>
     <div id="log-list"></div>
   </div>
 </div>
@@ -428,7 +436,7 @@
 </nav>
 
 <!-- Student modal -->
-<div class="modal-overlay" id="student-modal" onclick="closeModalOnBg(event)">
+<div class="modal-overlay" id="student-modal" onclick="closeModalOnBg(event)" role="dialog" aria-modal="true" aria-labelledby="modal-title">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
     <div class="modal-header">
@@ -490,7 +498,7 @@
 <button class="fab" id="fab-add-student" onclick="openStudentModal(null)" aria-label="إضافة طالب">+</button>
 
 <!-- WhatsApp modal -->
-<div class="modal-overlay" id="wa-modal" onclick="closeWaModal(event)">
+<div class="modal-overlay" id="wa-modal" onclick="closeWaModal(event)" role="dialog" aria-modal="true" aria-label="إرسال ملخص الجلسة">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
     <div class="modal-header">
@@ -502,12 +510,13 @@
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="document.getElementById('wa-modal').classList.remove('open')">تخطي</button>
+      <button class="btn-secondary" onclick="copyWaMessage()" style="flex:0 0 auto;padding:14px 16px">📋</button>
       <button class="btn-primary" id="wa-send-btn" onclick="sendWhatsApp()" style="background:#25D366">📲 إرسال واتساب</button>
     </div>
   </div>
 </div>
 <!-- Stars/Attendance-champions modal -->
-<div class="modal-overlay" id="stars-modal" onclick="closeStarsModal(event)">
+<div class="modal-overlay" id="stars-modal" onclick="closeStarsModal(event)" role="dialog" aria-modal="true" aria-label="نجوم الحضور">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
     <div class="modal-header">
@@ -527,6 +536,10 @@
 </div>
 
 <div class="toast" id="toast">✓ تم الحفظ بنجاح</div>
+<div class="toast undo-toast" id="undo-toast">
+  <span id="undo-toast-text"></span>
+  <button type="button" onclick="undoPendingDelete()">تراجع</button>
+</div>
 
 <script>
 const firebaseConfig = {
@@ -768,6 +781,57 @@ function deleteRecordFromFirebase(id) {
 // ---- Live sync: the ONLY way data enters the app ----
 let syncStarted = false;
 let firstStudentsLoaded = false, firstRecordsLoaded = false;
+
+// U2: lets render functions show a loading skeleton instead of a misleading
+// "no data yet" empty-state during the brief window before the first
+// Firebase sync completes.
+function dataReady() { return firstStudentsLoaded && firstRecordsLoaded; }
+function skeletonRows(n) { return Array(n).fill('<div class="skeleton-row"></div>').join(''); }
+
+// ---- U3: undoable delete — hides the item immediately (optimistic), only
+// actually deletes from Firebase after a grace period with no undo click.
+const pendingDeleteRecordIds = new Set();
+const pendingDeleteStudentIds = new Set();
+let pendingDeleteTimer = null;
+let pendingDeleteUndo = null;
+
+function showUndoToast(msg, onUndo) {
+  const t = document.getElementById('undo-toast');
+  document.getElementById('undo-toast-text').textContent = msg;
+  pendingDeleteUndo = onUndo;
+  t.classList.add('show');
+}
+
+function hideUndoToast() {
+  document.getElementById('undo-toast').classList.remove('show');
+  pendingDeleteUndo = null;
+}
+
+function undoPendingDelete() {
+  if (pendingDeleteUndo) pendingDeleteUndo();
+}
+
+function scheduleUndoableDelete(idSet, id, label, performDelete) {
+  const key = String(id);
+  idSet.add(key);
+  refreshVisibleScreens();
+  clearTimeout(pendingDeleteTimer);
+  pendingDeleteTimer = setTimeout(() => {
+    idSet.delete(key);
+    hideUndoToast();
+    performDelete().catch(err => {
+      console.error('delete failed:', err);
+      showToast('⚠️ فشل الحذف — تأكد من الإنترنت وحاول تاني', true);
+      refreshVisibleScreens();
+    });
+  }, 5000);
+  showUndoToast(label, () => {
+    idSet.delete(key);
+    clearTimeout(pendingDeleteTimer);
+    hideUndoToast();
+    refreshVisibleScreens();
+  });
+}
 
 function startSync() {
   if (syncStarted) return;
@@ -1304,10 +1368,12 @@ function attendBadgeHTML(rank) {
 
 function renderStudentList() {
   const el = document.getElementById('students-list');
-  if (!students.length) { el.innerHTML = '<div class="empty-state">لا يوجد طلاب بعد</div>'; return; }
+  if (!students.length) { el.innerHTML = dataReady() ? '<div class="empty-state">لا يوجد طلاب بعد</div>' : skeletonRows(5); return; }
+  const visibleStudents = students.filter(s => !pendingDeleteStudentIds.has(String(s.id)));
+  if (!visibleStudents.length) { el.innerHTML = '<div class="empty-state">لا يوجد طلاب بعد</div>'; return; }
   const topRanks = {};
   getAttendanceRanking(ATTENDANCE_BADGE_THRESHOLD).list.forEach(x => { topRanks[x.name] = x.rank; });
-  el.innerHTML = students.map((s,i) => {
+  el.innerHTML = visibleStudents.map((s,i) => {
     const name = getStudentName(s);
     const age = s.age ? s.age + ' سنة' : '';
     const grade = s.grade || '';
@@ -1416,11 +1482,7 @@ function deleteStudent(e, id) {
     ? `حذف "${getStudentName(s)}"؟\n\nله ${linkedCount} جلسة مسجلة — هتفضل موجودة في السجل والإحصائيات باسمه الحالي لكن بدون إمكانية ربطها بملفه بعد الحذف.`
     : `حذف "${getStudentName(s)}"؟`;
   if (!confirm(warning)) return;
-  deleteStudentFromFirebase(id) // listener removes it from every device
-    .catch(err => {
-      console.error('deleteStudent failed:', err);
-      showToast('⚠️ فشل الحذف — تأكد من الإنترنت وحاول تاني', true);
-    });
+  scheduleUndoableDelete(pendingDeleteStudentIds, id, `🗑 تم حذف ${getStudentName(s)}`, () => deleteStudentFromFirebase(id));
 }
 
 /* ---- Sura validation ---- */
@@ -1581,8 +1643,18 @@ function resetForm() {
 /* ---- Log ---- */
 function renderLog() {
   const el = document.getElementById('log-list');
-  if (!records.length) { el.innerHTML='<div class="empty-state"><div class="big">📝</div>لا يوجد جلسات مسجلة بعد</div>'; return; }
-  const sorted = [...records].sort(byNewest).slice(0,40);
+  if (!records.length) { el.innerHTML = dataReady() ? '<div class="empty-state"><div class="big">📝</div>لا يوجد جلسات مسجلة بعد</div>' : skeletonRows(6); return; }
+  const searchInput = document.getElementById('log-search-input');
+  const query = searchInput ? searchInput.value.trim() : '';
+  const allSorted = [...records].filter(r => !pendingDeleteRecordIds.has(String(r.id))).sort(byNewest);
+  // M4: with an active search, show every match (capped generously) instead
+  // of only ever looking at the most recent 40 sessions total.
+  const filtered = query ? allSorted.filter(r => displayStudentName(r).includes(query)) : allSorted;
+  const sorted = filtered.slice(0, query ? 200 : 40);
+  if (query && !sorted.length) {
+    el.innerHTML = `<div class="empty-state"><div class="big">🔍</div>لا يوجد نتائج لـ "${esc(query)}"</div>`;
+    return;
+  }
   el.innerHTML = sorted.map(r => {
     const stars = n => '★'.repeat(n)+'☆'.repeat(5-n);
     const starsScore = s => s ? renderStarsHTML(s) : '';
@@ -1623,10 +1695,8 @@ function deleteRecord(id) {
   const r = records.find(rr => String(rr.id) === String(id));
   if (!r) return;
   const label = r.attendance_only ? `حضور ${displayStudentName(r)}` : `جلسة ${displayStudentName(r)}`;
-  if (!confirm(`حذف "${label}"؟\nلا يمكن التراجع.`)) return;
-  // Remove from Firebase. The live listener removes it from every device, permanently.
-  deleteRecordFromFirebase(id);
-  showToast('✓ تم الحذف');
+  if (!confirm(`حذف "${label}"؟`)) return;
+  scheduleUndoableDelete(pendingDeleteRecordIds, id, `🗑 تم حذف ${label}`, () => deleteRecordFromFirebase(id));
 }
 
 function editRecord(id) {
@@ -2050,6 +2120,29 @@ function sendWhatsApp() {
   document.getElementById('wa-modal').classList.remove('open');
 }
 
+// U8: lets the admin copy the message manually — useful if WhatsApp isn't
+// installed, the number is wrong, or they want to paste it somewhere else.
+function copyWaMessage() {
+  const msg = document.getElementById('wa-preview').textContent;
+  const done = () => showToast('✓ تم نسخ الرسالة');
+  const fail = () => showToast('⚠️ تعذر نسخ الرسالة', true);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(msg).then(done).catch(fail);
+  } else {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = msg;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      done();
+    } catch (e) { fail(); }
+  }
+}
+
 function closeWaModal(e) {
   if (e.target === document.getElementById('wa-modal'))
     document.getElementById('wa-modal').classList.remove('open');
@@ -2112,6 +2205,34 @@ function showToast(msg, isError) {
 }
 
 // ---- PWA: register service worker for offline + installable app ----
+// ---- U5: modal accessibility — ESC closes, Tab is trapped inside, focus
+// moves into the modal when it opens. Works generically for all three
+// modals (student/whatsapp/stars) without touching their individual
+// open-functions, via a MutationObserver on the shared .open class.
+function getOpenModal() { return document.querySelector('.modal-overlay.open'); }
+
+new MutationObserver(mutations => {
+  mutations.forEach(m => {
+    if (m.attributeName !== 'class') return;
+    const el = m.target;
+    if (!el.classList || !el.classList.contains('modal-overlay') || !el.classList.contains('open')) return;
+    const focusable = el.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (focusable) setTimeout(() => focusable.focus(), 50);
+  });
+}).observe(document.body, { attributes: true, subtree: true, attributeFilter: ['class'] });
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' && e.key !== 'Tab') return;
+  const modal = getOpenModal();
+  if (!modal) return;
+  if (e.key === 'Escape') { modal.classList.remove('open'); return; }
+  const focusables = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  if (!focusables.length) return;
+  const first = focusables[0], last = focusables[focusables.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
