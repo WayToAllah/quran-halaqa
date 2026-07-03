@@ -713,6 +713,35 @@ function backfillStudentIds() {
   });
 }
 
+// H2: a handful of names from the old attendance import were spelled
+// slightly differently from the official student list (double spaces,
+// ي/ى variants), which silently split one real student's attendance across
+// two "ghost" identities in the stats. Each pair below was confirmed by
+// Muhammad on 2026-07-03 to be the same student before merging. This is a
+// one-time, idempotent self-heal — once a record is corrected it has both
+// the right name and studentId, so it never matches this map again.
+const CONFIRMED_NAME_MERGES = {
+  'عمر  محمد يحي': 'عمر محمد يحيى',
+  'محمود عمرو محمود محمد': 'محمود عمرو محمود',
+  'ياسين  محمد': 'ياسين محمد',
+  'يحيي محمد': 'يحيى محمد',
+  'مروان  اشرف': 'مروان اشرف'
+};
+let ghostMergeRan = false;
+function mergeGhostNames() {
+  if (ghostMergeRan || !db) return;
+  ghostMergeRan = true;
+  records.forEach(r => {
+    const canonical = CONFIRMED_NAME_MERGES[r.student];
+    if (!canonical) return;
+    const target = students.find(s => getStudentName(s) === canonical);
+    const updates = { student: canonical };
+    if (target) updates.studentId = target.id;
+    db.ref('records/' + fbKey(r.id)).update(updates)
+      .catch(err => console.warn('ghost name merge failed for', r.id, err));
+  });
+}
+
 // ---- Students ----
 function saveStudentToFirebase(student) {
   if (!db) { alert('لا يوجد اتصال بقاعدة البيانات. تأكد من الإنترنت.'); return Promise.reject(); }
@@ -767,6 +796,7 @@ function markConnected() {
   if (firstStudentsLoaded && firstRecordsLoaded) {
     const sub = document.getElementById('header-sub');
     if (sub && sub.dataset.syncing === '1') { sub.dataset.syncing = '0'; updateHeader(); }
+    mergeGhostNames();
     backfillStudentIds();
   }
 }
