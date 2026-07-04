@@ -947,6 +947,16 @@ const ATTENDANCE_BADGE_THRESHOLD = 70;
 // hole where student names / notes / phone numbers (editable via parent-form.html
 // or directly in Firebase) could otherwise run as HTML/JS in the admin's browser.
 // Safe for both text nodes and quoted HTML attributes.
+// تطبيع عربي للبحث: توحيد الهمزات والياء والتاء المربوطة وإزالة التشكيل
+function normAr(s) {
+  return String(s ?? '')
+    .replace(/[\u064B-\u0652\u0670]/g, '')   // تشكيل
+    .replace(/[\u0623\u0625\u0622]/g, '\u0627') // أ إ آ -> ا
+    .replace(/\u0649/g, '\u064A')               // ى -> ي
+    .replace(/\u0629/g, '\u0647')               // ة -> ه
+    .replace(/\s+/g, ' ').trim();
+}
+
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -1447,7 +1457,8 @@ function renderStudentList() {
   const searchInput = document.getElementById('students-search-input');
   const query = searchInput ? searchInput.value.trim() : '';
   if (query) {
-    visibleStudents = visibleStudents.filter(s => getStudentName(s).includes(query));
+    const nq = normAr(query);
+    visibleStudents = visibleStudents.filter(s => normAr(getStudentName(s)).includes(nq));
     if (!visibleStudents.length) {
       el.innerHTML = `<div class="empty-state"><div class="big">🔍</div>لا يوجد نتائج لـ "${esc(query)}"</div>`;
       return;
@@ -1828,7 +1839,8 @@ function renderLog() {
   const allSorted = [...records].filter(r => !pendingDeleteRecordIds.has(String(r.id))).sort(byNewest);
   // M4: with an active search, show every match (capped generously) instead
   // of only ever looking at the most recent 40 sessions total.
-  const filtered = query ? allSorted.filter(r => displayStudentName(r).includes(query)) : allSorted;
+  const nq = normAr(query);
+  const filtered = query ? allSorted.filter(r => normAr(displayStudentName(r)).includes(nq)) : allSorted;
   const sorted = filtered.slice(0, query ? 200 : 40);
   if (query && !sorted.length) {
     el.innerHTML = `<div class="empty-state"><div class="big">🔍</div>لا يوجد نتائج لـ "${esc(query)}"</div>`;
