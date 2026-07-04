@@ -1,161 +1,82 @@
-# متابعة حفظ القرآن — Project Context
+# متابعة حفظ القرآن — Project Reference
 
-## 🚧 ACTIVE TASK as of 2026-07-04 (read this first in a new session)
-
-**Muhammad wants multi-mosque support**, added on top of the current single-halaqa app.
-Confirmed decisions so far:
-- **Full 3-level hierarchy**: `mosque → halaqa → students/records` (not a flattened
-  mosque-only model) — he confirmed this explicitly by saying his mosque "has its halaqat"
-  (plural), matching the recommendation in the architecture plan below.
-- **First real mosque to migrate**: "مسجد التيسير" — this is the one currently live with all
-  existing students/records.
-- **Its current halaqa**: he described it as "a single halaqa for now" but has **not given it
-  an explicit name** — pick a sensible placeholder (e.g. "الحلقة الأساسية") during migration
-  unless he specifies one when you pick this back up.
-- A full written architecture plan already exists covering data model, security rules, admin
-  roles, migration steps, cost/scale analysis, and a phased rollout — it was delivered to him
-  as `multi-mosque-architecture-plan.md` on 2026-07-03. **Re-read that plan's reasoning before
-  writing any code** — don't redesign from scratch.
-- **A dedicated backup branch `backup-2026-07-04-pre-multi-mosque`** was created right before
-  this work started, pointing at the last known-good single-mosque commit. If anything about
-  the migration goes wrong, that branch has the working single-mosque app to revert to.
-- **Migration has NOT started yet** as of this note — Muhammad was asked to export the live
-  Firebase data (Console → Realtime Database → Export JSON) as an extra safety net before the
-  actual data migration runs; confirm that happened before touching Firebase data structure.
-- Recommended sequence (from the architecture plan): finish the new schema + security rules +
-  migration script for مسجد التيسير ALONE first, verify it works exactly like today, before
-  adding any second mosque or building the mosque-switcher UI.
-
----
-
-## Overview
-A mobile-first web app for tracking a Quran memorization circle (~50 students).
-Single HTML file, no build tools, works in any browser. Installable as a PWA.
+Mobile-first Quran memorization circle (halaqa) tracker for ~50 students. Single HTML file,
+no build tools, installable as a PWA. This document describes the project **as it currently
+stands** — a reference for any future development work, not a changelog.
 
 **Live URL:** https://mredwan214-code.github.io/quran-halaqa
-**GitHub Repo:** https://github.com/mredwan214-code/quran-halaqa (branch `main`)
+**Repo:** https://github.com/mredwan214-code/quran-halaqa (branch `main`)
 
 ---
 
-## Tech Stack
-- **Frontend:** Vanilla HTML + CSS + JS (single `index.html`)
-- **Realtime DB:** Firebase Realtime Database — **single source of truth**, no localStorage anywhere
-- **Auth:** Firebase Authentication — **Email/Password** for the admin app, **Anonymous** for `parent-form.html`
-- **Sheets Sync:** Google Apps Script (fire-and-forget, best-effort logging only — not read from)
-- **Hosting:** GitHub Pages
-- **PWA:** `manifest.json` + `sw.js` (network-first shell, offline fallback) + branded icon set in `icons/`
-- **Optional lib:** `html2canvas` (CDN) — used only for downloading the "نجوم الحضور" attendance-stars card as a PNG
+## 1. Tech Stack
 
-> **Architecture note:** There is exactly one way data enters the UI: a live Firebase
-> `.on('value', …)` listener on `students` and `records` that rebuilds the in-memory arrays
-> and re-renders on every change. No localStorage cache, no merge logic. Writes go straight
-> to Firebase (`set()`/`update()`/`remove()`), and the listener does the rest on every device.
-> **The app only starts syncing after a signed-in admin session is confirmed** (see Auth below)
-> — `init()`/`startSync()` are called from inside `onAuthStateChanged`, not unconditionally.
-> **This single-tree structure (`/students`, `/records`) is exactly what the multi-mosque
-> migration above needs to restructure into `/mosques/{id}/halaqat/{id}/students` etc.**
+| Layer | Choice |
+|---|---|
+| Frontend | Vanilla HTML/CSS/JS, single `index.html` (~2000 lines) |
+| Data | Firebase Realtime Database — sole source of truth, no localStorage |
+| Auth | Firebase Authentication — Email/Password (admin), Anonymous (`parent-form.html`) |
+| External sync | Google Apps Script → Google Sheets (write-only logging, not read from) |
+| Hosting | GitHub Pages |
+| PWA | `manifest.json` + `sw.js`, branded icons in `icons/` |
+| Optional | `html2canvas` (CDN) — renders the "نجوم الحضور" share card to PNG |
+
+**Files in the repo:**
+- `index.html` — the admin app (record sessions, manage students, log, stats)
+- `parent-form.html` — lightweight page for parents to view/update their child's contact info
+- `manifest.json`, `sw.js`, `icons/*` — PWA
+- `PROJECT_CONTEXT.md` — this document
+- `BRD.html` — a standalone requirements/analysis document, informational only, not wired into the app
 
 ---
 
-## Auth & Security — COMPLETE as of 2026-07-04
+## 2. Architecture
 
-- **Admin app (`index.html`):** full-screen login gate (`#login-screen`) blocks the UI until
-  `firebase.auth().onAuthStateChanged` reports a signed-in user. Email/Password only — new
-  admins are added via Firebase Console → Authentication → Users (no in-app invite flow).
-  Logout button (🚪) in the header calls `firebase.auth().signOut()`.
-- **`parent-form.html`:** signs in **anonymously** on load before touching the DB. It still
-  shows **every** student to any visitor (no per-student token) — deliberate, deferred
-  trade-off, not an oversight.
-- **Realtime Database security rules** (set in Firebase Console, not in this repo):
+There is exactly one path data takes into the UI: a live Firebase `.on('value', …)` listener
+on `students` and `records` rebuilds the in-memory `students`/`records` arrays and re-renders
+on every change, on every connected device. All writes go straight to Firebase
+(`set()`/`update()`/`remove()`); there is no client-side cache or merge logic to reason about.
+
+The app does not start syncing until a signed-in admin session is confirmed —
+`init()`/`startSync()` are invoked from inside `firebase.auth().onAuthStateChanged`, gated
+behind the full-screen login overlay (`#login-screen`).
+
+```
+students/{studentId}  → student profile
+records/{recordId}    → one session or attendance-only entry
+```
+
+---
+
+## 3. Auth & Security
+
+- **Admin app:** email/password login required before any UI is usable; logout via the 🚪
+  button in the header. New admins are added directly in Firebase Console → Authentication →
+  Users (no in-app invite flow exists).
+- **`parent-form.html`:** signs in anonymously on load so it can operate under the security
+  rules below. It currently shows every student's record to any visitor with the link — there
+  is no per-student access token, by design choice rather than oversight.
+- **Realtime Database rules** (configured in Firebase Console, not stored in this repo):
   ```json
   { "rules": { ".read": "auth != null", ".write": "auth != null" } }
   ```
-  Root-level. **This will need to become per-mosque path rules** as part of the multi-mosque
-  work (see architecture plan) — currently any authenticated user can read/write everything,
-  which is fine for one mosque but not once multiple mosques' admins share the same DB.
-- **XSS:** every value that can originate from user input (student names, notes, phone
-  numbers, sura fields restored during edit) goes through `esc()` before `innerHTML`. Sura
-  names from the hardcoded `SURAS` array are the only unescaped strings (not user-controllable).
-- **`setup.html` was removed (2026-07-04)** — a one-time destructive wipe/reseed tool with 51
-  real student names hardcoded in plaintext, no auth of its own. Preserved in the
-  `backup-2026-07-03-pre-security` branch if ever needed for reference.
-- **GitHub PAT rotated (2026-07-04).** The old classic token (shared in an earlier chat
-  context) has been revoked by Muhammad. Current deploys use a fine-grained token scoped only
-  to this repo (Contents: read/write). **The token itself is not written down here** — a fresh
-  session will need Muhammad to provide a working token again (or generate a new one) before
-  it can push commits.
-- **Google Apps Script (`SHEETS_URL`) is now protected (2026-07-04).** The app sends a shared
-  secret (`SHEETS_SECRET` constant in `index.html`) with every sync request; the Apps Script
-  checks it against its own `SHARED_SECRET` constant and rejects mismatches. **The secret value
-  is not repeated in this doc** — see the `SHEETS_SECRET` constant in the live `index.html` if
-  you need it (e.g. to help Muhammad rotate it later).
-  - While fixing this, two long-standing **silent data bugs** in the Apps Script were also
-    fixed: it read `s.phoneMom`/`s.phoneDad` (fields that haven't existed since the student
-    shape became `phonePrimary`/`phoneSecondary`/`phoneType`), and it read `r.loh.sura`/
-    `r.madi.sura` directly (those fields haven't held sura info since `newLoh`/`newMadi`
-    arrays were introduced — `loh`/`madi` are now evaluation-only `{score, stars}`). Both had
-    been silently writing blank columns to the "طلاب"/"جلسات" Sheets for a while before this
-    session. Fixed script now reads the correct current fields.
+  Any authenticated user (admin or anonymous parent-form visitor) can read/write any node.
+  There is no per-mosque or per-role restriction — appropriate for a single halaqa, and the
+  first thing that needs to change if multi-tenant support is added (see §10).
+- **XSS defense:** every value that can originate from user input (student names, notes,
+  phone numbers) passes through `esc()` before being placed in `innerHTML`. Sura names from
+  the fixed 114-entry `SURAS` constant are the only strings deliberately left unescaped, since
+  they're never user-controllable.
+- **Google Apps Script endpoint** requires a shared secret sent with every request
+  (`SHEETS_SECRET` constant in `index.html`, checked against `SHARED_SECRET` in the Apps
+  Script project) — requests without a match are rejected.
+- **GitHub deploy token:** a fine-grained PAT scoped to Contents (read/write) on this repo
+  only. Not stored in this document; a session that needs to push commits will need a working
+  token supplied fresh.
 
 ---
 
-## Firebase Config
-```javascript
-const firebaseConfig = {
-  apiKey: "AIzaSyCLzsd-tyAPKoS6HQ-Kw6LEwaxPSibbKSg",
-  authDomain: "quran-app-abe52.firebaseapp.com",
-  databaseURL: "https://quran-app-abe52-default-rtdb.firebaseio.com",
-  projectId: "quran-app-abe52",
-  storageBucket: "quran-app-abe52.firebasestorage.app",
-  messagingSenderId: "484959710944",
-  appId: "1:484959710944:web:454059b1f2136c0d73aa85"
-};
-```
-Note: `quran-app-abe52-default-rtdb.firebaseio.com` and `*.gstatic.com`/`*.script.google.com`
-are **not** reachable from the Claude sandbox's network egress allowlist. Testing this app
-therefore requires a local Firebase mock (see Testing section) rather than the live DB, and
-the Apps Script endpoint can't be curled directly from the sandbox either — verification of
-that fix relied on Muhammad's own confirmation of deploying + testing it.
-
-## Google Apps Script URL
-```
-https://script.google.com/macros/s/AKfycbzw3X51RGVsjg0IhXbD1Tbv0ZZ09bUP8jiM4ufEU3fVRw2Ow3nbQqVosvzeAQId1_zQjQ/exec
-```
-Now requires the shared secret (see Auth & Security above) — a bare POST without it gets
-rejected with `'unauthorized'`.
-
----
-
-## GitHub Pages deployment — known flakiness (2026-07-04)
-
-GitHub's Pages deploy step has failed transiently **multiple times** in this project, in two
-distinct ways — neither is a code problem:
-1. **Build succeeds, deploy step fails** with GitHub's own generic message "Deployment
-   failed, try again later." Fix: push a small trivial commit (e.g. append an HTML comment to
-   `index.html`) to trigger a fresh run.
-2. **No workflow run gets triggered at all** for a push that landed correctly on `main` (rare,
-   happened once). Same fix: push a trivial follow-up commit.
-
-**Always verify a deploy actually succeeded** by checking BOTH:
-```
-GET /repos/{owner}/{repo}/git/ref/heads/main            → note the sha
-GET /repos/{owner}/{repo}/deployments?per_page=1        → note its sha AND id
-GET /repos/{owner}/{repo}/deployments/{id}/statuses     → confirm the LATEST entry is "success"
-```
-A deployment *record* existing with the right sha does **not** mean it succeeded — its own
-status history can still end in "failure". Don't trust workflow-run "conclusion: success"
-alone either if a `deploy` job exists as a separate step; check that job's own conclusion.
-
-Also relevant: `sw.js`'s navigation fetch now uses `{cache: 'no-store'}` (bumped to
-`CACHE_NAME = 'quran-halaqa-v2'`) because GitHub Pages' own `Cache-Control` header could
-serve a stale cached HTML response for several minutes even under a "network-first" fetch
-that doesn't explicitly bypass HTTP caching. If Muhammad reports "I don't see the update,"
-check deployment success first (per above), then suggest a hard-close-and-reopen of the PWA
-or an incognito tab before assuming it's still a caching issue on his device.
-
----
-
-## Data Structures
+## 4. Data Model
 
 ### Student
 ```json
@@ -170,17 +91,10 @@ or an incognito tab before assuming it's still a caching issue on his device.
   "phoneSecondary": "01XXXXXXXXX"
 }
 ```
-- `id` is a stable generated key (`genId('s')` → `s_<ms>_<rand>`), used as the Firebase key
-  (via `fbKey()`) and as the reference on records (`studentId`).
-- **Renaming a student is completely safe.** All lookups resolve via `studentId` first (see
-  `studentMatch()` / `displayStudentName()` / `recordsForStudent()`); the stored `student`
-  name on a record is only a fallback display value for legacy records that predate
-  `studentId`. A one-time self-heal (`backfillStudentIds()`) retroactively links legacy
-  records automatically.
-- Renaming to a name that collides with another existing student is blocked with an alert
-  (checked on edit too, not just when adding).
-- Deleting a student warns with the exact count of linked sessions, then goes through a
-  5-second undoable-delete flow rather than firing immediately.
+`id` is a generated key (`genId('s')`) used as both the Firebase key (via `fbKey()`) and the
+reference other records point to (`studentId`). All student↔record matching goes through
+`studentId`, never the name string — a student can be renamed freely without breaking any
+historical link (see `studentMatch()` / `displayStudentName()` in §7).
 
 ### Session Record
 ```json
@@ -200,45 +114,14 @@ or an incognito tab before assuming it's still a caching issue on his device.
   "note": "general note"
 }
 ```
-- **`loh.score` / `madi.score` are `null`, not `0`, when no evaluation was entered** — a real
-  "إعادة" (zero) grade must be distinguishable from "nothing was evaluated." All such checks
-  use `hasScore(o)` (`!!o && o.score != null`), never a plain truthy check.
-- `newLoh`/`newMadi` are arrays (multiple suras per session supported for both). **When
-  displaying multiple suras in one place, join them with `joinSuraNames()`** (e.g. "الإخلاص
-  والفلق") rather than one line per sura — this is the pattern used in both the WhatsApp
-  message and the log screen as of 2026-07-04.
-- **When a sura has no ayah range entered, show just the sura name** — use `ayahRange(from, to)`
-  (returns `''` if both empty, `' (from–to)'` if both present, `' (من from)'` if only `from`)
-  rather than a `||'?'` fallback that produces an ugly "(?–?)".
-- Each session stores the **evaluation of the previous task** (`loh.score`/`madi.score`) AND
-  the **new task** for next time (`newLoh`/`newMadi`). Selecting a student auto-loads their
-  last session's `newLoh`/`newMadi` as today's items to evaluate (`onStudentChange`).
-- **Editing an old (non-latest) session is safe in every place that looks up "the previous
-  session," not just one:**
-  - Switching the student dropdown mid-edit cancels edit mode instead of silently reassigning
-    the old session to the newly-picked student (`onStudentSelectManualChange`).
-  - The WhatsApp "previous session" lookup (`prevRecs` in `showWhatsAppPrompt`) only considers
-    sessions chronologically *before* the one being edited (`byNewest(r, rec) > 0`).
-  - **`onStudentChange()`'s own "last session" lookup has the same guard** (added 2026-07-04,
-    same bug class as the WhatsApp one but missed in the first pass): when
-    `editingRecordId !== null`, it excludes the record being edited and only considers records
-    strictly before it. Without this, editing a student's *latest* session — a very common
-    case — made that session "the previous session for itself," so the "ما سمعناه النهارده"
-    card showed the exact same content as the "المهمة الجديدة" section right below it. This
-    was reported directly by Muhammad from live usage, not caught by the original test suite
-    (which didn't specifically test editing the *latest* session for a student).
-  - **The log's display of `newMadi` had a separate, longstanding bug** (also found via live
-    usage, not the original audit): it checked `Array.isArray(r.madi)`, which is never true
-    under the current schema (`r.madi` is only `{score, stars}`) — so "الماضي الجديد" silently
-    never appeared in the log at all, and there was no "تقييم الماضي" score line either (only
-    "تقييم اللوح" existed). Both fixed 2026-07-04. The stats/ayat-counting functions had
-    already been checking `newMadi` correctly — only the log's *visual* rendering was wrong,
-    so historical stats/totals were never actually affected by this bug.
-- A completely empty session (no loh, no madi, no tajweed, no note) asks for confirmation
-  before saving.
-- Saving is guarded against double-submit (`savingRecord` flag + disabled button, correctly
-  scoped to `#screen-record .save-btn` — see gotcha below) and against silent Firebase
-  failures (`.then()`/`.catch()`, red toast + form stays filled on failure).
+- `loh`/`madi` hold the **evaluation of the previous session's assignment** — `score` is
+  `null` when nothing was evaluated (distinct from a genuine zero grade "إعادة") and a number
+  0–100 otherwise. `student` is a plain display-name snapshot; `studentId` is authoritative.
+- `newLoh`/`newMadi` hold **this session's new assignment** for next time — arrays, since a
+  session can assign more than one sura for either. `tajweed` is optional and self-contained
+  (has its own sura/range/score, added only when the "مراجعة التجويد" toggle is used).
+- Selecting a student in the تسجيل screen auto-loads their most recent session's
+  `newLoh`/`newMadi` as today's items to evaluate.
 
 ### Attendance-only Record
 ```json
@@ -251,176 +134,173 @@ or an incognito tab before assuming it's still a caching issue on his device.
   "note": ""
 }
 ```
-- Now creatable from the UI via "✅ تسجيل حضور جماعي" on the تسجيل screen — checklist of all
-  students for a chosen date, batch-creates one record per checked student, greys out/disables
-  students who already have any record that date.
-- Five specific "ghost" name variants from the historical import (double spaces, ي/ى spelling)
-  were confirmed by Muhammad on 2026-07-03 to be typos, and are auto-merged on load
-  (`CONFIRMED_NAME_MERGES` in `mergeGhostNames()`).
+No `loh`/`madi`/`newLoh`/`newMadi`. Created individually via historical import, or in bulk via
+the "✅ تسجيل حضور جماعي" flow (a date-scoped checklist of all students that batch-creates one
+of these per checked student, skipping anyone who already has a record that date).
 
 ---
 
-## Screens
-| Screen | Purpose |
-|--------|---------|
-| تسجيل (Record) | Evaluate previous task + assign new task; searchable student picker; "تسجيل حضور جماعي" button |
-| الطلاب (Students) | Add/edit/delete student profiles; top-70%-attendance badge; skeleton loading state |
-| السجل (Log) | Sessions newest-first; search box filters by student name; each session editable/deletable with undo; multi-sura lines joined with "و"; empty ayah ranges show sura name alone |
-| إحصاءات (Stats) | Summary cards, weekly bar chart, score distribution, top-3 leaderboards, per-student detail, "نجوم الحضور" share card |
+## 5. Screens
 
-Student picker (`#student-search-input` + hidden `#student-select` + `#student-search-dropdown`)
-resolves selections by **array index** into `studentDropdownList`, not by embedding the name in
-the `onclick` string — student names are user-editable, unlike the fixed 114-sura list.
+| Screen | Contents |
+|---|---|
+| **تسجيل** | Searchable student picker (type-to-filter, not a native `<select>`) → previous-task evaluation card → new-assignment form (multi-sura loh/madi rows, optional tajweed) → save. Includes the group-attendance entry point. |
+| **الطلاب** | Add/edit/delete student profiles; attendance-badge indicator per student; search-as-you-type is not present here (full list, since it's typically ≤50 rows) |
+| **السجل** | All sessions newest-first, with a name-search box; each entry editable or (undoably) deletable; multi-sura assignments shown joined ("الإخلاص والفلق"), suras with no ayah range shown by name alone |
+| **إحصاءات** | Summary cards (total sessions, ayat, averages), weekly bar chart, top-3 ayat/attendance leaderboards, full per-student table, downloadable/shareable "نجوم الحضور" card |
+
+`parent-form.html` is a separate, standalone page: student dropdown → view/edit that student's
+own profile fields (name, age, grade, school, phone numbers). Renaming a student here cascades
+to their historical records' `studentId` link automatically (see §7).
 
 ---
 
-## Scoring System
+## 6. Scoring & Attendance
+
 | Score | Label |
-|-------|-------|
+|---|---|
 | 85–100 | ممتاز |
 | 75–84 | جيد جداً |
 | 65–74 | جيد |
 | 50–64 | مقبول |
 | 0–49 | إعادة |
 
-- Every 10 points = half star (`scoreToHalfStars`), 0–5 stars in 0.5 steps.
-- `hasScore(o)` (`!!o && o.score != null`) — never a plain truthy check on `.score`.
+- Every 10 points = half a star; 0–5 stars in 0.5 steps (`scoreToHalfStars`).
+- Total halaqa days = unique dates with any record, excluding `EXCLUDED_HALAQA_DATES` (a single
+  named constant array — currently `['2026-06-04']`, a bonus/makeup day that shouldn't count
+  against attendance percentages).
+- Per-student attendance % = their unique session dates ÷ total halaqa days, capped at 100.
+- "نجم الحضور" badge threshold is `ATTENDANCE_BADGE_THRESHOLD` (70), one named constant.
+- Ranking is dense (tied students share a rank; no gaps in the sequence).
 
 ---
 
-## Attendance Calculation
-- Total halaqa days = unique dates with any record, excluding `EXCLUDED_HALAQA_DATES`
-  (currently just `2026-06-04`) — one constant, not duplicated inline.
-- Badge threshold is `ATTENDANCE_BADGE_THRESHOLD` (70) — one constant, used everywhere.
-- Ranking (`getAttendanceRanking`) uses dense ranking (ties share a rank, no gaps).
+## 7. Core JS Patterns Worth Knowing Before Editing
 
----
-
-## UX additions (2026-07-04)
-- **PWA:** installable via "Add to Home Screen" — see deployment section above for the
-  cache/no-store fix.
-- **Undoable delete:** deleting a student or session hides it immediately (optimistic UI via
-  `pendingDeleteStudentIds`/`pendingDeleteRecordIds`), 5-second "تراجع" toast before the actual
-  Firebase delete fires.
-- **Loading skeleton:** `dataReady()` gates whether the student list/log show a pulsing
-  skeleton or a genuine empty-state.
-- **Modal accessibility:** all three modals have `role="dialog"`/`aria-modal`; a generic
-  `MutationObserver` moves focus in, Escape closes, Tab is trapped — implemented once,
-  generically.
-- **Copy button** on the WhatsApp preview (`copyWaMessage()`).
-- Viewport no longer blocks pinch-zoom; all field inputs are `font-size:16px` to prevent iOS
-  auto-zoom-on-focus as a result.
-- Ayah placeholder numerals and all sura/ayah-range display standardized (Latin digits;
-  `ayahRange()`/`joinSuraNames()` used consistently — see Session Record section above).
-
----
-
-## Known code-level gotchas
-- **`.save-btn` is not a unique class** — the login screen's submit button and the record
-  screen's save button both have it. Always scope to `#screen-record .save-btn` explicitly, or
-  `document.querySelector('.save-btn')` silently grabs the login button instead.
-- **Toasts have `pointer-events:none` by default.** The undo-toast's button needs
-  `.undo-toast.show { pointer-events:auto; }` specifically or it's visible but unclickable.
-- Any date formatting must use `localDateStr(d)`, never `.toISOString().slice(0,10)` (reports
-  UTC; Egypt is UTC+2/+3, so a session recorded just after midnight would silently save under
-  yesterday's date).
-- **Any "find the previous/most-recent session" lookup must account for edit mode** — check
-  `editingRecordId` and exclude/reorder relative to the record being edited. This bug class has
-  now bitten twice (WhatsApp preview, then `onStudentChange`'s own lookup) — if a third such
-  lookup is ever added, apply the same guard from the start.
-- **Any place that reads `r.loh`/`r.madi` for *sura* info is reading the wrong field** — those
-  are evaluation-only (`{score, stars}`) under the current schema. Sura/from/to for the *new*
-  assignment lives in `newLoh`/`newMadi` (arrays). This mistake has been found and fixed twice
-  now (once in the Apps Script, once in the log's own rendering) — grep for `.loh.sura` or
-  `.madi.sura` outside of legacy-fallback branches if this bug class needs auditing again.
-
-## Not implemented / deliberately deferred
-- Per-student unique parent-form links (token-based access) — still shows every student to any
-  visitor. Deferred by choice; revisit if it becomes a real concern.
-- Automatic annual grade promotion — no such logic exists anywhere despite older notes.
-- Live-listener performance at scale (`M2`): `.on('value')` reloads the *entire* `records` node
-  on every change; fine at current volume.
-- Concurrent-edit protection (`M10`): last-write-wins, no version check. Low real risk for a
-  small admin team.
-- **Multi-mosque/multi-tenant is no longer deferred — see the ACTIVE TASK section at the very
-  top of this document.** It was scoped and deprioritized on 2026-07-03, then explicitly
-  reactivated by Muhammad on 2026-07-04.
-
----
-
-## Key JS Patterns
 ```javascript
-// Robust student↔record matching — prefer studentId, fall back to name for
-// records that predate it. Never compare by name directly elsewhere.
+// Student↔record matching: always prefer the stable id, fall back to the
+// name string only for records that predate studentId existing at all.
 function studentMatch(rec, student) {
   if (rec.studentId && student.id) return rec.studentId === student.id;
   return rec.student === getStudentName(student);
 }
+// Display name always resolves to the student's CURRENT name via studentId,
+// falling back to the name captured on the record if the student was deleted.
 function displayStudentName(rec) {
-  if (rec.studentId) {
-    const s = students.find(st => st.id === rec.studentId);
-    if (s) return getStudentName(s);
-  }
-  return rec.student || '—';
+  const s = rec.studentId && students.find(st => st.id === rec.studentId);
+  return s ? getStudentName(s) : (rec.student || '—');
 }
 
-// Distinguish "not evaluated" from "evaluated as zero"
+// A real zero score must be distinguishable from "not evaluated" — never
+// use a plain truthy check on `.score` (0 is falsy in JS).
 function hasScore(o) { return !!o && o.score != null; }
 
-// Local (not UTC) date string
+// Local (not UTC) date string — needed because Egypt is UTC+2/+3, so a
+// naive toISOString().slice(0,10) can silently roll a late-night session
+// back to the previous calendar day.
 function localDateStr(d) {
   d = d || new Date();
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
-// Ayah range / multi-sura display (used in both the WhatsApp message and the log)
+// Ayah-range and multi-sura display, shared by the WhatsApp message and the log:
 function ayahRange(from, to) { return (from && to) ? ' (' + from + '–' + to + ')' : from ? ' (من ' + from + ')' : ''; }
 function joinSuraNames(list) {
   const parts = list.map(m => m.sura + ayahRange(m.from, m.to));
-  if (parts.length === 1) return parts[0];
-  return parts.slice(0, -1).join('، ') + ' و' + parts[parts.length - 1];
+  return parts.length === 1 ? parts[0] : parts.slice(0, -1).join('، ') + ' و' + parts[parts.length - 1];
 }
 
-// Escape before injecting into innerHTML — required for any value that can
-// originate from user input (names, notes, phone numbers)
+// Any value that can originate from user input must pass through this
+// before being placed in innerHTML.
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-// Firebase save pattern — direct set() by sanitized id, no push()/merge
+// Firebase write pattern — direct set() by sanitized id, no push()/merge.
 function saveRecordToFirebase(rec) { return db.ref('records/' + fbKey(rec.id)).set(rec); }
 function saveStudentToFirebase(s)  { return db.ref('students/' + fbKey(s.id)).set(s); }
 ```
 
----
+**When looking up "the previous/most recent session"** anywhere (evaluation defaults, the
+WhatsApp preview, etc.), the lookup must exclude the record currently being edited and only
+consider records strictly before it chronologically (`byNewest(r, editingRec) > 0`) — a lookup
+that just grabs "the most recent session for this student" is wrong whenever the session being
+edited is itself the most recent one.
 
-## Testing
-No test framework is committed to the repo, but this app has been thoroughly tested with
-Playwright + a hand-rolled Firebase compat-SDK mock (necessary since `*.gstatic.com` and
-`*.firebaseio.com` aren't reachable from a sandboxed environment). Key lessons:
-1. A mock `firebase` global is served in place of the real gstatic script tags via Playwright
-   route interception, backed by `window.__mockDb` with `.on()`/`.set()`/`.update()`/`.remove()`.
-2. **Seed data must be injected via `page.add_init_script()` before navigation**, not
-   `page.evaluate()` after the fact — the app's one-time self-heal functions
-   (`backfillStudentIds`, `mergeGhostNames`) guard against re-running, so if they fire once
-   against empty seed data before real test data lands, they never fire again for that load.
-3. Give the mock's `set()`/`update()` a small artificial delay (~150ms) so transient UI states
-   (disabled buttons, loading labels) are actually observable before Playwright's next
-   assertion runs.
-4. **Test the specific scenario a user reports, not just the general case.** The original 74
-   automated tests all passed, yet two real bugs (`onStudentChange` duplicate-content on
-   editing the *latest* session; `newMadi` never displaying) were still live — because no test
-   specifically covered "edit the most recent session" or "a record whose newMadi has entries
-   but whose legacy `madi` field only holds a score." When Muhammad reports something's wrong,
-   write a test that reproduces his exact words before fixing blind.
-- 91 assertions across 9 test files as of 2026-07-04 (16+10+7+5+9+17+10+3+5, before the
-  ayahRange/newMadi/joinSuraNames fixes added their own suite). None of this is committed to
-  the repo (lived in the sandbox only) — rebuilding the harness is the fastest path if
-  regression testing is wanted in a future session, not writing one from scratch.
+**`.save-btn` is used by more than one button** (the login screen's submit button also has
+it) — always scope selectors to `#screen-record .save-btn` rather than querying the class
+alone.
+
+**Toasts have `pointer-events:none` by default** so a passing success/error toast doesn't
+block clicks underneath it. Any toast variant that needs an interactive element (like the
+undo-toast's button) needs `pointer-events:auto` scoped to its own `.show` state.
+
+**Sura/range data for the *new* assignment lives only in `newLoh`/`newMadi`.** `loh`/`madi`
+are evaluation-only (`{score, stars}`) and have no `sura`/`from`/`to` fields — anything that
+needs the assigned sura for a session should read `newLoh`/`newMadi`, with a same-shape legacy
+fallback only for pre-migration records that might not have those arrays.
 
 ---
 
-## Students List (reference only — Firebase is the source of truth)
+## 8. Testing Approach
+
+No test framework is committed to the repo. The app has been validated with Playwright driving
+a real Chromium browser against a hand-rolled Firebase compat-SDK mock (`window.firebase.auth()`
+/`.database()` backed by an in-memory `window.__mockDb`), since the real Firebase/gstatic
+endpoints aren't reachable from every environment this project gets worked on in. Key practices
+for anyone rebuilding this harness:
+- Serve the mock in place of the real `firebase-*-compat.js` script tags via request-route
+  interception, so the app's actual code executes unmodified against realistic-looking Firebase
+  calls (`.on()`, `.set()`, `.update()`, `.remove()`, `.signInWithEmailAndPassword()`, etc.).
+- Seed test data via an init script that runs **before navigation**, not after page load — the
+  app's one-time self-heal routines (auto-linking legacy records, merging known duplicate
+  names) only run once per page load and will not re-fire against data injected later.
+- Give mocked writes a small artificial delay rather than resolving instantly, so transient UI
+  states (disabled buttons, loading labels) are actually observable by assertions.
+- Cover the exact interaction sequence being tested, not just the general case — e.g. "edit a
+  student's most recent session" is a meaningfully different code path from "edit an older
+  one," and both are common enough in real use to need their own coverage.
+
+---
+
+## 9. Deployment Notes
+
+Static hosting via GitHub Pages, auto-deployed on every push to `main`. The GitHub Pages
+deploy step is occasionally flaky at the platform level (build succeeds, deploy step fails
+with a generic "try again later," or a push lands without triggering a workflow run at all) —
+neither is a code issue; retriggering with a fresh commit resolves it. To confirm a deploy
+truly succeeded, check that the latest deployment's own status history ends in `success` (its
+mere existence with the right commit sha doesn't guarantee that).
+
+The service worker's navigation handler uses `{cache: 'no-store'}` to bypass GitHub Pages'
+own HTTP caching, so a network-first strategy is actually network-first rather than serving a
+several-minutes-stale cached response.
+
+---
+
+## 10. Scope Boundaries / Not Implemented
+
+- **Multi-mosque / multi-tenant support** — currently in progress. Target design: a 3-level
+  hierarchy (`mosques/{id}/halaqat/{id}/students|records`) with per-mosque security rules and
+  an admin/mosque membership mapping, replacing the current flat `students`/`records` root.
+  First mosque to migrate: مسجد التيسير (currently the only data in the system). A full
+  architecture write-up (data model, rules sketch, admin-role design, migration plan, scale
+  analysis) exists as a separate document delivered outside this repo.
+- **Per-student parent-form access tokens** — `parent-form.html` shows every student to any
+  visitor with the link; no per-family scoping exists yet.
+- **Automatic annual grade promotion** — no such logic exists anywhere in the app.
+- **Server-side/query-based pagination** — `.on('value')` loads the entire `records` tree into
+  memory on every change; fine at current data volume (~50 students, low thousands of
+  records), would need `orderByChild`/pagination if that grows an order of magnitude.
+- **Concurrent-edit protection** — last-write-wins, no version/timestamp check; acceptable
+  risk for a small number of admins editing at different times.
+
+---
+
+## 11. Reference Data
+
+**Current halaqa's students** (Firebase is the source of truth; this list is a point-in-time
+reference only):
 زيد احمد، عبد الله احمد، ريتال رضا، رويدا رضا، يزن رفقي، نادين رفقي،
 ساجد محمود ناجي، اسر محمود ناجي، يوسف خالد، انس هيثم، ياسين هيثم،
 فاروق طارق، احمد حسام، فريدة حسام، عمر احمد خضر، عبد الرحمن جار،
@@ -432,9 +312,5 @@ Playwright + a hand-rolled Firebase compat-SDK mock (necessary since `*.gstatic.
 مروان اشرف، طارق عيد، بتول احمد، احمد ياسر، زين الدين اسلام،
 محمود عمرو محمود، يحيى محمد، يارا وليد، انس وليد، زياد جابر شريف
 
----
-
-## Related documents (not in this repo, delivered directly to Muhammad)
-- `multi-mosque-architecture-plan.md` (2026-07-03) — full data model, security rules sketch,
-  admin-role design, migration steps, Firebase free-tier scale analysis, phased rollout for
-  the multi-mosque work described in the ACTIVE TASK section at the top of this document.
+**Firebase project:** `quran-app-abe52` (Realtime Database, Authentication enabled for
+Email/Password + Anonymous providers).
