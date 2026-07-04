@@ -789,6 +789,136 @@ function mergeGhostNames() {
   });
 }
 
+// ============================================================================
+//  PUBLIC PER-CHILD STATS (child.html) — each student gets a permanent,
+//  unguessable link (`CHILD_STATS_BASE_URL?t=<parentToken>`) that shows a
+//  read-only view of just their own progress. This is written to a SEPARATE
+//  `publicStats/{token}` node (not `students`/`records` directly), and the
+//  Realtime Database rules grant public read on that exact token path only —
+//  knowing a token unlocks exactly one child's stats and nothing else, no
+//  auth required. Writing publicStats still requires an authenticated admin
+//  session, same as everything else in this app.
+// ============================================================================
+
+// 20 chars from a 58-char unambiguous alphabet (no 0/O/1/l/I) ≈ 118 bits of
+// entropy — effectively unguessable, short enough to fit comfortably in a URL.
+function genParentToken() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  let t = '';
+  for (let i = 0; i < 20; i++) t += chars[Math.floor(Math.random() * chars.length)];
+  return t;
+}
+
+// Returns the student's existing token, or mints + persists a new one on the
+// spot and updates the in-memory object immediately so a link is available
+// the instant it's needed (e.g. right after saving a brand-new student's
+// first session), without waiting for the next Firebase round-trip.
+function ensureParentToken(sObj) {
+  if (!sObj) return null;
+  if (sObj.parentToken) return sObj.parentToken;
+  const token = genParentToken();
+  sObj.parentToken = token;
+  if (db) {
+    db.ref('students/' + fbKey(sObj.id) + '/parentToken').set(token)
+      .catch(err => console.warn('parentToken write failed for', sObj.id, err));
+  }
+  return token;
+}
+
+// One-time, idempotent self-heal (same pattern as backfillStudentIds): any
+// student that existed before this feature shipped gets a token generated
+// and persisted, exactly once per student, the first time data syncs in.
+let tokenBackfillRan = false;
+function backfillParentTokens() {
+  if (tokenBackfillRan || !db) return;
+  tokenBackfillRan = true;
+  students.forEach(s => { if (!s.parentToken) ensureParentToken(s); });
+}
+
+// Debounced full recompute: a batch action (group attendance, an import,
+// several quick saves) should trigger one publicStats write, not one per
+// record. Also prunes publicStats entries whose student no longer exists
+// (deleted students shouldn't leave a permanently-live parent link behind).
+let publicStatsTimer = null;
+function schedulePublicStatsRecompute() {
+  if (!db) return;
+  clearTimeout(publicStatsTimer);
+  publicStatsTimer = setTimeout(recomputePublicStats, 900);
+}
+
+function recomputePublicStats() {
+  if (!db || !dataReady()) return;
+  const totalHalaqaDays = new Set(records.map(r => r.date).filter(d => d && !EXCLUDED_HALAQA_DATES.includes(d))).size;
+  const rankByName = {};
+  getAttendanceRanking(ATTENDANCE_BADGE_THRESHOLD).list.forEach(x => { rankByName[x.name] = x.rank; });
+
+  const updates = {};
+  const validTokens = new Set();
+
+  students.forEach(s => {
+    if (!s.parentToken) return; // backfillParentTokens() will mint one shortly; picked up on the next recompute
+    const token = fbKey(s.parentToken);
+    validTokens.add(token);
+    const name = getStudentName(s);
+    const allRecs = recordsForStudent(s);
+    const realRecs = allRecs.filter(r => !r.attendance_only).sort(byNewest);
+
+    const scoredLohRecs = realRecs.filter(r => hasScore(r.loh));
+    const avgLoh = scoredLohRecs.length
+      ? Math.round(scoredLohRecs.reduce((a, r) => a + r.loh.score, 0) / scoredLohRecs.length)
+      : null;
+
+    let totalAyat = 0;
+    realRecs.forEach(r => {
+      const lohArr = r.newLoh ? (Array.isArray(r.newLoh) ? r.newLoh : [r.newLoh]) : [];
+      lohArr.forEach(l => { if (l && l.sura) totalAyat += countAyat(l.from, l.to); });
+      const madiArr = r.newMadi ? (Array.isArray(r.newMadi) ? r.newMadi : [r.newMadi]) : [];
+      madiArr.forEach(m => { if (m && m.sura) totalAyat += countAyat(m.from, m.to); });
+    });
+
+    const uniqueDays = new Set(allRecs.map(r => r.date)).size;
+    const attendPct = totalHalaqaDays > 0 ? Math.min(100, Math.round(uniqueDays / totalHalaqaDays * 100)) : 0;
+
+    const latest = realRecs[0];
+    const currentTask = latest ? {
+      date: latest.date,
+      newLoh: (Array.isArray(latest.newLoh) ? latest.newLoh : (latest.newLoh ? [latest.newLoh] : [])).filter(l => l && l.sura),
+      newMadi: (Array.isArray(latest.newMadi) ? latest.newMadi : (latest.newMadi ? [latest.newMadi] : [])).filter(m => m && m.sura)
+    } : null;
+
+    const recentSessions = realRecs.slice(0, 10).map(r => ({
+      date: r.date || '',
+      loh: hasScore(r.loh) ? { score: r.loh.score } : null,
+      madi: hasScore(r.madi) ? { score: r.madi.score } : null,
+      newLoh: (Array.isArray(r.newLoh) ? r.newLoh : (r.newLoh ? [r.newLoh] : [])).filter(l => l && l.sura),
+      newMadi: (Array.isArray(r.newMadi) ? r.newMadi : (r.newMadi ? [r.newMadi] : [])).filter(m => m && m.sura),
+      tajweed: (r.tajweed && r.tajweed.sura) ? { sura: r.tajweed.sura, from: r.tajweed.from || '', to: r.tajweed.to || '' } : null,
+      note: r.note || ''
+    }));
+
+    updates[token] = {
+      name,
+      updatedAt: Date.now(),
+      totalHalaqaDays,
+      uniqueDays,
+      attendPct,
+      rank: rankByName[name] || null,
+      sessionsCount: realRecs.length,
+      totalAyat,
+      avgLoh,
+      currentTask,
+      recentSessions
+    };
+  });
+
+  // Prune orphaned entries (deleted students / rotated tokens) in the same batch.
+  db.ref('publicStats').once('value').then(snap => {
+    const existing = snap.val() || {};
+    Object.keys(existing).forEach(tok => { if (!validTokens.has(tok)) updates[tok] = null; });
+    return db.ref('publicStats').update(updates);
+  }).catch(err => console.warn('publicStats recompute failed', err));
+}
+
 // ---- Students ----
 function saveStudentToFirebase(student) {
   if (!db) { alert('لا يوجد اتصال بقاعدة البيانات. تأكد من الإنترنت.'); return Promise.reject(); }
@@ -913,6 +1043,8 @@ function markConnected() {
     if (sub && sub.dataset.syncing === '1') { sub.dataset.syncing = '0'; updateHeader(); }
     mergeGhostNames();
     backfillStudentIds();
+    backfillParentTokens();
+    schedulePublicStatsRecompute();
   }
 }
 
@@ -942,6 +1074,12 @@ const EXCLUDED_HALAQA_DATES = ['2026-06-04'];
 // M9: minimum attendance % to earn a "نجم الحضور" badge (was hardcoded
 // separately as three different literal `70` arguments).
 const ATTENDANCE_BADGE_THRESHOLD = 70;
+
+// Base URL for the read-only per-child stats page (child.html). Each
+// student's link is `${CHILD_STATS_BASE_URL}?t=${parentToken}` — see the
+// "Public per-child stats" block below for how the token/publicStats data
+// are generated and kept in sync.
+const CHILD_STATS_BASE_URL = 'https://mredwan214-code.github.io/quran-halaqa/child.html';
 
 // Escape any value before injecting it into innerHTML — closes the stored-XSS
 // hole where student names / notes / phone numbers (editable via parent-form.html
@@ -1487,11 +1625,36 @@ function renderStudentList() {
         <div class="student-meta-line">${count} جلسة مسجلة</div>
       </div>
       <div class="student-actions">
+        <button class="icon-btn" onclick="copyChildLink(event,'${esc(s.id)}')" aria-label="نسخ رابط المتابعة">🔗</button>
         <button class="icon-btn" onclick="openStudentModal('${esc(s.id)}')" aria-label="تعديل">✏️</button>
         <button class="icon-btn danger" onclick="deleteStudent(event,'${esc(s.id)}')" aria-label="حذف">🗑</button>
       </div>
     </div>`;
   }).join('');
+}
+
+// U-child: lets the admin grab a student's read-only stats-page link on demand
+// (onboarding a new family, or re-sending a lost link) without needing to save
+// a session first.
+function copyChildLink(e, id) {
+  e.stopPropagation();
+  const s = students.find(st => st.id === id);
+  if (!s) return;
+  const url = CHILD_STATS_BASE_URL + '?t=' + ensureParentToken(s);
+  const done = () => showToast('✓ تم نسخ رابط المتابعة');
+  const fail = () => showToast('⚠️ تعذر نسخ الرابط', true);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(done).catch(fail);
+  } else {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      done();
+    } catch (err) { fail(); }
+  }
 }
 
 /* ---- Modal ---- */
@@ -1633,6 +1796,10 @@ function saveStudentModal() {
     school: document.getElementById('modal-school').value.trim(),
     phonePrimary: document.getElementById('modal-phone-primary').value.trim(),
     phoneSecondary: document.getElementById('modal-phone-secondary').value.trim(),
+    // Carry the existing parentToken forward on edit (this is a full .set(),
+    // so omitting it here would silently break the student's child.html link
+    // on every profile edit). New students get one minted immediately.
+    parentToken: (existing && existing.parentToken) ? existing.parentToken : genParentToken(),
   };
   // M6: duplicate-name check used to only run when adding a NEW student —
   // renaming an existing one to match another student's name went through
@@ -2304,6 +2471,13 @@ function showWhatsAppPrompt(rec, sObj) {
   }
 
   if (rec.note) msg += '💬 *ملاحظة:* ' + rec.note + nl + nl;
+
+  const parentToken = ensureParentToken(sObj);
+  if (parentToken) {
+    msg += '📊 لمتابعة تقدم ' + rec.student.split(' ')[0] + ' أول بأول:' + nl;
+    msg += CHILD_STATS_BASE_URL + '?t=' + parentToken + nl + nl;
+  }
+
   msg += 'جزاكم الله خيراً 🤲';
 
   document.getElementById('wa-preview').textContent = msg;
