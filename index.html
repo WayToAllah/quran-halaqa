@@ -376,6 +376,9 @@
 <div id="screen-students" class="screen">
   <div class="card">
     <div class="card-title"><div class="dot"></div> الطلاب المسجلون</div>
+    <div class="field" style="margin-bottom:12px">
+      <input type="text" id="students-search-input" placeholder="🔍 ابحث باسم الطالب..." autocomplete="off" oninput="renderStudentList()">
+    </div>
     <div id="students-list"></div>
   </div>
 </div>
@@ -1439,8 +1442,17 @@ function attendBadgeHTML(rank) {
 function renderStudentList() {
   const el = document.getElementById('students-list');
   if (!students.length) { el.innerHTML = dataReady() ? '<div class="empty-state">لا يوجد طلاب بعد</div>' : skeletonRows(5); return; }
-  const visibleStudents = students.filter(s => !pendingDeleteStudentIds.has(String(s.id)));
+  let visibleStudents = students.filter(s => !pendingDeleteStudentIds.has(String(s.id)));
   if (!visibleStudents.length) { el.innerHTML = '<div class="empty-state">لا يوجد طلاب بعد</div>'; return; }
+  const searchInput = document.getElementById('students-search-input');
+  const query = searchInput ? searchInput.value.trim() : '';
+  if (query) {
+    visibleStudents = visibleStudents.filter(s => getStudentName(s).includes(query));
+    if (!visibleStudents.length) {
+      el.innerHTML = `<div class="empty-state"><div class="big">🔍</div>لا يوجد نتائج لـ "${esc(query)}"</div>`;
+      return;
+    }
+  }
   const topRanks = {};
   getAttendanceRanking(ATTENDANCE_BADGE_THRESHOLD).list.forEach(x => { topRanks[x.name] = x.rank; });
   el.innerHTML = visibleStudents.map((s,i) => {
