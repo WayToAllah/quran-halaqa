@@ -820,8 +820,14 @@ function skeletonRows(n) { return Array(n).fill('<div class="skeleton-row"></div
 // actually deletes from Firebase after a grace period with no undo click.
 const pendingDeleteRecordIds = new Set();
 const pendingDeleteStudentIds = new Set();
-let pendingDeleteTimer = null;
+// One timer PER pending delete (keyed by id), not a single shared timer —
+// otherwise deleting a second item before the first one's 5s grace period
+// ends cancels the FIRST item's actual-delete timer. The first item then
+// stays hidden client-side forever (via the idSet above) but is never
+// really removed from Firebase, so it silently reappears on next refresh.
+const pendingDeleteTimers = new Map();
 let pendingDeleteUndo = null;
+let currentUndoKey = null;
 
 function showUndoToast(msg, onUndo) {
   const t = document.getElementById('undo-toast');
@@ -843,19 +849,30 @@ function scheduleUndoableDelete(idSet, id, label, performDelete) {
   const key = String(id);
   idSet.add(key);
   refreshVisibleScreens();
-  clearTimeout(pendingDeleteTimer);
-  pendingDeleteTimer = setTimeout(() => {
+
+  // If this exact item somehow already had a pending delete, restart its
+  // own timer — but never touch any OTHER item's timer.
+  if (pendingDeleteTimers.has(key)) clearTimeout(pendingDeleteTimers.get(key));
+
+  const timeoutId = setTimeout(() => {
     idSet.delete(key);
-    hideUndoToast();
+    pendingDeleteTimers.delete(key);
+    if (currentUndoKey === key) hideUndoToast();
     performDelete().catch(err => {
       console.error('delete failed:', err);
       showToast('⚠️ فشل الحذف — تأكد من الإنترنت وحاول تاني', true);
       refreshVisibleScreens();
     });
   }, 5000);
+  pendingDeleteTimers.set(key, timeoutId);
+
+  currentUndoKey = key;
   showUndoToast(label, () => {
     idSet.delete(key);
-    clearTimeout(pendingDeleteTimer);
+    if (pendingDeleteTimers.has(key)) {
+      clearTimeout(pendingDeleteTimers.get(key));
+      pendingDeleteTimers.delete(key);
+    }
     hideUndoToast();
     refreshVisibleScreens();
   });
