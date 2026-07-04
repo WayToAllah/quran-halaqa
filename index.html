@@ -330,7 +330,7 @@
       <div class="row3">
         <div class="field" style="position:relative">
           <label>السورة</label>
-          <input type="text" id="tajweed-sura-input" placeholder="اكتب اسم السورة..." autocomplete="off" oninput="filterSuras('tajweed')" onfocus="showDropdown('tajweed')" onblur="hideDropdown('tajweed')">
+          <input type="text" id="tajweed-sura-input" placeholder="اكتب اسم السورة..." autocomplete="off" oninput="filterSuras('tajweed')" onfocus="showDropdown('tajweed')" onblur="resolveTypedSura('tajweed'); hideDropdown('tajweed')">
           <input type="hidden" id="tajweed-sura">
           <div id="tajweed-sura-dropdown" style="display:none;position:absolute;top:100%;right:0;left:0;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius-sm);z-index:100;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.15)"></div>
         </div>
@@ -1212,6 +1212,7 @@ function filterSuras(prefix) {
   showDropdown(prefix);
   // clear hidden val if user is typing
   document.getElementById(prefix+'-sura').value = '';
+  document.getElementById(prefix+'-sura-input').classList.remove('invalid');
   document.getElementById('hint-'+prefix).textContent = '';
 }
 
@@ -1253,6 +1254,34 @@ function hideDropdown(prefix, immediate) {
   }
 }
 
+// H11: filterSuras() clears the hidden `-sura` field on every keystroke, and
+// until now the ONLY way to fill it back in was tapping a suggestion in the
+// dropdown (selectSura, bound via onmousedown). Typing the exact, correct
+// sura name and moving straight to the next field (tab, or tapping "من آية")
+// without tapping the suggestion left the hidden field empty — getLohData()/
+// getMadiData() silently filter out any row with an empty sura, so that
+// entire row vanished from the saved session with no warning at all. This
+// runs on blur (before hideDropdown) and auto-confirms an exact text match
+// without requiring the extra tap; a typed value that ISN'T a real sura name
+// gets flagged red instead of silently disappearing.
+function resolveTypedSura(prefix) {
+  const hidden = document.getElementById(prefix+'-sura');
+  const inputEl = document.getElementById(prefix+'-sura-input');
+  if (!hidden || !inputEl) return;
+  if (hidden.value) { inputEl.classList.remove('invalid'); return; } // already resolved via dropdown tap
+  const typed = inputEl.value.trim().replace(/\s+/g, ' ');
+  if (!typed) { inputEl.classList.remove('invalid'); return; }
+  const match = SURAS.find(([n]) => n.replace(/\s+/g, ' ') === typed);
+  if (match) {
+    inputEl.value = match[0];
+    hidden.value = match[0];
+    inputEl.classList.remove('invalid');
+    onSuraChange(prefix);
+  } else {
+    inputEl.classList.add('invalid');
+  }
+}
+
 
 
 
@@ -1276,7 +1305,7 @@ function addMadiRow(data) {
       <div class="field sura-field">
         <label>السورة</label>
         <input type="text" id="${id}-sura-input" placeholder="اكتب اسم السورة..." autocomplete="off"
-          oninput="filterSuras('${id}')" onfocus="showDropdown('${id}')" onblur="hideDropdown('${id}')">
+          oninput="filterSuras('${id}')" onfocus="showDropdown('${id}')" onblur="resolveTypedSura('${id}'); hideDropdown('${id}')">
         <input type="hidden" id="${id}-sura" value="${esc(data ? data.sura||'' : '')}">
         <div class="sura-dropdown" id="${id}-sura-dropdown"></div>
       </div>
@@ -1353,7 +1382,7 @@ function addLohRow(data) {
       <div class="field sura-field">
         <label>السورة</label>
         <input type="text" id="${id}-sura-input" placeholder="اكتب اسم السورة..." autocomplete="off"
-          oninput="filterSuras('${id}')" onfocus="showDropdown('${id}')" onblur="hideDropdown('${id}')">
+          oninput="filterSuras('${id}')" onfocus="showDropdown('${id}')" onblur="resolveTypedSura('${id}'); hideDropdown('${id}')">
         <input type="hidden" id="${id}-sura" value="${esc(data ? data.sura||'' : '')}">
         <div class="sura-dropdown" id="${id}-sura-dropdown"></div>
       </div>
@@ -1932,6 +1961,30 @@ function saveRecord() {
   if (!student) { alert('اختر طالباً أولاً'); return; }
   const lohOk = lohRows.every(row => validateAyah(row.id));
   if (!lohOk) { alert('يوجد خطأ في أرقام آيات اللوح'); return; }
+
+  // H11 safety net: catches a sura that was typed but never actually
+  // resolved into the hidden field (see resolveTypedSura for the full
+  // story) — a last-chance auto-resolve, then a clear, specific warning
+  // for anything that still doesn't match a real sura, instead of letting
+  // getLohData()/getMadiData() silently drop that row from the session.
+  function findUnresolvedSura(rows, label) {
+    for (let i = 0; i < rows.length; i++) {
+      const id = rows[i].id;
+      resolveTypedSura(id);
+      const inputEl = document.getElementById(id + '-sura-input');
+      const hidden = document.getElementById(id + '-sura');
+      if (inputEl && hidden && inputEl.value.trim() && !hidden.value) {
+        return label + (rows.length > 1 ? ' رقم ' + (i + 1) : '');
+      }
+    }
+    return null;
+  }
+  const unresolvedLabel = findUnresolvedSura(lohRows, 'سورة اللوح') || findUnresolvedSura(madiRows, 'سورة الماضي');
+  if (unresolvedLabel) {
+    alert('السورة المكتوبة في "' + unresolvedLabel + '" مش متأكدة — اختارها من القائمة أو امسحها قبل الحفظ.');
+    return;
+  }
+
   const isEditing = editingRecordId !== null;
   const existing = isEditing ? records.find(r => String(r.id) === String(editingRecordId)) : null;
   const sObj = students.find(s => getStudentName(s) === student);
@@ -1956,6 +2009,13 @@ function saveRecord() {
     note: document.getElementById('general-note').value.trim()
   };
   if (document.getElementById('tajweed-toggle').checked) {
+    resolveTypedSura('tajweed');
+    const tajweedInput = document.getElementById('tajweed-sura-input');
+    const tajweedHidden = document.getElementById('tajweed-sura');
+    if (tajweedInput && tajweedHidden && tajweedInput.value.trim() && !tajweedHidden.value) {
+      alert('السورة المكتوبة في "سورة التجويد" مش متأكدة — اختارها من القائمة أو امسحها قبل الحفظ.');
+      return;
+    }
     if (!validateAyah('tajweed')) { alert('يوجد خطأ في آيات التجويد'); return; }
     rec.tajweed = { sura:document.getElementById('tajweed-sura').value, from:document.getElementById('tajweed-from').value, to:document.getElementById('tajweed-to').value, stars:starVals.tajweed, score:starScores.tajweed||0, note:document.getElementById('tajweed-note').value.trim() };
   }
