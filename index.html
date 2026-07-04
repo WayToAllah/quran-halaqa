@@ -1827,7 +1827,7 @@ function renderLog() {
       ${(() => {
         const lohArr = r.newLoh ? (Array.isArray(r.newLoh) ? r.newLoh : [r.newLoh]) : [];
         const filtered = lohArr.filter(l=>l && l.sura);
-        if (filtered.length) return filtered.map(l=>`<div class="log-line"><span>📝</span> لوح جديد: ${esc(l.sura)}${ayahRange(esc(l.from), esc(l.to))}</div>`).join('');
+        if (filtered.length) return `<div class="log-line"><span>📝</span> لوح جديد: ${esc(joinSuraNames(filtered))}</div>`;
         if (r.loh && r.loh.sura) return `<div class="log-line"><span>📖</span> لوح: ${esc(r.loh.sura)}${ayahRange(esc(r.loh.from), esc(r.loh.to))} ${hasScore(r.loh)?r.loh.score+'/100 '+renderStarsHTML(r.loh.score)+' '+scoreName(r.loh.score):''}</div>`;
         return '';
       })()}
@@ -1839,7 +1839,7 @@ function renderLog() {
         // so "الماضي الجديد" silently never appeared in the log at all.
         const madiArr = r.newMadi ? (Array.isArray(r.newMadi) ? r.newMadi : [r.newMadi]) : [];
         const filtered = madiArr.filter(m => m && m.sura);
-        if (filtered.length) return filtered.map(m=>`<div class="log-line"><span>🔄</span> ماضي جديد: ${esc(m.sura)}${ayahRange(esc(m.from), esc(m.to))}</div>`).join('');
+        if (filtered.length) return `<div class="log-line"><span>🔄</span> ماضي جديد: ${esc(joinSuraNames(filtered))}</div>`;
         if (r.madi && r.madi.sura) return `<div class="log-line"><span>🔄</span> ماضي: ${esc(r.madi.sura)}${ayahRange(esc(r.madi.from), esc(r.madi.to))} ${stars(r.madi.stars)}</div>`;
         return '';
       })()}
