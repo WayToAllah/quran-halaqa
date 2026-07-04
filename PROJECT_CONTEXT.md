@@ -24,6 +24,8 @@ stands** — a reference for any future development work, not a changelog.
 **Files in the repo:**
 - `index.html` — the admin app (record sessions, manage students, log, stats)
 - `parent-form.html` — lightweight page for parents to view/update their child's contact info
+- `child.html` — read-only, per-child progress page for parents; see §3/§4 for the
+  `parentToken`/`publicStats` mechanism behind it
 - `manifest.json`, `sw.js`, `icons/*` — PWA
 - `PROJECT_CONTEXT.md` — this document
 - `BRD.html` — a standalone requirements/analysis document, informational only, not wired into the app
@@ -42,9 +44,16 @@ The app does not start syncing until a signed-in admin session is confirmed —
 behind the full-screen login overlay (`#login-screen`).
 
 ```
-students/{studentId}  → student profile
-records/{recordId}    → one session or attendance-only entry
+students/{studentId}     → student profile
+records/{recordId}       → one session or attendance-only entry
+publicStats/{parentToken} → derived, read-only per-child summary (see §3/§4)
 ```
+
+`publicStats` is not an independent data source — it's fully derived from `students`/`records`
+by the admin app itself. `recomputePublicStats()` runs (debounced) every time the live
+`students`/`records` listeners fire, rebuilding every student's summary from scratch and
+pruning entries for students that no longer exist. `child.html` never talks to `students` or
+`records` directly; it only ever reads its own `publicStats/{token}` node.
 
 ---
 
@@ -56,12 +65,32 @@ records/{recordId}    → one session or attendance-only entry
 - **`parent-form.html`:** signs in anonymously on load so it can operate under the security
   rules below. It currently shows every student's record to any visitor with the link — there
   is no per-student access token, by design choice rather than oversight.
-- **Realtime Database rules** (configured in Firebase Console, not stored in this repo):
+- **`child.html`:** no sign-in at all. Reads exactly one path, `publicStats/{token}`, where
+  `token` is a 20-char random string (`genParentToken()`, ~118 bits of entropy) stored on the
+  student record. Knowing a token reveals only that one child's derived summary — never
+  `students`/`records` — because the rules below grant read access at the `publicStats/$token`
+  level specifically, not at the tree root.
+- **Realtime Database rules** (configured in Firebase Console, not stored in this repo) —
+  **⚠️ PENDING: still needs to be applied by Muhammad; the flat rule below is what's live as of
+  this writing, and does *not* yet give child.html's link the isolation described above** (a
+  root-level `auth != null` grant cascades to every child path including `publicStats`, so
+  adding a nested rule under it changes nothing until the root grant is split up like this):
   ```json
-  { "rules": { ".read": "auth != null", ".write": "auth != null" } }
+  {
+    "rules": {
+      "students": { ".read": "auth != null", ".write": "auth != null" },
+      "records": { ".read": "auth != null", ".write": "auth != null" },
+      "publicStats": {
+        "$token": { ".read": true, ".write": "auth != null" }
+      }
+    }
+  }
   ```
-  Any authenticated user (admin or anonymous parent-form visitor) can read/write any node.
-  There is no per-mosque or per-role restriction — appropriate for a single halaqa, and the
+  `students`/`records` keep their exact current behavior (any authenticated user — admin or
+  anonymous parent-form visitor — can read/write either tree; unchanged from before). The new
+  `publicStats/$token` rule is the only actual change: public, unauthenticated read of one
+  specific token path, write still admin-only. There's still no per-mosque or per-role
+  restriction on `students`/`records` themselves — appropriate for a single halaqa, and the
   first thing that needs to change if multi-tenant support is added (see §10).
 - **XSS defense:** every value that can originate from user input (student names, notes,
   phone numbers) passes through `esc()` before being placed in `innerHTML`. Sura names from
@@ -88,13 +117,20 @@ records/{recordId}    → one session or attendance-only entry
   "school": "اسم المدرسة",
   "phoneType": "أم",
   "phonePrimary": "01XXXXXXXXX",
-  "phoneSecondary": "01XXXXXXXXX"
+  "phoneSecondary": "01XXXXXXXXX",
+  "parentToken": "Xk3f9aQzR2mNp8LwQhT4"
 }
 ```
 `id` is a generated key (`genId('s')`) used as both the Firebase key (via `fbKey()`) and the
 reference other records point to (`studentId`). All student↔record matching goes through
 `studentId`, never the name string — a student can be renamed freely without breaking any
 historical link (see `studentMatch()` / `displayStudentName()` in §7).
+
+`parentToken` is minted once per student (`genParentToken()`) and never changes — it's the `t=`
+query param in that student's `child.html` link. `saveStudentModal()` always carries an
+existing token forward explicitly (it's a full `.set()`, so leaving it out on an edit would
+silently break the family's saved link); `backfillParentTokens()` mints one for any student
+that predates this feature, the first time data syncs in each admin session.
 
 ### Session Record
 ```json
@@ -138,6 +174,27 @@ No `loh`/`madi`/`newLoh`/`newMadi`. Created individually via historical import, 
 the "✅ تسجيل حضور جماعي" flow (a date-scoped checklist of all students that batch-creates one
 of these per checked student, skipping anyone who already has a record that date).
 
+### Public Stats (`publicStats/{parentToken}`)
+```json
+{
+  "name": "زيد احمد",
+  "updatedAt": 1751500000000,
+  "totalHalaqaDays": 12,
+  "uniqueDays": 10,
+  "attendPct": 83,
+  "rank": 2,
+  "sessionsCount": 9,
+  "totalAyat": 340,
+  "avgLoh": 88,
+  "currentTask": { "date": "2026-06-29", "newLoh": [...], "newMadi": [...] },
+  "recentSessions": [ { "date", "loh":{"score"}, "madi":{"score"}, "newLoh", "newMadi", "tajweed", "note" }, … up to 10, newest first ]
+}
+```
+Entirely derived — never hand-edited. `recomputePublicStats()` rebuilds every student's entry
+from `students`/`records` (debounced ~900ms after any change) and deletes entries for students
+that no longer exist. `rank`/`attendPct` reuse the exact same `getAttendanceRanking()` logic as
+the الإحصاءات screen, so a parent's link and the admin's leaderboard never disagree.
+
 ---
 
 ## 5. Screens
@@ -152,6 +209,13 @@ of these per checked student, skipping anyone who already has a record that date
 `parent-form.html` is a separate, standalone page: student dropdown → view/edit that student's
 own profile fields (name, age, grade, school, phone numbers). Renaming a student here cascades
 to their historical records' `studentId` link automatically (see §7).
+
+`child.html` is another separate, standalone page: a permanent, read-only link
+(`child.html?t={parentToken}`) showing one student's own attendance %, session count, total
+ayat, average لوح score, current assignment, and last 10 sessions — nothing editable, and no
+sign-in. The link is generated automatically and appended to every WhatsApp session summary
+(`showWhatsAppPrompt()`), and can also be copied on demand from the 🔗 button on that student's
+row in شاشة الطلاب (`copyChildLink()`).
 
 ---
 
