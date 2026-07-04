@@ -846,11 +846,93 @@ function schedulePublicStatsRecompute() {
   publicStatsTimer = setTimeout(recomputePublicStats, 900);
 }
 
-function recomputePublicStats() {
-  if (!db || !dataReady()) return;
-  const totalHalaqaDays = new Set(records.map(r => r.date).filter(d => d && !EXCLUDED_HALAQA_DATES.includes(d))).size;
+// Pure per-student stats builder shared by the full recompute below and by
+// pushPublicStatsForStudent() (the immediate, non-debounced write triggered
+// right when a link is about to be shared — see the bug note there).
+function buildStudentPublicStats(s, totalHalaqaDays, rankByName) {
+  const name = getStudentName(s);
+  const allRecs = recordsForStudent(s);
+  const realRecs = allRecs.filter(r => !r.attendance_only).sort(byNewest);
+
+  const scoredLohRecs = realRecs.filter(r => hasScore(r.loh));
+  const avgLoh = scoredLohRecs.length
+    ? Math.round(scoredLohRecs.reduce((a, r) => a + r.loh.score, 0) / scoredLohRecs.length)
+    : null;
+
+  let totalAyat = 0;
+  realRecs.forEach(r => {
+    const lohArr = r.newLoh ? (Array.isArray(r.newLoh) ? r.newLoh : [r.newLoh]) : [];
+    lohArr.forEach(l => { if (l && l.sura) totalAyat += countAyat(l.from, l.to); });
+    const madiArr = r.newMadi ? (Array.isArray(r.newMadi) ? r.newMadi : [r.newMadi]) : [];
+    madiArr.forEach(m => { if (m && m.sura) totalAyat += countAyat(m.from, m.to); });
+  });
+
+  const uniqueDays = new Set(allRecs.map(r => r.date)).size;
+  const attendPct = totalHalaqaDays > 0 ? Math.min(100, Math.round(uniqueDays / totalHalaqaDays * 100)) : 0;
+
+  const latest = realRecs[0];
+  const currentTask = latest ? {
+    date: latest.date,
+    newLoh: (Array.isArray(latest.newLoh) ? latest.newLoh : (latest.newLoh ? [latest.newLoh] : [])).filter(l => l && l.sura),
+    newMadi: (Array.isArray(latest.newMadi) ? latest.newMadi : (latest.newMadi ? [latest.newMadi] : [])).filter(m => m && m.sura)
+  } : null;
+
+  const recentSessions = realRecs.slice(0, 10).map(r => ({
+    date: r.date || '',
+    loh: hasScore(r.loh) ? { score: r.loh.score } : null,
+    madi: hasScore(r.madi) ? { score: r.madi.score } : null,
+    newLoh: (Array.isArray(r.newLoh) ? r.newLoh : (r.newLoh ? [r.newLoh] : [])).filter(l => l && l.sura),
+    newMadi: (Array.isArray(r.newMadi) ? r.newMadi : (r.newMadi ? [r.newMadi] : [])).filter(m => m && m.sura),
+    tajweed: (r.tajweed && r.tajweed.sura) ? { sura: r.tajweed.sura, from: r.tajweed.from || '', to: r.tajweed.to || '' } : null,
+    note: r.note || ''
+  }));
+
+  return {
+    name,
+    updatedAt: Date.now(),
+    totalHalaqaDays,
+    uniqueDays,
+    attendPct,
+    rank: rankByName[name] || null,
+    sessionsCount: realRecs.length,
+    totalAyat,
+    avgLoh,
+    currentTask,
+    recentSessions
+  };
+}
+
+function rankByNameNow() {
   const rankByName = {};
   getAttendanceRanking(ATTENDANCE_BADGE_THRESHOLD).list.forEach(x => { rankByName[x.name] = x.rank; });
+  return rankByName;
+}
+function totalHalaqaDaysNow() {
+  return new Set(records.map(r => r.date).filter(d => d && !EXCLUDED_HALAQA_DATES.includes(d))).size;
+}
+
+// H10 (bug fix): the debounced full recompute below only ever runs from
+// inside a live Firebase listener callback in an OPEN admin tab. In practice
+// a teacher saves a session, the WhatsApp prompt appears ~1.8s later, they
+// send it and close the tab within a couple of seconds — well inside the
+// 900ms debounce window in the best case, but with NO guarantee the tab is
+// still open when that timer fires. That left a real gap where a freshly
+// shared child.html link could point at a publicStats entry that was never
+// actually written. Both places that hand a link to someone (copyChildLink,
+// showWhatsAppPrompt) now push that ONE student's stats immediately and
+// synchronously-triggered (not debounced) the moment the link is generated,
+// so the data is guaranteed to exist before the link ever reaches a parent.
+function pushPublicStatsForStudent(s) {
+  if (!db || !s || !s.parentToken || !dataReady()) return Promise.resolve();
+  const data = buildStudentPublicStats(s, totalHalaqaDaysNow(), rankByNameNow());
+  return db.ref('publicStats/' + fbKey(s.parentToken)).set(data)
+    .catch(err => console.warn('immediate publicStats push failed for', s.id, err));
+}
+
+function recomputePublicStats() {
+  if (!db || !dataReady()) return;
+  const totalHalaqaDays = totalHalaqaDaysNow();
+  const rankByName = rankByNameNow();
 
   const updates = {};
   const validTokens = new Set();
@@ -859,56 +941,7 @@ function recomputePublicStats() {
     if (!s.parentToken) return; // backfillParentTokens() will mint one shortly; picked up on the next recompute
     const token = fbKey(s.parentToken);
     validTokens.add(token);
-    const name = getStudentName(s);
-    const allRecs = recordsForStudent(s);
-    const realRecs = allRecs.filter(r => !r.attendance_only).sort(byNewest);
-
-    const scoredLohRecs = realRecs.filter(r => hasScore(r.loh));
-    const avgLoh = scoredLohRecs.length
-      ? Math.round(scoredLohRecs.reduce((a, r) => a + r.loh.score, 0) / scoredLohRecs.length)
-      : null;
-
-    let totalAyat = 0;
-    realRecs.forEach(r => {
-      const lohArr = r.newLoh ? (Array.isArray(r.newLoh) ? r.newLoh : [r.newLoh]) : [];
-      lohArr.forEach(l => { if (l && l.sura) totalAyat += countAyat(l.from, l.to); });
-      const madiArr = r.newMadi ? (Array.isArray(r.newMadi) ? r.newMadi : [r.newMadi]) : [];
-      madiArr.forEach(m => { if (m && m.sura) totalAyat += countAyat(m.from, m.to); });
-    });
-
-    const uniqueDays = new Set(allRecs.map(r => r.date)).size;
-    const attendPct = totalHalaqaDays > 0 ? Math.min(100, Math.round(uniqueDays / totalHalaqaDays * 100)) : 0;
-
-    const latest = realRecs[0];
-    const currentTask = latest ? {
-      date: latest.date,
-      newLoh: (Array.isArray(latest.newLoh) ? latest.newLoh : (latest.newLoh ? [latest.newLoh] : [])).filter(l => l && l.sura),
-      newMadi: (Array.isArray(latest.newMadi) ? latest.newMadi : (latest.newMadi ? [latest.newMadi] : [])).filter(m => m && m.sura)
-    } : null;
-
-    const recentSessions = realRecs.slice(0, 10).map(r => ({
-      date: r.date || '',
-      loh: hasScore(r.loh) ? { score: r.loh.score } : null,
-      madi: hasScore(r.madi) ? { score: r.madi.score } : null,
-      newLoh: (Array.isArray(r.newLoh) ? r.newLoh : (r.newLoh ? [r.newLoh] : [])).filter(l => l && l.sura),
-      newMadi: (Array.isArray(r.newMadi) ? r.newMadi : (r.newMadi ? [r.newMadi] : [])).filter(m => m && m.sura),
-      tajweed: (r.tajweed && r.tajweed.sura) ? { sura: r.tajweed.sura, from: r.tajweed.from || '', to: r.tajweed.to || '' } : null,
-      note: r.note || ''
-    }));
-
-    updates[token] = {
-      name,
-      updatedAt: Date.now(),
-      totalHalaqaDays,
-      uniqueDays,
-      attendPct,
-      rank: rankByName[name] || null,
-      sessionsCount: realRecs.length,
-      totalAyat,
-      avgLoh,
-      currentTask,
-      recentSessions
-    };
+    updates[token] = buildStudentPublicStats(s, totalHalaqaDays, rankByName);
   });
 
   // Prune orphaned entries (deleted students / rotated tokens) in the same batch.
@@ -1641,6 +1674,7 @@ function copyChildLink(e, id) {
   const s = students.find(st => st.id === id);
   if (!s) return;
   const url = CHILD_STATS_BASE_URL + '?t=' + ensureParentToken(s);
+  pushPublicStatsForStudent(s);
   const done = () => showToast('✓ تم نسخ رابط المتابعة');
   const fail = () => showToast('⚠️ تعذر نسخ الرابط', true);
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -2474,6 +2508,7 @@ function showWhatsAppPrompt(rec, sObj) {
 
   const parentToken = ensureParentToken(sObj);
   if (parentToken) {
+    pushPublicStatsForStudent(sObj);
     msg += '📊 لمتابعة تقدم ' + rec.student.split(' ')[0] + ' أول بأول:' + nl;
     msg += CHILD_STATS_BASE_URL + '?t=' + parentToken + nl + nl;
   }
