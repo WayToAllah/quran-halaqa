@@ -932,13 +932,19 @@ function esc(s) {
 }
 const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzw3X51RGVsjg0IhXbD1Tbv0ZZ09bUP8jiM4ufEU3fVRw2Ow3nbQqVosvzeAQId1_zQjQ/exec';
 
+// C5: SHEETS_SECRET must match SHARED_SECRET in the Apps Script project —
+// without it, the endpoint now rejects the request. Keeping this as a
+// separate named constant (not inlined) makes it obvious where to update it
+// if the secret is ever rotated.
+const SHEETS_SECRET = '6oQkqryHIFNcwgyQPOIFeuoaTyLPYoto';
+
 async function syncToSheets(type, payload) {
   try {
     await fetch(SHEETS_URL, {
       method: 'POST',
       mode: 'no-cors',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({type, ...payload})
+      body: JSON.stringify({type, secret: SHEETS_SECRET, ...payload})
     });
   } catch(e) { console.warn('Sheets sync failed:', e); }
 }
@@ -2382,4 +2388,3 @@ if ('serviceWorker' in navigator) {
 </html>
 <!-- redeploy trigger 2026-07-03T retry2 -->
 <!-- redeploy retry -->
-<!-- token rotation verified 2026-07-04 -->
