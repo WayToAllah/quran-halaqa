@@ -1217,9 +1217,28 @@ function onStudentChange() {
   if (!name) { document.getElementById('prev-task-card').style.display='none'; return; }
   // find the most recent session by actual date + creation time (same robust rule used across the app)
   const studentObj = students.find(s => getStudentName(s) === name);
-  const recs = (studentObj ? recordsForStudent(studentObj) : records.filter(r=>r.student===name)).filter(r => !r.attendance_only);
+  let recs = (studentObj ? recordsForStudent(studentObj) : records.filter(r=>r.student===name)).filter(r => !r.attendance_only);
+
+  // When editing an existing session, "last" must mean the session
+  // chronologically BEFORE the one being edited — not simply the most
+  // recent session ever. Without this, editing the student's latest
+  // session (a very common case) makes it its own "previous session",
+  // so the "ما سمعناه النهارده" card ends up showing the exact same
+  // newLoh/newMadi as the "المهمة الجديدة" section right below it.
+  if (editingRecordId !== null) {
+    const editingRec = records.find(r => String(r.id) === String(editingRecordId));
+    if (editingRec) {
+      recs = recs.filter(r => String(r.id) !== String(editingRecordId) && byNewest(r, editingRec) > 0);
+    }
+  }
+
   const last = recs.length ? [...recs].sort(byNewest)[0] : null;
-  if (!last) { document.getElementById('prev-task-card').style.display='none'; return; }
+  if (!last) {
+    document.getElementById('prev-task-card').style.display='none';
+    document.getElementById('prev-loh-info').textContent = '—';
+    document.getElementById('prev-madi-info').textContent = '—';
+    return;
+  }
 
   document.getElementById('prev-task-card').style.display='block';
   const dateStr = new Date(last.date).toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'});
