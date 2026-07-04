@@ -7,7 +7,7 @@
 //  - Firebase Realtime Database itself runs over WebSocket, not fetch — untouched by this file
 //
 // Bump CACHE_NAME whenever you change this file (or want to force-refresh cached assets).
-const CACHE_NAME = 'quran-halaqa-v1';
+const CACHE_NAME = 'quran-halaqa-v2';
 
 const APP_SHELL = [
   './',
@@ -43,7 +43,7 @@ self.addEventListener('fetch', (event) => {
   // HTML navigation: network-first, offline fallback to cached shell
   if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req)
+      fetch(req, { cache: 'no-store' })
         .then((res) => {
           const clone = res.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put('./index.html', clone));
