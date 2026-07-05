@@ -4,8 +4,8 @@ Mobile-first Quran memorization circle (halaqa) tracker for ~50 students. Single
 no build tools, installable as a PWA. This document describes the project **as it currently
 stands** — a reference for any future development work, not a changelog.
 
-**Live URL:** https://mredwan214-code.github.io/quran-halaqa
-**Repo:** https://github.com/mredwan214-code/quran-halaqa (branch `main`)
+**Live URL:** https://waytoallah.github.io/quran-halaqa
+**Repo:** https://github.com/WayToAllah/quran-halaqa (branch `main`)
 
 ---
 
@@ -284,6 +284,14 @@ function esc(s) {
 function saveRecordToFirebase(rec) { return db.ref('records/' + fbKey(rec.id)).set(rec); }
 function saveStudentToFirebase(s)  { return db.ref('students/' + fbKey(s.id)).set(s); }
 ```
+
+**`CHILD_STATS_BASE_URL` is a hardcoded absolute URL constant in `index.html`**
+(`https://waytoallah.github.io/quran-halaqa/child.html`), used to build every student's
+`child.html?t={parentToken}` link (copy-link button, WhatsApp message). It does **not**
+derive from `location.origin` — if the GitHub Pages domain ever changes again (repo
+transfer, username change, custom domain), this constant must be updated by hand or every
+newly-generated parent link will point at a dead URL, and links already sent before the
+change will need to be regenerated and re-sent.
 
 **When looking up "the previous/most recent session"** anywhere (evaluation defaults, the
 WhatsApp preview, etc.), the lookup must exclude the record currently being edited and only
