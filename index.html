@@ -2311,8 +2311,10 @@ function renderStats() {
 
 function getWeekStart(dateStr) {
   const d = new Date(dateStr+'T00:00:00');
-  const day = d.getDay();
-  d.setDate(d.getDate()-day);
+  const day = d.getDay(); // 0=Sun ... 6=Sat
+  // الأسبوع يبدأ السبت وينتهي الجمعة، فبنرجع لأقرب سبت قبل التاريخ ده أو بيساويه
+  const offset = (day + 1) % 7;
+  d.setDate(d.getDate()-offset);
   return localDateStr(d);
 }
 
