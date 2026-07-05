@@ -45,6 +45,8 @@
   .status-msg { text-align:center; padding:60px 20px; color:var(--text-muted); font-size:14.5px; line-height:1.8; }
   .status-msg .big { font-size:38px; margin-bottom:12px; }
   .hint { font-size:11.5px; color:var(--text-hint); text-align:center; margin-top:6px; line-height:1.7; }
+  .badges-list { display:flex; flex-wrap:wrap; gap:8px; }
+  .badge-pill { display:inline-flex; align-items:center; gap:5px; background:var(--gold-light); color:var(--gold); border:1px solid rgba(184,136,30,0.25); font-size:12.5px; font-weight:600; padding:7px 12px; border-radius:20px; }
   @media (prefers-color-scheme:dark) {
     :root { --text:#eef2ef; --text-muted:#9fb0a6; --text-hint:#6a7872; --bg:#10140f; --surface:#1a1f1b; --border:rgba(255,255,255,0.08); --border-strong:rgba(255,255,255,0.16); --green-light:#15301f; }
   }
@@ -63,6 +65,11 @@
 <div class="wrap">
   <div id="content" style="display:none">
     <div class="stat-grid" id="stat-grid"></div>
+
+    <div class="card" id="badges-card" style="display:none">
+      <div class="card-title"><div class="dot"></div> 🏅 الأوسمة</div>
+      <div class="badges-list" id="badges-list"></div>
+    </div>
 
     <div class="card" id="task-card" style="display:none">
       <div class="card-title"><div class="dot"></div> 📝 المهمة الحالية</div>
@@ -166,6 +173,17 @@ function render(data) {
     <div class="stat-card"><div class="stat-num">${data.sessionsCount ?? 0}</div><div class="stat-lbl">جلسة مسجلة</div></div>
     <div class="stat-card"><div class="stat-num">${(data.totalAyat || 0).toLocaleString()}</div><div class="stat-lbl">آية مسمّعة</div></div>
     <div class="stat-card"><div class="stat-num">${data.avgLoh != null ? data.avgLoh + '%' : '—'}</div><div class="stat-lbl">متوسط اللوح</div></div>`;
+
+  const badges = data.badges || [];
+  const badgesCard = document.getElementById('badges-card');
+  if (badges.length) {
+    badgesCard.style.display = 'block';
+    document.getElementById('badges-list').innerHTML = badges.map(b =>
+      `<span class="badge-pill">${esc(b.icon)} ${esc(b.label)}</span>`
+    ).join('');
+  } else {
+    badgesCard.style.display = 'none';
+  }
 
   const task = data.currentTask;
   const taskCard = document.getElementById('task-card');
