@@ -378,3 +378,4 @@ reference only):
 
 **Firebase project:** `quran-app-abe52` (Realtime Database, Authentication enabled for
 Email/Password + Anonymous providers).
+
