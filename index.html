@@ -854,10 +854,87 @@ function schedulePublicStatsRecompute() {
   publicStatsTimer = setTimeout(recomputePublicStats, 900);
 }
 
+// ---- Badges (child.html only): computed entirely from existing data, no
+// new tracking fields. Thresholds are named constants so they're one place
+// to tune later.
+const AYAT_MILESTONES = [
+  { key: 'ayat100', threshold: 100, icon: '📖', label: 'حافظ ١٠٠ آية' },
+  { key: 'ayat200', threshold: 200, icon: '📗', label: 'حافظ ٢٠٠ آية' },
+  { key: 'ayat500', threshold: 500, icon: '📘', label: 'حافظ ٥٠٠ آية' }
+];
+const ATTENDANCE_STREAK_THRESHOLD = 12; // consecutive halaqa days attended
+const EXCELLENCE_SCORE_THRESHOLD = 85;  // avg(loh, madi) >= هذا يستحق "التميز"
+
+// Unique halaqa dates (same exclusion rule as attendance %), newest first.
+// Date strings are 'YYYY-MM-DD' so a plain string sort is chronologically correct.
+function sortedHalaqaDatesDesc() {
+  return Array.from(new Set(records.map(r => r.date).filter(d => d && !EXCLUDED_HALAQA_DATES.includes(d))))
+    .sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
+}
+
+// Counts backward from the most recent halaqa day: how many in a row this
+// student has an attendance record for, stopping at the first gap.
+function computeAttendanceStreak(studentDatesSet, halaqaDatesDesc) {
+  let streak = 0;
+  for (const d of halaqaDatesDesc) {
+    if (studentDatesSet.has(d)) streak++; else break;
+  }
+  return streak;
+}
+
+// "Improving": average of the most recent 3 scored sessions is higher than
+// the average of the 3 before that. Needs at least 6 scored sessions so the
+// comparison isn't noise from one or two data points.
+function computeIsImproving(realRecsNewestFirst) {
+  const scored = realRecsNewestFirst
+    .filter(r => hasScore(r.loh) || hasScore(r.madi))
+    .map(r => {
+      const vals = [];
+      if (hasScore(r.loh)) vals.push(r.loh.score);
+      if (hasScore(r.madi)) vals.push(r.madi.score);
+      return vals.reduce((a, b) => a + b, 0) / vals.length;
+    });
+  if (scored.length < 6) return false;
+  const recentAvg = scored.slice(0, 3).reduce((a, b) => a + b, 0) / 3;
+  const priorAvg = scored.slice(3, 6).reduce((a, b) => a + b, 0) / 3;
+  return recentAvg > priorAvg;
+}
+
+function buildStudentBadges(opts) {
+  const { attendPct, allRecs, realRecsNewestFirst, totalAyat, avgLoh, avgMadi, halaqaDatesDesc } = opts;
+  const badges = [];
+
+  if (attendPct >= 100) badges.push({ key: 'perfectAttendance', icon: '💯', label: 'حضور مثالي' });
+
+  const studentDates = new Set(allRecs.map(r => r.date));
+  const streak = computeAttendanceStreak(studentDates, halaqaDatesDesc);
+  if (streak >= ATTENDANCE_STREAK_THRESHOLD) {
+    badges.push({ key: 'streak', icon: '🔥', label: 'استمرارية ' + streak + ' يوم' });
+  }
+
+  AYAT_MILESTONES.forEach(m => {
+    if (totalAyat >= m.threshold) badges.push({ key: m.key, icon: m.icon, label: m.label });
+  });
+
+  const scores = [avgLoh, avgMadi].filter(v => v != null);
+  if (scores.length) {
+    const combinedAvg = scores.reduce((a, b) => a + b, 0) / scores.length;
+    if (combinedAvg >= EXCELLENCE_SCORE_THRESHOLD) {
+      badges.push({ key: 'excellence', icon: '🌟', label: 'التميّز' });
+    }
+  }
+
+  if (computeIsImproving(realRecsNewestFirst)) {
+    badges.push({ key: 'improving', icon: '📈', label: 'الأكثر تحسناً' });
+  }
+
+  return badges;
+}
+
 // Pure per-student stats builder shared by the full recompute below and by
 // pushPublicStatsForStudent() (the immediate, non-debounced write triggered
 // right when a link is about to be shared — see the bug note there).
-function buildStudentPublicStats(s, totalHalaqaDays, rankByName) {
+function buildStudentPublicStats(s, totalHalaqaDays, rankByName, halaqaDatesDesc) {
   const name = getStudentName(s);
   const allRecs = recordsForStudent(s);
   const realRecs = allRecs.filter(r => !r.attendance_only).sort(byNewest);
@@ -865,6 +942,10 @@ function buildStudentPublicStats(s, totalHalaqaDays, rankByName) {
   const scoredLohRecs = realRecs.filter(r => hasScore(r.loh));
   const avgLoh = scoredLohRecs.length
     ? Math.round(scoredLohRecs.reduce((a, r) => a + r.loh.score, 0) / scoredLohRecs.length)
+    : null;
+  const scoredMadiRecs = realRecs.filter(r => hasScore(r.madi));
+  const avgMadi = scoredMadiRecs.length
+    ? Math.round(scoredMadiRecs.reduce((a, r) => a + r.madi.score, 0) / scoredMadiRecs.length)
     : null;
 
   let totalAyat = 0;
@@ -895,6 +976,16 @@ function buildStudentPublicStats(s, totalHalaqaDays, rankByName) {
     note: r.note || ''
   }));
 
+  const badges = buildStudentBadges({
+    attendPct,
+    allRecs,
+    realRecsNewestFirst: realRecs,
+    totalAyat,
+    avgLoh,
+    avgMadi,
+    halaqaDatesDesc
+  });
+
   return {
     name,
     updatedAt: Date.now(),
@@ -905,6 +996,8 @@ function buildStudentPublicStats(s, totalHalaqaDays, rankByName) {
     sessionsCount: realRecs.length,
     totalAyat,
     avgLoh,
+    avgMadi,
+    badges,
     currentTask,
     recentSessions
   };
@@ -932,7 +1025,7 @@ function totalHalaqaDaysNow() {
 // so the data is guaranteed to exist before the link ever reaches a parent.
 function pushPublicStatsForStudent(s) {
   if (!db || !s || !s.parentToken || !dataReady()) return Promise.resolve();
-  const data = buildStudentPublicStats(s, totalHalaqaDaysNow(), rankByNameNow());
+  const data = buildStudentPublicStats(s, totalHalaqaDaysNow(), rankByNameNow(), sortedHalaqaDatesDesc());
   return db.ref('publicStats/' + fbKey(s.parentToken)).set(data)
     .catch(err => console.warn('immediate publicStats push failed for', s.id, err));
 }
@@ -941,6 +1034,7 @@ function recomputePublicStats() {
   if (!db || !dataReady()) return;
   const totalHalaqaDays = totalHalaqaDaysNow();
   const rankByName = rankByNameNow();
+  const halaqaDatesDesc = sortedHalaqaDatesDesc();
 
   const updates = {};
   const validTokens = new Set();
@@ -949,7 +1043,7 @@ function recomputePublicStats() {
     if (!s.parentToken) return; // backfillParentTokens() will mint one shortly; picked up on the next recompute
     const token = fbKey(s.parentToken);
     validTokens.add(token);
-    updates[token] = buildStudentPublicStats(s, totalHalaqaDays, rankByName);
+    updates[token] = buildStudentPublicStats(s, totalHalaqaDays, rankByName, halaqaDatesDesc);
   });
 
   // Prune orphaned entries (deleted students / rotated tokens) in the same batch.
