@@ -55,6 +55,30 @@ by the admin app itself. `recomputePublicStats()` runs (debounced) every time th
 pruning entries for students that no longer exist. `child.html` never talks to `students` or
 `records` directly; it only ever reads its own `publicStats/{token}` node.
 
+**Achievement badges** (`buildStudentBadges()` in `index.html`, rendered in `child.html`'s
+"🏅 الأوسمة" card) are computed as part of `buildStudentPublicStats()` and stored as a
+`badges: [{key, icon, label}, ...]` array inside each student's `publicStats` entry — there is
+no separate Firebase node for them. Every badge in the current set is derived entirely from
+existing `students`/`records` data (no new tracking fields were added):
+
+| Badge | Condition |
+|---|---|
+| 💯 حضور مثالي | `attendPct >= 100` for the current period |
+| 🔥 استمرارية N يوم | `ATTENDANCE_STREAK_THRESHOLD` (12) consecutive halaqa days attended, counted backward from the most recent halaqa day via `sortedHalaqaDatesDesc()` — stops at the first gap |
+| 📖/📗/📘 حافظ ١٠٠/٢٠٠/٥٠٠ آية | `totalAyat` crosses each threshold in `AYAT_MILESTONES` (a student can hold more than one at once) |
+| 🌟 التميّز | average of `avgLoh`/`avgMadi` (whichever exist) ≥ `EXCELLENCE_SCORE_THRESHOLD` (85) |
+| 📈 الأكثر تحسناً | `computeIsImproving()`: needs ≥6 scored sessions; true when the average of the most recent 3 beats the average of the 3 before that |
+
+`avgMadi` is a new field alongside the pre-existing `avgLoh`, computed the same way
+(`hasScore()`-filtered mean, rounded) but was previously only tracked implicitly — it now
+exists explicitly in `publicStats` for the excellence badge and is available for future stats
+work too.
+
+**Deferred (need new data tracking, not implemented yet):** بادج صلاة الجماعة، بادج الصف
+الأول، وبادج حفظ الحديث — كل واحد فيهم محتاج حقل تسجيل جديد (مش موجود في الداتا موديل
+الحالي) قبل ما يبقى قابل للحساب؛ اتفقنا يبقوا مرحلة تانية بعد ما نتفق على شكل التسجيل
+اليومي المطلوب لكل واحد منهم.
+
 ---
 
 ## 3. Auth & Security
