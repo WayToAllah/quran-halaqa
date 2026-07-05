@@ -396,6 +396,14 @@
 
 <!-- Stats screen -->
 <div id="screen-stats" class="screen">
+  <div class="card" style="margin-bottom:12px">
+    <div class="field" style="margin-bottom:0">
+      <label>📅 الفترة</label>
+      <select id="stats-month-filter" onchange="onStatsMonthChange()">
+        <option value="all">كل الفترة</option>
+      </select>
+    </div>
+  </div>
   <div class="stat-grid" id="stat-grid"></div>
 
   <div class="card" style="margin-bottom:12px">
@@ -718,8 +726,8 @@ function studentMatch(rec, student) {
   return rec.student === getStudentName(student);
 }
 
-function recordsForStudent(student) {
-  return records.filter(r => studentMatch(r, student));
+function recordsForStudent(student, list) {
+  return (list || records).filter(r => studentMatch(r, student));
 }
 
 // Display name for a record: prefer the *current* name of the linked student
@@ -1185,6 +1193,7 @@ const SURAS = [
 
 let students = [], records = [], starVals = {loh:0, tajweed:0}, starScores = {loh:0, tajweed:0, 'prev-loh':0, 'prev-madi':0};
 let statsPer = [], statsTotalDays = 0, statsSortKey = 'attend';
+let statsMonthFilter = 'all';
 let starsCardData = null;
 let madiRows = []; // [{id, stars}]
 let lohRows = []; // [{id}]
@@ -1607,11 +1616,12 @@ function hideStudentDropdown(immediate) {
   }
 }
 
-function getAttendanceRanking(minPct) {
-  const totalHalaqaDays = new Set(records.map(r=>r.date).filter(d => d && !EXCLUDED_HALAQA_DATES.includes(d))).size;
+function getAttendanceRanking(minPct, recsFilter) {
+  const recs0 = recsFilter || records;
+  const totalHalaqaDays = new Set(recs0.map(r=>r.date).filter(d => d && !EXCLUDED_HALAQA_DATES.includes(d))).size;
   const per = students.map(s=>{
     const name = getStudentName(s);
-    const recs = recordsForStudent(s);
+    const recs = recordsForStudent(s, recs0);
     if (!recs.length) return null;
     const uniqueDays = new Set(recs.map(r=>r.date)).size;
     const attendPct = totalHalaqaDays > 0 ? Math.min(100, Math.round(uniqueDays/totalHalaqaDays*100)) : 0;
@@ -2217,15 +2227,46 @@ function countAyat(from, to) {
 }
 
 
+// الشهور المتاحة فعلياً في البيانات، عشان القايمة متعرضش شهور مفيهاش سجلات
+function populateStatsMonthOptions() {
+  const sel = document.getElementById('stats-month-filter');
+  if (!sel) return;
+  const MONTH_NAMES = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  const months = [...new Set(records.map(r=>r.date).filter(Boolean).map(d=>d.slice(0,7)))].sort().reverse();
+  const cur = sel.value || statsMonthFilter;
+  sel.innerHTML = '<option value="all">كل الفترة</option>' + months.map(m=>{
+    const [y,mo] = m.split('-');
+    const idx = parseInt(mo,10)-1;
+    const label = (MONTH_NAMES[idx]||mo) + ' ' + y;
+    return `<option value="${m}">${label}</option>`;
+  }).join('');
+  sel.value = (cur === 'all' || months.includes(cur)) ? cur : 'all';
+  statsMonthFilter = sel.value;
+}
+
+function onStatsMonthChange() {
+  const sel = document.getElementById('stats-month-filter');
+  statsMonthFilter = sel ? sel.value : 'all';
+  renderStats();
+}
+
+// السجلات المستخدمة في شاشة الإحصائيات بعد تطبيق فلتر الشهر (لو "كل الفترة" بترجع كل السجلات زي ما هي)
+function getStatsRecords() {
+  if (statsMonthFilter === 'all') return records;
+  return records.filter(r => r.date && r.date.slice(0,7) === statsMonthFilter);
+}
+
 function renderStats() {
-  const total = records.length;
-  const uniq = [...new Set(records.map(r=>r.studentId || r.student))].length;
-  const scoredRecs = records.filter(r=>hasScore(r.loh));
-  const avgL = scoredRecs.length ? Math.round(scoredRecs.reduce((a,r)=>a+r.loh.score,0)/scoredRecs.length) : (total ? Math.round(records.reduce((a,r)=>a+(r.loh?r.loh.stars:0),0)/total*20) : 0);
+  populateStatsMonthOptions();
+  const filtered = getStatsRecords();
+  const total = filtered.length;
+  const uniq = [...new Set(filtered.map(r=>r.studentId || r.student))].length;
+  const scoredRecs = filtered.filter(r=>hasScore(r.loh));
+  const avgL = scoredRecs.length ? Math.round(scoredRecs.reduce((a,r)=>a+r.loh.score,0)/scoredRecs.length) : (total ? Math.round(filtered.reduce((a,r)=>a+(r.loh?r.loh.stars:0),0)/total*20) : 0);
 
   // count ayat
   let lohAyat = 0, madiAyat = 0, tajweedAyat = 0;
-  records.forEach(r => {
+  filtered.forEach(r => {
     // ayat live in newLoh/newMadi (the assigned task); fall back to legacy loh/madi if present
     const lohArr = r.newLoh ? (Array.isArray(r.newLoh) ? r.newLoh : [r.newLoh]) : (r.loh && r.loh.sura ? [r.loh] : []);
     lohArr.forEach(l => { if (l && l.sura) lohAyat += countAyat(l.from, l.to); });
@@ -2235,8 +2276,8 @@ function renderStats() {
   });
   const totalAyat = lohAyat + madiAyat + tajweedAyat;
 
-  // إجمالي أيام الحلقة = الأيام الفريدة اللي اتسجل فيها أي طالب
-  const totalHalaqaDays = new Set(records.map(r=>r.date).filter(d => d && !EXCLUDED_HALAQA_DATES.includes(d))).size;
+  // إجمالي أيام الحلقة = الأيام الفريدة اللي اتسجل فيها أي طالب (داخل الفترة المختارة)
+  const totalHalaqaDays = new Set(filtered.map(r=>r.date).filter(d => d && !EXCLUDED_HALAQA_DATES.includes(d))).size;
 
   document.getElementById('stat-grid').innerHTML = `
     <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-num">${total}</div><div class="stat-lbl">جلسة مسجلة</div></div>
@@ -2246,13 +2287,13 @@ function renderStats() {
     <div class="stat-card"><div class="stat-icon">📝</div><div class="stat-num">${lohAyat.toLocaleString()}</div><div class="stat-lbl">آيات لوح</div></div>
     <div class="stat-card"><div class="stat-icon">🔄</div><div class="stat-num">${madiAyat.toLocaleString()}</div><div class="stat-lbl">آيات ماضي</div></div>`;
 
-  renderWeeklyChart();
-  renderScoreDistribution();
+  renderWeeklyChart(filtered);
+  renderScoreDistribution(filtered);
 
-  // بيانات كل طالب
+  // بيانات كل طالب (داخل الفترة المختارة)
   const per = students.map(s=>{
     const name = getStudentName(s);
-    const recs = recordsForStudent(s);
+    const recs = recordsForStudent(s, filtered);
     if (!recs.length) return null;
     const scoredLohRecs = recs.filter(r=>hasScore(r.loh));
     const avg = scoredLohRecs.length
@@ -2287,8 +2328,8 @@ function renderStats() {
       <div style="font-size:16px;font-weight:700;color:var(--gold)">${x.ayat}</div>
     </div>`).join(''); }
 
-  // أعلى 15 حضوراً (مع مشاركة نفس المركز عند تساوي النسبة)
-  const topAttend = getAttendanceRanking(ATTENDANCE_BADGE_THRESHOLD).list;
+  // أعلى 15 حضوراً (مع مشاركة نفس المركز عند تساوي النسبة) — داخل الفترة المختارة
+  const topAttend = getAttendanceRanking(ATTENDANCE_BADGE_THRESHOLD, filtered).list;
   const topAttendEl = document.getElementById('top-attend-list');
   if (!topAttend.length) { topAttendEl.innerHTML='<div class="empty-state">لا يوجد بيانات</div>'; }
   else {
@@ -2318,9 +2359,9 @@ function getWeekStart(dateStr) {
   return localDateStr(d);
 }
 
-function renderWeeklyChart() {
+function renderWeeklyChart(list) {
   const el = document.getElementById('weekly-chart');
-  const dated = records.filter(r=>r.date);
+  const dated = (list || records).filter(r=>r.date);
   if (!dated.length) { el.innerHTML = '<div class="empty-state">لا يوجد بيانات</div>'; return; }
   const counts = {};
   dated.forEach(r => { const wk = getWeekStart(r.date); counts[wk] = (counts[wk]||0) + 1; });
@@ -2339,15 +2380,15 @@ function renderWeeklyChart() {
   }).join('') + '</div>';
 }
 
-function renderScoreDistribution() {
+function renderScoreDistribution(list) {
   const el = document.getElementById('score-distribution');
   const order = ['ممتاز','جيد جداً','جيد','مقبول','إعادة'];
   const colors = {'ممتاز':'var(--green)','جيد جداً':'#3d8f5f','جيد':'var(--gold)','مقبول':'#d4901e','إعادة':'var(--red)'};
   const buckets = {'ممتاز':0,'جيد جداً':0,'جيد':0,'مقبول':0,'إعادة':0};
   let total = 0;
-  records.forEach(r=>{
+  (list || records).forEach(r=>{
     [r.loh, r.madi, r.tajweed].forEach(obj=>{
-      if (obj && obj.score) {
+      if (hasScore(obj)) {
         const name = scoreName(obj.score);
         if (name && buckets.hasOwnProperty(name)) { buckets[name]++; total++; }
       }
