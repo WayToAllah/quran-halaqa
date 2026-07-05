@@ -2662,10 +2662,16 @@ function closeWaModal(e) {
 }
 
 /* ---- نجوم الحضور ---- */
+// الكارت ده بيمثّل الشهر اللي فات (مش الشهر الحالي) — لأن إحصاء الحضور
+// بيتقفل بعد ما الشهر يخلص فعلاً، فمفيش معنى نعرض "شهر يوليو" ونحن لسه فيه.
 function openStarsCard() {
-  const { list, totalHalaqaDays } = getAttendanceRanking(ATTENDANCE_BADGE_THRESHOLD);
-  if (!list.length) { alert('لا يوجد طلاب بنسبة حضور 70% أو أكثر بعد'); return; }
-  const monthLabel = new Date().toLocaleDateString('ar-EG', {month:'long', year:'numeric'});
+  const now = new Date();
+  const prevMonthDate = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const prevMonthKey = prevMonthDate.getFullYear() + '-' + String(prevMonthDate.getMonth()+1).padStart(2,'0');
+  const monthLabel = prevMonthDate.toLocaleDateString('ar-EG', {month:'long', year:'numeric'});
+  const monthRecords = records.filter(r => r.date && r.date.slice(0,7) === prevMonthKey);
+  const { list, totalHalaqaDays } = getAttendanceRanking(ATTENDANCE_BADGE_THRESHOLD, monthRecords);
+  if (!list.length) { alert('لا يوجد طلاب بنسبة حضور 70% أو أكثر في شهر ' + monthLabel); return; }
   const rowsHtml = list.map(x=>`
     <div class="stars-row-item">
       <div class="stars-rank">${rankBadgeHTML(x.rank)}</div>
