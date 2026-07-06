@@ -2617,7 +2617,7 @@ function renderStarsHTML(score) {
 
 function scoreName(score) {
   const s = parseInt(score);
-  if (isNaN(s)||s===0) return '';
+  if (isNaN(s)) return '';
   if (s >= 85) return 'ممتاز';
   if (s >= 75) return 'جيد جداً';
   if (s >= 65) return 'جيد';
