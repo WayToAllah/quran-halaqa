@@ -39,20 +39,25 @@ export function subscribeRecentRecords(
   mosqueId: string,
   halaqaId: string,
   pageSize: number,
-  onChange: (records: SessionRecord[]) => void,
+  onChange: (records: SessionRecord[], lastDoc: QueryDocumentSnapshot | null) => void,
   onError: (err: unknown) => void,
 ): Unsubscribe {
   const q = query(recordsCollection(mosqueId, halaqaId), orderBy('date', 'desc'), limit(pageSize));
-  return onSnapshot(q, (snap) => onChange(snap.docs.map((d) => d.data())), onError);
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map((d) => d.data()), snap.docs[snap.docs.length - 1] ?? null),
+    onError,
+  );
 }
 
-/** One-time (non-live) page of older records, for "تحميل المزيد" in the log screen. */
+/** One-time (non-live) page of older records, for "تحميل المزيد" in the log screen.
+ * Returns the new records plus the new last-doc cursor for a further page. */
 export async function loadMoreRecords(
   mosqueId: string,
   halaqaId: string,
   pageSize: number,
   afterDoc: QueryDocumentSnapshot,
-): Promise<SessionRecord[]> {
+): Promise<{ records: SessionRecord[]; lastDoc: QueryDocumentSnapshot | null }> {
   const q = query(
     recordsCollection(mosqueId, halaqaId),
     orderBy('date', 'desc'),
@@ -60,7 +65,7 @@ export async function loadMoreRecords(
     limit(pageSize),
   );
   const snap = await getDocs(q);
-  return snap.docs.map((d) => d.data());
+  return { records: snap.docs.map((d) => d.data()), lastDoc: snap.docs[snap.docs.length - 1] ?? null };
 }
 
 /**

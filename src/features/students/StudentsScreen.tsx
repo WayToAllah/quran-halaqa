@@ -1,6 +1,7 @@
-import { useMemo, useRef, useState } from 'preact/hooks';
+import { useMemo, useState } from 'preact/hooks';
 import { useStudents } from '../../hooks/useStudents';
 import { useAllRecords } from '../../hooks/useAllRecords';
+import { useUndoableDelete } from '../../hooks/useUndoableDelete';
 import { deleteStudent as deleteStudentDoc, updateStudent } from '../../data/students.repo';
 import { normAr, esc } from '../../domain/text';
 import { getStudentName, recordsForStudent } from '../../domain/students';
@@ -30,13 +31,12 @@ function initialsOf(name: string): string {
 export function StudentsScreen() {
   const { students, loaded: studentsLoaded } = useStudents(MOSQUE_ID, HALAQA_ID);
   const { records } = useAllRecords(MOSQUE_ID, HALAQA_ID);
-  const { showToast, showUndoToast } = useToast();
+  const { showToast } = useToast();
 
   const [query, setQuery] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
-  const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<string>>(new Set());
-  const deleteTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const { pendingIds: pendingDeleteIds, requestDelete } = useUndoableDelete();
 
   const topRanks = useMemo(() => {
     const map: Record<string, number> = {};
@@ -92,39 +92,7 @@ export function StudentsScreen() {
       ? `حذف "${getStudentName(s)}"؟\n\nله ${linkedCount} جلسة مسجلة — هتفضل موجودة في السجل والإحصائيات باسمه الحالي لكن بدون إمكانية ربطها بملفه بعد الحذف.`
       : `حذف "${getStudentName(s)}"؟`;
     if (!confirm(warning)) return;
-
-    setPendingDeleteIds((prev) => new Set(prev).add(s.id));
-    const existing = deleteTimers.current.get(s.id);
-    if (existing) clearTimeout(existing);
-
-    const timer = setTimeout(async () => {
-      deleteTimers.current.delete(s.id);
-      setPendingDeleteIds((prev) => {
-        const next = new Set(prev);
-        next.delete(s.id);
-        return next;
-      });
-      try {
-        await deleteStudentDoc(MOSQUE_ID, HALAQA_ID, s.id);
-      } catch (err) {
-        console.error('delete failed:', err);
-        showToast('⚠️ فشل الحذف — تأكد من الإنترنت وحاول تاني', true);
-      }
-    }, 5000);
-    deleteTimers.current.set(s.id, timer);
-
-    showUndoToast(`🗑 تم حذف ${getStudentName(s)}`, () => {
-      const t = deleteTimers.current.get(s.id);
-      if (t) {
-        clearTimeout(t);
-        deleteTimers.current.delete(s.id);
-      }
-      setPendingDeleteIds((prev) => {
-        const next = new Set(prev);
-        next.delete(s.id);
-        return next;
-      });
-    });
+    requestDelete(s.id, `🗑 تم حذف ${getStudentName(s)}`, (id) => deleteStudentDoc(MOSQUE_ID, HALAQA_ID, id));
   }
 
   return (

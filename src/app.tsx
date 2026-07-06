@@ -3,6 +3,7 @@ import { ToastProvider } from './ui/ToastProvider';
 import { useAuth } from './features/auth/useAuth';
 import { LoginScreen } from './features/auth/LoginScreen';
 import { StudentsScreen } from './features/students/StudentsScreen';
+import { LogScreen } from './features/log/LogScreen';
 
 type Tab = 'record' | 'students' | 'log' | 'stats';
 
@@ -52,7 +53,7 @@ function AppShell() {
       <main>
         {tab === 'record' && <ComingSoon label="تسجيل" />}
         {tab === 'students' && <StudentsScreen />}
-        {tab === 'log' && <ComingSoon label="السجل" />}
+        {tab === 'log' && <LogScreen />}
         {tab === 'stats' && <ComingSoon label="إحصاءات" />}
       </main>
 
