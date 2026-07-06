@@ -47,16 +47,6 @@
   .hint { font-size:11.5px; color:var(--text-hint); text-align:center; margin-top:6px; line-height:1.7; }
   .badges-list { display:flex; flex-wrap:wrap; gap:8px; }
   .badge-pill { display:inline-flex; align-items:center; gap:5px; background:var(--gold-light); color:var(--gold); border:1px solid rgba(184,136,30,0.25); font-size:12.5px; font-weight:600; padding:7px 12px; border-radius:20px; }
-  .field-group { margin-bottom:12px; }
-  .field-label { display:block; font-size:12.5px; color:var(--text-muted); margin-bottom:6px; font-weight:600; }
-  .field-input { width:100%; padding:11px 13px; border:1px solid var(--border-strong); border-radius:var(--radius-sm); font-size:14.5px; font-family:inherit; direction:ltr; text-align:right; background:var(--surface); color:var(--text); }
-  .field-input:focus { outline:none; border-color:var(--green); }
-  .save-phone-btn { width:100%; padding:12px; background:var(--green); color:#fff; border:none; border-radius:var(--radius-sm); font-size:14px; font-weight:700; font-family:inherit; cursor:pointer; margin-top:4px; }
-  .save-phone-btn:active { background:var(--green-deep); }
-  .save-phone-btn:disabled { opacity:0.6; }
-  .phone-status { font-size:12.5px; text-align:center; margin-top:9px; min-height:16px; }
-  .phone-status.ok { color:var(--green); }
-  .phone-status.err { color:var(--red); }
   @media (prefers-color-scheme:dark) {
     :root { --text:#eef2ef; --text-muted:#9fb0a6; --text-hint:#6a7872; --bg:#10140f; --surface:#1a1f1b; --border:rgba(255,255,255,0.08); --border-strong:rgba(255,255,255,0.16); --green-light:#15301f; }
   }
@@ -89,20 +79,6 @@
     <div class="card">
       <div class="card-title"><div class="dot"></div> آخر الجلسات</div>
       <div id="sessions-list"></div>
-    </div>
-
-    <div class="card">
-      <div class="card-title"><div class="dot"></div> 📱 تعديل رقم الموبايل</div>
-      <div class="field-group">
-        <label class="field-label" for="phone-primary">رقم الموبايل الأساسي</label>
-        <input type="tel" class="field-input" id="phone-primary" placeholder="01XXXXXXXXX">
-      </div>
-      <div class="field-group">
-        <label class="field-label" for="phone-secondary">رقم الموبايل الثانوي</label>
-        <input type="tel" class="field-input" id="phone-secondary" placeholder="01XXXXXXXXX">
-      </div>
-      <button class="save-phone-btn" id="save-phone-btn" onclick="savePhoneNumbers()">حفظ التعديل</button>
-      <div class="phone-status" id="phone-status"></div>
     </div>
 
     <div class="hint" id="updated-hint"></div>
@@ -243,49 +219,6 @@ function render(data) {
   if (data.updatedAt) {
     document.getElementById('updated-hint').textContent = 'آخر تحديث: ' + new Date(data.updatedAt).toLocaleString('ar-EG', { dateStyle:'medium', timeStyle:'short' });
   }
-
-  // Pre-fill the phone fields only the very first time data arrives — this
-  // listener re-fires on every publicStats change (new session, badge
-  // recompute, etc.), and re-populating on every snapshot would silently
-  // wipe out whatever the parent is mid-typing.
-  if (!phoneFieldsInitialized) {
-    phoneFieldsInitialized = true;
-    document.getElementById('phone-primary').value = data.phonePrimary || '';
-    document.getElementById('phone-secondary').value = data.phoneSecondary || '';
-  }
-}
-
-let phoneFieldsInitialized = false;
-
-function savePhoneNumbers() {
-  const btn = document.getElementById('save-phone-btn');
-  const statusEl = document.getElementById('phone-status');
-  const primary = document.getElementById('phone-primary').value.trim();
-  const secondary = document.getElementById('phone-secondary').value.trim();
-
-  if (!primary) {
-    statusEl.className = 'phone-status err';
-    statusEl.textContent = 'من فضلكم أدخلوا رقم الموبايل الأساسي.';
-    return;
-  }
-
-  btn.disabled = true;
-  statusEl.className = 'phone-status';
-  statusEl.textContent = 'جاري الحفظ...';
-
-  db.ref('phoneUpdates/' + token).set({
-    phonePrimary: primary,
-    phoneSecondary: secondary,
-    updatedAt: Date.now()
-  }).then(() => {
-    statusEl.className = 'phone-status ok';
-    statusEl.textContent = '✅ تم إرسال التعديل، هيتحدّث تلقائياً قريباً.';
-  }).catch(() => {
-    statusEl.className = 'phone-status err';
-    statusEl.textContent = '⚠️ تعذّر الحفظ، تأكدوا من الإنترنت وحاولوا تاني.';
-  }).finally(() => {
-    btn.disabled = false;
-  });
 }
 
 const token = getToken();
