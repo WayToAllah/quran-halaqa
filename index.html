@@ -1248,8 +1248,8 @@ const ATTENDANCE_BADGE_THRESHOLD = 70;
 const CHILD_STATS_BASE_URL = 'https://waytoallah.github.io/quran-halaqa/child.html';
 
 // Escape any value before injecting it into innerHTML — closes the stored-XSS
-// hole where student names / notes / phone numbers (editable via parent-form.html
-// or directly in Firebase) could otherwise run as HTML/JS in the admin's browser.
+// hole where student names / notes / phone numbers (editable directly in
+// Firebase) could otherwise run as HTML/JS in the admin's browser.
 // Safe for both text nodes and quoted HTML attributes.
 // تطبيع عربي للبحث: توحيد الهمزات والياء والتاء المربوطة وإزالة التشكيل
 function normAr(s) {
