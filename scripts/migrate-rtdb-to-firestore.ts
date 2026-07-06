@@ -15,41 +15,31 @@
  *
  * ⚠️ CANNOT be run from the sandboxed environment this was written in — it
  * needs real network access to Firebase (firebaseio.com, googleapis.com),
- * both of which are outside that sandbox's allowed domains. This is meant
- * to run on Muhammad's own machine (or a CI job with normal internet).
+ * both outside that sandbox's allowed domains. Designed to run either:
+ *   (a) via GitHub Actions — see .github/workflows/migrate.yml, triggered
+ *       manually from the Actions tab, no local setup needed at all; or
+ *   (b) on any machine with normal internet access and Node.js installed.
+ *
+ * By default this reads LIVE data straight from the Realtime Database via
+ * the Admin SDK (no manual "Export JSON" step needed) — pass --export
+ * <path> instead to migrate from a previously-downloaded export file.
  *
  * ---------------------------------------------------------------------------
- * HOW TO RUN (on a machine with normal internet access):
+ * HOW TO RUN VIA GITHUB ACTIONS (recommended — no local install needed):
+ * See the numbered steps in .github/workflows/migrate.yml's header comment.
  *
- * 1. Export the current RTDB data:
- *    Firebase Console → Realtime Database → ⋮ menu → "Export JSON"
- *    Save it as e.g. rtdb-export.json in this folder.
- *
- * 2. Get a service account key (one-time):
- *    Firebase Console → Project Settings → Service Accounts →
- *    "Generate new private key" → save as serviceAccountKey.json
- *    (⚠️ do NOT commit this file — it's already covered by .gitignore's
- *    `*.json` service-account pattern; double check before committing)
- *
- * 3. Find your admin Firebase Auth UID:
- *    Firebase Console → Authentication → Users → copy the UID column
- *    for your admin account.
- *
- * 4. Enable Firestore (if not already): Firebase Console → Firestore
+ * HOW TO RUN LOCALLY (alternative, needs Node.js):
+ * 1. Get a service account key (one-time): Firebase Console → Project
+ *    Settings → Service Accounts → "Generate new private key" → save as
+ *    serviceAccountKey.json (already covered by .gitignore — do not commit it)
+ * 2. Find your admin Firebase Auth UID: Firebase Console → Authentication
+ *    → Users → copy the UID column for your admin account.
+ * 3. Enable Firestore (if not already): Firebase Console → Firestore
  *    Database → Create database.
- *
- * 5. Dry run first (no writes, just prints what WOULD happen):
+ * 4. Dry run first (no writes, just prints what WOULD happen):
  *    GOOGLE_APPLICATION_CREDENTIALS=./serviceAccountKey.json \
- *      npx tsx scripts/migrate-rtdb-to-firestore.ts \
- *      --export ./rtdb-export.json \
- *      --admin-uid <YOUR_UID> \
- *      --dry-run
- *
- * 6. Then for real:
- *    GOOGLE_APPLICATION_CREDENTIALS=./serviceAccountKey.json \
- *      npx tsx scripts/migrate-rtdb-to-firestore.ts \
- *      --export ./rtdb-export.json \
- *      --admin-uid <YOUR_UID>
+ *      npx tsx scripts/migrate-rtdb-to-firestore.ts --admin-uid <YOUR_UID> --dry-run
+ * 5. Then for real (same command, minus --dry-run).
  *
  * The script is idempotent (safe to re-run) — every write is a `set()` on
  * the same id, not an `add()`, so running it twice just overwrites with
@@ -59,9 +49,12 @@
 import { readFileSync } from 'node:fs';
 import { initializeApp, applicationDefault } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getDatabase } from 'firebase-admin/database';
+
+const RTDB_URL = 'https://quran-app-abe52-default-rtdb.firebaseio.com';
 
 interface Args {
-  export: string;
+  exportPath?: string;
   adminUid: string;
   mosqueId: string;
   halaqaId: string;
@@ -74,16 +67,15 @@ function parseArgs(): Args {
     const i = argv.indexOf(flag);
     return i >= 0 ? argv[i + 1] : undefined;
   };
-  const exportPath = get('--export');
   const adminUid = get('--admin-uid');
-  if (!exportPath || !adminUid) {
+  if (!adminUid) {
     console.error(
-      'Usage: tsx scripts/migrate-rtdb-to-firestore.ts --export <path> --admin-uid <uid> [--mosque-id altayseer] [--halaqa-id main] [--dry-run]',
+      'Usage: tsx scripts/migrate-rtdb-to-firestore.ts --admin-uid <uid> [--export <path>] [--mosque-id altayseer] [--halaqa-id main] [--dry-run]',
     );
     process.exit(1);
   }
   return {
-    export: exportPath,
+    exportPath: get('--export'),
     adminUid,
     mosqueId: get('--mosque-id') ?? 'altayseer',
     halaqaId: get('--halaqa-id') ?? 'main',
@@ -91,16 +83,43 @@ function parseArgs(): Args {
   };
 }
 
-interface RtdbExport {
+interface RtdbSnapshot {
   students?: Record<string, Record<string, unknown>>;
   records?: Record<string, Record<string, unknown>>;
   publicStats?: Record<string, Record<string, unknown>>;
 }
 
+async function loadFromRtdb(): Promise<RtdbSnapshot> {
+  console.log(`Reading live data from ${RTDB_URL} ...`);
+  const db = getDatabase();
+  const [studentsSnap, recordsSnap, publicStatsSnap] = await Promise.all([
+    db.ref('students').once('value'),
+    db.ref('records').once('value'),
+    db.ref('publicStats').once('value'),
+  ]);
+  return {
+    students: studentsSnap.val() ?? {},
+    records: recordsSnap.val() ?? {},
+    publicStats: publicStatsSnap.val() ?? {},
+  };
+}
+
+function loadFromFile(path: string): RtdbSnapshot {
+  console.log(`Reading export from ${path} ...`);
+  return JSON.parse(readFileSync(path, 'utf8'));
+}
+
 async function main() {
   const args = parseArgs();
-  console.log(`Reading export from ${args.export} ...`);
-  const raw: RtdbExport = JSON.parse(readFileSync(args.export, 'utf8'));
+
+  // Every mode below needs credentials, including a dry-run that reads
+  // live data — only a dry-run reading from a local --export file needs none.
+  const needsFirebase = !args.exportPath || !args.dryRun;
+  if (needsFirebase) {
+    initializeApp({ credential: applicationDefault(), databaseURL: RTDB_URL });
+  }
+
+  const raw: RtdbSnapshot = args.exportPath ? loadFromFile(args.exportPath) : await loadFromRtdb();
 
   const students = raw.students ?? {};
   const records = raw.records ?? {};
@@ -135,12 +154,7 @@ async function main() {
     return;
   }
 
-  // Reads the service account key from GOOGLE_APPLICATION_CREDENTIALS (see
-  // the usage instructions at the top of this file) — never a hardcoded
-  // credential in this repo. Fails with a clear error if that env var isn't set.
-  initializeApp({ credential: applicationDefault() });
   const db = getFirestore();
-
   const halaqaRef = db.doc(`mosques/${args.mosqueId}/halaqat/${args.halaqaId}`);
 
   console.log('\nWriting mosque + membership + halaqa metadata...');
@@ -196,7 +210,7 @@ async function main() {
     await batch.commit();
   }
 
-  // Verification: read back counts and compare against the source export.
+  // Verification: read back counts and compare against the source.
   console.log('\nVerifying...');
   const [studentsSnap, recordsSnap] = await Promise.all([
     halaqaRef.collection('students').count().get(),
