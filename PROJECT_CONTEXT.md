@@ -381,6 +381,15 @@ several-minutes-stale cached response.
 - **Parent-editable profile page** — removed (previously `parent-form.html`); if a
   parent-facing profile-edit flow is reintroduced later, it must be built with per-family
   token scoping from the start rather than the old any-visitor-sees-everyone model.
+- **Parent phone-number editing from `child.html`** — removed. `child.html` previously had a
+  phone-edit card writing suggestions to a `phoneUpdates/{token}` queue that the admin app
+  consumed and applied. Both sides are gone: the card and `savePhoneNumbers()` in `child.html`,
+  and `attachPhoneUpdatesListenerOnce()`/`applyPendingPhoneUpdate()` in `index.html`.
+  `phonePrimary`/`phoneSecondary` were also dropped from the `publicStats` payload (they only
+  existed to pre-fill that card, and there's no reason to publish family phone numbers on a
+  publicly-readable node). Phone edits now happen only in the admin's student modal. A stale
+  `phoneUpdates` node may still exist in Firebase with old queued entries — safe to delete
+  manually from the Console; nothing reads or writes it anymore.
 - **Automatic annual grade promotion** — no such logic exists anywhere in the app.
 - **Server-side/query-based pagination** — `.on('value')` loads the entire `records` tree into
   memory on every change; fine at current data volume (~50 students, low thousands of
