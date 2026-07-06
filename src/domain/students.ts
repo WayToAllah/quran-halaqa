@@ -23,6 +23,13 @@ export function recordsForStudent(student: Student, allRecords: SessionRecord[])
   return allRecords.filter((r) => studentMatch(r, student));
 }
 
+/** Whether this student already has ANY record (session or attendance-only)
+ * on the given date — used by group attendance to skip already-covered
+ * students instead of creating a duplicate entry. */
+export function studentHasRecordOnDate(student: Student, dateStr: string, allRecords: SessionRecord[]): boolean {
+  return allRecords.some((r) => studentMatch(r, student) && r.date === dateStr);
+}
+
 /**
  * Display name for a record: prefer the *current* name of the linked student
  * (so renames show up everywhere instantly), fall back to the name stored on

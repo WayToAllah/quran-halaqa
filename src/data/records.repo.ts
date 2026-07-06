@@ -139,6 +139,15 @@ export function subscribeAllRecords(
   return onSnapshot(recordsCollection(mosqueId, halaqaId), (snap) => onChange(snap.docs.map((d) => d.data())), onError);
 }
 
+/** All records on one specific date — used by group attendance to find
+ * students already covered that day, without loading the whole halaqa's
+ * history. Single-field equality filter, no composite index needed. */
+export async function getRecordsByDate(mosqueId: string, halaqaId: string, dateStr: string): Promise<SessionRecord[]> {
+  const q = query(recordsCollection(mosqueId, halaqaId), where('date', '==', dateStr));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => d.data());
+}
+
 export function saveRecord(mosqueId: string, halaqaId: string, record: SessionRecord): Promise<void> {
   return setDoc(recordDocRef(mosqueId, halaqaId, record.id), record);
 }

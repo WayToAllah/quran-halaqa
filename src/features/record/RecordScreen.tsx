@@ -7,7 +7,10 @@ import { getStudentName } from '../../domain/students';
 import { localDateStr, genId } from '../../domain';
 import { scoreToStars } from '../../domain/scoring';
 import { extractAssignedSuras, validateAyahRange } from '../../domain/record';
+import { buildWhatsAppMessage, normalizeWhatsAppPhone } from '../../domain/whatsapp';
 import { SuraRow } from './SuraRow';
+import { GroupAttendanceModal } from './GroupAttendanceModal';
+import { WhatsAppModal } from './WhatsAppModal';
 import { StarPicker } from '../../ui/StarPicker';
 import { useToast } from '../../ui/ToastProvider';
 import { MOSQUE_ID, HALAQA_ID } from '../../config';
@@ -52,6 +55,8 @@ export function RecordScreen() {
 
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [showGroupAttendance, setShowGroupAttendance] = useState(false);
+  const [whatsAppPreview, setWhatsAppPreview] = useState<{ message: string; phone: string } | null>(null);
 
   const studentMatches = useMemo(() => {
     const q = studentQuery.trim();
@@ -135,7 +140,10 @@ export function RecordScreen() {
     try {
       await saveRecord(MOSQUE_ID, HALAQA_ID, rec);
       showToast('✓ تم الحفظ بنجاح');
+      const message = buildWhatsAppMessage(rec, prevSession, selectedStudent.parentToken);
+      const phone = normalizeWhatsAppPhone(selectedStudent.phonePrimary);
       resetForm();
+      setWhatsAppPreview({ message, phone });
     } catch (err) {
       console.error('saveRecord failed:', err);
       showToast('⚠️ فشل الحفظ — تأكد من الإنترنت وحاول تاني', true);
@@ -155,6 +163,14 @@ export function RecordScreen() {
           onInput={(e) => setDate((e.target as HTMLInputElement).value)}
         />
       </div>
+
+      <button
+        type="button"
+        class="w-full py-3 rounded-xl border-2 border-dashed border-emerald-300 text-emerald-700 text-sm font-bold"
+        onClick={() => setShowGroupAttendance(true)}
+      >
+        ✅ تسجيل حضور جماعي
+      </button>
 
       <div class="bg-white rounded-2xl border border-neutral-200 p-4 relative">
         <label class="text-xs font-semibold text-neutral-600 block mb-1">الطالب</label>
@@ -323,6 +339,22 @@ export function RecordScreen() {
       >
         {saving ? '⏳ جاري الحفظ…' : '💾 حفظ الجلسة'}
       </button>
+
+      {showGroupAttendance && (
+        <GroupAttendanceModal
+          initialDate={date}
+          students={students}
+          onClose={() => setShowGroupAttendance(false)}
+        />
+      )}
+
+      {whatsAppPreview && (
+        <WhatsAppModal
+          message={whatsAppPreview.message}
+          phone={whatsAppPreview.phone}
+          onClose={() => setWhatsAppPreview(null)}
+        />
+      )}
     </div>
   );
 }

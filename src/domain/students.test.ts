@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { displayStudentName, getStudentName, recordsForStudent, studentMatch } from './students';
+import { displayStudentName, getStudentName, recordsForStudent, studentHasRecordOnDate, studentMatch } from './students';
 import type { SessionRecord, Student } from '../types';
 
 const zaid: Student = { id: 's_1', name: 'زيد احمد' };
@@ -55,6 +55,20 @@ describe('recordsForStudent', () => {
     ];
     const result = recordsForStudent(zaid, records);
     expect(result.map((r) => r.id)).toEqual(['r1', 'r3']);
+  });
+});
+
+describe('studentHasRecordOnDate', () => {
+  const records: SessionRecord[] = [
+    { id: 'r1', studentId: 's_1', date: '2026-07-01' },
+    { id: 'att1', studentId: 's_1', date: '2026-07-02', attendance_only: true },
+  ];
+  it('is true for a date with any record (session or attendance-only)', () => {
+    expect(studentHasRecordOnDate(zaid, '2026-07-01', records)).toBe(true);
+    expect(studentHasRecordOnDate(zaid, '2026-07-02', records)).toBe(true);
+  });
+  it('is false for a date with no record at all', () => {
+    expect(studentHasRecordOnDate(zaid, '2026-07-05', records)).toBe(false);
   });
 });
 
