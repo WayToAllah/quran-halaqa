@@ -1,0 +1,65 @@
+rules_version = '2';
+
+// ============================================================================
+// متابعة حفظ القرآن — Firestore Security Rules (Phase 2)
+//
+// Model: mosques/{mosqueId} owns halaqat/{halaqaId}, which owns its own
+// students/records. Access to everything under a mosque requires a
+// members/{uid} doc under that mosque — there is no blanket "any signed-in
+// user can read/write anything" rule like the old RTDB `auth != null` grant.
+//
+// publicStats/{token} is the one deliberately public exception: child.html
+// reads a single doc by a high-entropy token, with no sign-in at all. `get`
+// is allowed, `list` is denied (tokens can never be enumerated), and `write`
+// is denied to every client — only a trusted server context (Cloud Function
+// or Admin SDK migration script) may write it.
+//
+// Verify with the Rules Playground in Firebase Console, or (preferred, and
+// what the CI workflow in .github/workflows/ci.yml runs automatically)
+// `firebase emulators:exec` against firestore.rules.test.ts.
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isMosqueMember(mosqueId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/mosques/$(mosqueId)/members/$(request.auth.uid));
+    }
+
+    match /mosques/{mosqueId} {
+      allow read: if isMosqueMember(mosqueId);
+      // Mosque documents themselves are created/managed out-of-band (Firebase
+      // Console or an Admin SDK script), never by a client — prevents anyone
+      // from, say, renaming the mosque or granting themselves membership.
+      allow write: if false;
+
+      match /members/{uid} {
+        allow read: if isMosqueMember(mosqueId);
+        allow write: if false; // membership managed by Admin SDK/Console only
+      }
+
+      match /halaqat/{halaqaId} {
+        allow read, write: if isMosqueMember(mosqueId);
+
+        match /students/{studentId} {
+          allow read, write: if isMosqueMember(mosqueId);
+        }
+
+        match /records/{recordId} {
+          allow read, write: if isMosqueMember(mosqueId);
+        }
+      }
+    }
+
+    match /publicStats/{token} {
+      allow get: if true;
+      allow list: if false;
+      allow write: if false;
+    }
+  }
+}

@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Firebase Admin SDK service account keys and RTDB export dumps — these
+# contain real credentials / real student data and must NEVER be committed.
+# Named explicitly (not a blanket *.json) so package.json, tsconfig*.json,
+# firebase.json, firestore.indexes.json etc. stay tracked as normal.
+serviceAccountKey.json
+service-account*.json
+rtdb-export*.json
+*.firebase-adminsdk-*.json

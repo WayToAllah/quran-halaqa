@@ -57,11 +57,38 @@ export interface SessionRecord {
   attendance_only?: boolean;
 }
 
+// ============================================================================
+// Multi-tenant hierarchy (Phase 2 — Firestore). A mosque owns one or more
+// halaqat (memorization circles); each halaqa owns its own students/records.
+// See /firestore.rules for the access-control rules built on this shape.
+// ============================================================================
+
+export interface Mosque {
+  id: string;
+  name: string;
+  createdAt: number;
+}
+
+export interface MosqueMember {
+  role: 'owner' | 'admin';
+}
+
+export interface Halaqa {
+  id: string;
+  name: string;
+  /** Bonus/makeup days excluded from attendance % (was a hardcoded constant,
+   * now per-halaqa so changing it doesn't require a redeploy). */
+  excludedDates: string[];
+  /** Minimum attendance % for the "نجم الحضور" badge (was a hardcoded constant). */
+  attendanceBadgeThreshold: number;
+}
+
 export interface Badge {
   key: string;
   icon: string;
   label: string;
 }
+
 
 /** Precomputed, publicly-readable per-student stats (denormalized for child.html). */
 export interface PublicStats {
