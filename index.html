@@ -998,8 +998,6 @@ function buildStudentPublicStats(s, totalHalaqaDays, rankByName, halaqaDatesDesc
     avgLoh,
     avgMadi,
     badges,
-    phonePrimary: s.phonePrimary || '',
-    phoneSecondary: s.phoneSecondary || '',
     currentTask,
     recentSessions
   };
@@ -1182,36 +1180,7 @@ function markConnected() {
     backfillStudentIds();
     backfillParentTokens();
     schedulePublicStatsRecompute();
-    attachPhoneUpdatesListenerOnce();
   }
-}
-
-// ---- child.html phone-number edit requests ----
-// child.html has no auth and no direct write access to students/records (by
-// design — see PROJECT_CONTEXT.md §3). A parent editing their number instead
-// writes to the narrow, publicly-writable `phoneUpdates/{token}` node; this
-// listener (attached only once students/records have already loaded, so
-// `students` is populated before any match is attempted) picks up pending
-// requests, applies them to the real student record via the matching
-// parentToken, then removes the pending entry. A token with no matching
-// student (deleted student, stale/tampered link) is simply discarded.
-let phoneUpdatesListenerAttached = false;
-function attachPhoneUpdatesListenerOnce() {
-  if (phoneUpdatesListenerAttached || !db) return;
-  phoneUpdatesListenerAttached = true;
-  db.ref('phoneUpdates').on('child_added', snap => applyPendingPhoneUpdate(snap.key, snap.val()));
-}
-
-function applyPendingPhoneUpdate(token, data) {
-  if (!db || !data) return;
-  const student = students.find(s => s.parentToken && fbKey(s.parentToken) === token);
-  if (!student) { db.ref('phoneUpdates/' + fbKey(token)).remove(); return; }
-  const updates = {};
-  if (typeof data.phonePrimary === 'string') updates.phonePrimary = data.phonePrimary.trim();
-  if (typeof data.phoneSecondary === 'string') updates.phoneSecondary = data.phoneSecondary.trim();
-  db.ref('students/' + fbKey(student.id)).update(updates)
-    .then(() => db.ref('phoneUpdates/' + fbKey(token)).remove())
-    .catch(err => console.warn('failed to apply phone update for token', token, err));
 }
 
 function showConnectionError() {
