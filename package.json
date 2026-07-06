@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:rules": "firebase emulators:exec --only firestore,auth --project quran-halaqa-rules-test \"vitest run --config vitest.rules.config.ts\"",
+    "test:rules": "firebase emulators:exec --only firestore,auth --project demo-quran-halaqa-rules-test \"vitest run --config vitest.rules.config.ts\"",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "typecheck:rules": "tsc --noEmit -p tsconfig.rules.json",
     "typecheck:scripts": "tsc --noEmit -p tsconfig.scripts.json",
