@@ -23,7 +23,7 @@ import {
 import { readFileSync } from 'fs';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 
-const PROJECT_ID = 'quran-halaqa-rules-test';
+const PROJECT_ID = 'demo-quran-halaqa-rules-test';
 const MOSQUE_ID = 'altayseer';
 const HALAQA_ID = 'main';
 const ADMIN_UID = 'admin_1';
