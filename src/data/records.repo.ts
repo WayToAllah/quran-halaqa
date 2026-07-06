@@ -114,6 +114,26 @@ export async function getRecordsInDateRange(
   return snap.docs.map((d) => d.data());
 }
 
+/**
+ * Live-subscribes to EVERY record in the halaqa, with no limit — the one
+ * deliberate exception to this file's "no whole-tree loads" rule. Cross-
+ * student aggregates (attendance ranking, badges) are mathematically
+ * cross-cutting and can't be computed from a paginated slice; the Log
+ * screen and record-lookup functions above all stay paginated/targeted,
+ * which is what actually scales badly with history (every session, every
+ * change, on every screen). This one scales the same way the original app
+ * did — acceptable at "a few thousand records" today, and the real fix is
+ * moving ranking into a server-side recompute (Phase 5), not fixing it here.
+ */
+export function subscribeAllRecords(
+  mosqueId: string,
+  halaqaId: string,
+  onChange: (records: SessionRecord[]) => void,
+  onError: (err: unknown) => void,
+): Unsubscribe {
+  return onSnapshot(recordsCollection(mosqueId, halaqaId), (snap) => onChange(snap.docs.map((d) => d.data())), onError);
+}
+
 export function saveRecord(mosqueId: string, halaqaId: string, record: SessionRecord): Promise<void> {
   return setDoc(recordDocRef(mosqueId, halaqaId, record.id), record);
 }

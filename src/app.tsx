@@ -1,24 +1,84 @@
-import { SURAS } from './domain/suras';
-import { scoreName } from './domain/scoring';
+import { useState } from 'preact/hooks';
+import { ToastProvider } from './ui/ToastProvider';
+import { useAuth } from './features/auth/useAuth';
+import { LoginScreen } from './features/auth/LoginScreen';
+import { StudentsScreen } from './features/students/StudentsScreen';
 
-/**
- * Placeholder shell for Phase 1 (foundation). The real admin screens
- * (تسجيل / الطلاب / السجل / إحصاءات) land in Phase 3 once the Firestore data
- * layer (Phase 2) exists. This just proves the scaffold — Vite, Preact,
- * TypeScript, Tailwind, and the domain layer — all boot and wire together
- * correctly.
- */
+type Tab = 'record' | 'students' | 'log' | 'stats';
+
+const TABS: { id: Tab; label: string; icon: string }[] = [
+  { id: 'record', label: 'تسجيل', icon: '📝' },
+  { id: 'students', label: 'الطلاب', icon: '👥' },
+  { id: 'log', label: 'السجل', icon: '📋' },
+  { id: 'stats', label: 'إحصاءات', icon: '📊' },
+];
+
+function ComingSoon({ label }: { label: string }) {
+  return (
+    <div class="p-8 text-center text-neutral-400 text-sm" dir="rtl">
+      شاشة "{label}" قريباً — المرحلة 3 لسه شغالة عليها.
+    </div>
+  );
+}
+
+function AppShell() {
+  const auth = useAuth();
+  const [tab, setTab] = useState<Tab>('students');
+
+  if (auth.status === 'loading' || auth.status === 'checking-membership') {
+    return <LoginScreen auth={auth} />;
+  }
+  if (auth.status === 'signed-out' || auth.status === 'denied') {
+    return <LoginScreen auth={auth} />;
+  }
+
+  return (
+    <div class="min-h-screen bg-neutral-50 pb-20" dir="rtl">
+      <header class="bg-emerald-700 text-white px-4 py-4 flex items-center gap-3">
+        <div class="text-2xl">📖</div>
+        <div class="flex-1">
+          <h1 class="font-bold text-sm">متابعة حفظ القرآن</h1>
+          <div class="text-xs text-emerald-100">{auth.user?.email}</div>
+        </div>
+        <button
+          class="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center"
+          aria-label="تسجيل الخروج"
+          onClick={() => auth.signOutUser()}
+        >
+          🚪
+        </button>
+      </header>
+
+      <main>
+        {tab === 'record' && <ComingSoon label="تسجيل" />}
+        {tab === 'students' && <StudentsScreen />}
+        {tab === 'log' && <ComingSoon label="السجل" />}
+        {tab === 'stats' && <ComingSoon label="إحصاءات" />}
+      </main>
+
+      <nav class="fixed bottom-0 inset-x-0 bg-white border-t border-neutral-200 flex">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            class={
+              'flex-1 py-2.5 flex flex-col items-center gap-0.5 text-xs ' +
+              (tab === t.id ? 'text-emerald-700 font-bold' : 'text-neutral-400')
+            }
+            onClick={() => setTab(t.id)}
+          >
+            <span class="text-lg">{t.icon}</span>
+            <span>{t.label}</span>
+          </button>
+        ))}
+      </nav>
+    </div>
+  );
+}
+
 export function App() {
   return (
-    <main class="min-h-screen bg-neutral-50 flex items-center justify-center p-6" dir="rtl">
-      <div class="max-w-md w-full bg-white rounded-2xl shadow-sm border border-neutral-200 p-8 text-center space-y-3">
-        <h1 class="text-xl font-bold text-neutral-900">متابعة حفظ القرآن — v2</h1>
-        <p class="text-sm text-neutral-500">المرحلة 1: الأساس جاهز</p>
-        <div class="text-xs text-neutral-400 pt-4 border-t border-neutral-100 space-y-1">
-          <p>عدد السور المحمّلة: {SURAS.length}</p>
-          <p>اختبار سريع: scoreName(0) = "{scoreName(0)}"</p>
-        </div>
-      </div>
-    </main>
+    <ToastProvider>
+      <AppShell />
+    </ToastProvider>
   );
 }

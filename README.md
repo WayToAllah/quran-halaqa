@@ -6,50 +6,44 @@
 ## الحالة الحالية
 
 ### المرحلة 1 — الأساس ✅
-- Vite + TypeScript + Preact + Tailwind CSS v4
-- `src/domain/` — منطق الأعمال الصافي بالكامل، منقول 1:1 من `index.html`/`child.html`
-  الحيّة، مع **85 اختبار Vitest** (`npm test`)
-- إصلاح مضمّن ومختبر: `scoreName(0)` بيرجّع `"إعادة"` صح (كان بيرجّع فاضي)
+Vite + TypeScript + Preact + Tailwind CSS v4، وطبقة `src/domain/` (منطق صافٍ 100%،
+منقول 1:1 من الكود الحي) مع **98 اختبار Vitest**، بما فيها إصلاح مضمّن ومختبر لـ
+`scoreName(0)`.
 
 ### المرحلة 2 — نموذج بيانات Firestore + قواعد الأمان ✅
-- `firestore.rules` — نموذج multi-tenant (`mosques/{id}/halaqat/{id}/students|records`)
-  بعضوية صريحة (`members/{uid}`)، بدل قاعدة RTDB القديمة المفتوحة لأي مستخدم موثّق
-- `src/data/` — طبقة وصول كاملة (`students.repo.ts`, `records.repo.ts`,
-  `publicStats.repo.ts`, `mosques.repo.ts`) باستخدام Firestore modular SDK،
-  باستعلامات مُرشّحة/محدودة بدل تحميل الشجرة كاملة على كل تغيير (المشكلة الأصلية
-  في التطبيق الحالي)
-- `firestore.rules.test.ts` — اختبارات آلية حقيقية لقواعد الأمان باستخدام
-  `@firebase/rules-unit-testing` الرسمية (راجع القسم أدناه لتفاصيل مهمة)
-- `scripts/migrate-rtdb-to-firestore.ts` — سكربت هجرة كامل، idempotent، بمعرّفات
-  محفوظة بالضبط (فلا تنكسر روابط `child.html` المُرسلة على واتساب)
+نموذج multi-tenant (`mosques/{id}/halaqat/{id}/students|records`) بعضوية صريحة،
+طبقة `src/data/` كاملة، سكربت هجرة، واختبارات قواعد أمان **مُثبَتة فعلاً عبر CI**
+(GitHub Actions يشغّل Firestore Emulator وينجح ✅ — راجع تبويب Actions في الريبو).
 
-## ⚠️ ملاحظة مهمة: اختبارات قواعد الأمان لم تُنفَّذ فعلياً هنا
+### المرحلة 3 — الشاشات (قيد التنفيذ) 🚧
+- ✅ **تسجيل الدخول** (`features/auth/`) — بريد/كلمة سر + فحص عضوية المسجد
+- ✅ **شاشة الطلاب** (`features/students/`) كاملة الوظائف:
+  - بحث بالاسم (بتطبيع عربي: أ/إ/آ ↔ ا، ة ↔ ه، إلخ)
+  - إضافة/تعديل (نفس الحقول والتحقق من التكرار الموجودين في التطبيق الحي)
+  - حذف بإمكانية **تراجع** (نفس نافذة الـ 5 ثوانٍ)
+  - نسخ رابط متابعة الطالب (مع توليد token عند الحاجة)
+  - شارة الترتيب في الحضور (👑🥈🥉)
+  - **14 اختبار مكوّن حقيقي** (`*.component.test.tsx`, Testing Library + happy-dom)
+    يغطي كل ما سبق فعلياً، مش مجرد تجميعه
+- ⏳ **تسجيل، السجل، إحصاءات** — لسه شاشات "قريباً" (placeholder) في `app.tsx`
 
-اختبارات `firestore.rules.test.ts` تحتاج تشغيل Firestore Emulator محلياً، واللي
-بيحتاج تنزيل ملف JAR من `storage.googleapis.com` أول مرة. النطاق ده **مش متاح**
-من الشبكة المقيدة اللي اتبنى بيها هذا الكود — جرّبت فعلياً وطلع خطأ 403 صريح
-(`Host not in allowlist: storage.googleapis.com`)، مش افتراض.
+## ⚠️ ملاحظة مهمة: اختبارات قواعد الأمان
 
-**يعني إيه عملياً:**
-- الكود مكتوب وتم فحص أنواعه (`npm run typecheck:rules`) ✅
-- لكن **لم يتم تشغيله فعلياً وليس مؤكَّداً أنه ينجح** حتى تُشغَّل إحدى الطريقتين التاليتين:
-  1. **GitHub Actions** (`.github/workflows/ci.yml`) — بيشتغل تلقائياً على push
-     لأن أجهزة GitHub عندها إنترنت عادي، مش مقيّد زي هنا
-  2. **جهازك المحلي** (لو عندك Node + إنترنت عادي): `npm run test:rules`
-
-**لا تعتبر هذا الجزء "مُختبَراً" فعلياً حتى تشوف نتيجة ✅ من إحدى الطريقتين دي.**
+اختبارات `firestore.rules.test.ts` تحتاج Firestore Emulator (يُحمَّل من
+`storage.googleapis.com`، مقفول من بيئة التطوير الأصلية لهذا الكود). **تم تشغيلها
+فعلاً بنجاح عبر GitHub Actions** — هذا ليس افتراضاً؛ النتيجة ظاهرة في تبويب Actions.
+لو عدّلت `firestore.rules`، تحقق من أن الـ CI لسه ناجح بعد التعديل.
 
 ## تشغيل محلي
 
 ```bash
 npm install
-npm run dev              # خادم تطوير
-npm run build            # بناء إنتاجي (يتحقق من TypeScript أولاً)
-npm test                 # اختبارات domain الصافية (سريعة، بلا شبكة)
-npm run test:rules       # اختبارات قواعد Firestore (يحتاج إنترنت عادي + Java)
-npm run typecheck        # فحص أنواع src/
-npm run typecheck:rules  # فحص أنواع firestore.rules.test.ts
-npm run typecheck:scripts # فحص أنواع scripts/
+npm run dev                # خادم تطوير
+npm run build               # بناء إنتاجي (يتحقق من TypeScript أولاً)
+npm test                    # اختبارات domain الصافية (سريعة، بلا شبكة) — 98 اختبار
+npm run test:components     # اختبارات المكوّنات (Testing Library + happy-dom) — 14 اختبار
+npm run test:rules          # اختبارات قواعد Firestore (يحتاج إنترنت عادي + Java 21+)
+npm run typecheck           # فحص أنواع src/
 ```
 
 ## البنية
@@ -57,32 +51,36 @@ npm run typecheck:scripts # فحص أنواع scripts/
 ```
 src/
   types/index.ts       ← Student, SessionRecord, PublicStats, Mosque, Halaqa...
-  domain/              ← منطق صافٍ 100%، بلا DOM ولا Firebase
-    ids.ts, dates.ts, scoring.ts, suras.ts, students.ts, text.ts,
-    attendance.ts, stats.ts   (+ 7 ملفات *.test.ts)
+  domain/              ← منطق صافٍ 100%، بلا DOM ولا Firebase (98 اختبار)
   data/                ← طبقة Firestore — كل وصول للبيانات يمر من هنا حصراً
-    firebase.ts          تهيئة Firestore/Auth (modular SDK)
-    converters.ts        محوّلات Firestore <-> TypeScript
-    students.repo.ts
-    records.repo.ts      ← استعلامات مُرشّحة/محدودة، لا تحميل شجرة كاملة
-    publicStats.repo.ts
-    mosques.repo.ts
-  app.tsx              ← شاشة placeholder مؤقتة (الشاشات الحقيقية في المرحلة 3)
-firestore.rules         ← قواعد الأمان (multi-tenant، عضوية صريحة)
-firestore.indexes.json  ← الفهارس المركّبة المطلوبة لاستعلامات records.repo.ts
-firestore.rules.test.ts ← اختبارات القواعد (تحتاج Emulator — راجع الملاحظة أعلاه)
-scripts/
-  migrate-rtdb-to-firestore.ts  ← سكربت الهجرة (تعليمات التشغيل داخل الملف)
-.github/workflows/ci.yml         ← typecheck + اختبارات domain + build + اختبارات القواعد
+    firebase.ts, converters.ts, students.repo.ts, records.repo.ts,
+    publicStats.repo.ts, mosques.repo.ts
+  hooks/               ← useStudents, useAllRecords (اشتراكات Firestore حية)
+  ui/                  ← ToastProvider (توست عادي + توست بزر "تراجع")
+  features/
+    auth/                useAuth.ts, LoginScreen.tsx
+    students/            StudentsScreen.tsx, StudentModal.tsx (+ اختبارات مكوّن)
+  config.ts            ← MOSQUE_ID/HALAQA_ID (مسجد التيسير الوحيد حالياً)
+  app.tsx              ← الهيكل العام: تسجيل دخول → تابات (الطلاب شغالة، الباقي قريباً)
+firestore.rules / firestore.indexes.json / firestore.rules.test.ts
+scripts/migrate-rtdb-to-firestore.ts
+.github/workflows/ci.yml
 ```
+
+## فجوات معروفة (موثّقة عمداً، مش أخطاء مخفية)
+
+- **"نسخ رابط المتابعة"** في شاشة الطلاب بيولّد الرابط ويحفظ الـ token، لكن **مبيحدّثش
+  `publicStats`** — قواعد Firestore الجديدة بتمنع أي كتابة مباشرة من العميل على
+  `publicStats` (عمداً، أأمن من قبل). التحديث الفعلي لازم يجي من Cloud Function
+  (المرحلة 5) أو من سكربت الهجرة. راجع `TODO(phase 5)` في `StudentsScreen.tsx`.
+- **رابط "المتابعة" حالياً بيشاور على `child.html` الإنتاجي** (RTDB)، مش بوابة v2
+  (لسه ما بُنيت). شغال بسبب حفظ الـ token بالضبط أثناء الهجرة، لكنه مؤقت.
+- شاشات **تسجيل/السجل/إحصاءات** لسه placeholders.
 
 ## الخطوات القادمة
 
-- **المرحلة 3:** الشاشات الأربع (تسجيل، الطلاب، السجل، إحصاءات) + بوابة ولي الأمر،
-  كل واحدة تستخدم `domain/` و`data/` مباشرة
-- **المرحلة 4:** تشغيل متوازي على مسار فرعي قبل أي قطع كامل عن `main`
-- **قرار معلّق:** دالة `scoreLabel()` في الكود الحي فيها نفس نمط `s === 0` لكن في
-  سياق مختلف (عرض حقل الإدخال المباشر، مش بيانات مخزّنة) — يحتاج قرار عند بناء
-  شاشة "تسجيل" في المرحلة 3
+- استكمال باقي شاشات المرحلة 3
+- المرحلة 4: تشغيل متوازي على مسار فرعي قبل أي قطع كامل عن `main`
+- المرحلة 5: Cloud Function لحساب `publicStats` (تسد الفجوة أعلاه) + مزامنة Sheets
 
 راجع خطة إعادة البناء الكاملة في المحادثة الأصلية للتفاصيل الكاملة لكل مرحلة.

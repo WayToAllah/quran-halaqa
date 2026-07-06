@@ -45,6 +45,14 @@ export interface AttendanceRankEntry {
   rank: number;
 }
 
+/** Top-3 ranks get a medal emoji; everyone else just shows their number. */
+export function rankBadgeEmoji(rank: number): string {
+  if (rank === 1) return '👑';
+  if (rank === 2) return '🥈';
+  if (rank === 3) return '🥉';
+  return String(rank);
+}
+
 /**
  * Attendance % per student + dense ranking (tied students share a rank, no
  * gaps in the sequence — e.g. two students at #1 means the next is #2, not #3).

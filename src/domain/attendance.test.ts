@@ -4,6 +4,7 @@ import {
   EXCLUDED_HALAQA_DATES,
   computeAttendanceStreak,
   getAttendanceRanking,
+  rankBadgeEmoji,
   sortedHalaqaDatesDesc,
 } from './attendance';
 import type { SessionRecord, Student } from '../types';
@@ -89,5 +90,17 @@ describe('getAttendanceRanking', () => {
     const { list } = getAttendanceRanking(students, records, ATTENDANCE_BADGE_THRESHOLD);
     expect(list.every((x) => x.attendPct >= ATTENDANCE_BADGE_THRESHOLD)).toBe(true);
     expect(list.find((x) => x.name === 'زيد')).toBeUndefined(); // 50% < 70%
+  });
+});
+
+describe('rankBadgeEmoji', () => {
+  it('returns medal emoji for ranks 1-3', () => {
+    expect(rankBadgeEmoji(1)).toBe('👑');
+    expect(rankBadgeEmoji(2)).toBe('🥈');
+    expect(rankBadgeEmoji(3)).toBe('🥉');
+  });
+  it('returns the plain number for rank 4+', () => {
+    expect(rankBadgeEmoji(4)).toBe('4');
+    expect(rankBadgeEmoji(10)).toBe('10');
   });
 });
