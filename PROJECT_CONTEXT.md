@@ -15,7 +15,7 @@ stands** — a reference for any future development work, not a changelog.
 |---|---|
 | Frontend | Vanilla HTML/CSS/JS, single `index.html` (~2000 lines) |
 | Data | Firebase Realtime Database — sole source of truth, no localStorage |
-| Auth | Firebase Authentication — Email/Password (admin), Anonymous (`parent-form.html`) |
+| Auth | Firebase Authentication — Email/Password (admin only) |
 | External sync | Google Apps Script → Google Sheets (write-only logging, not read from) |
 | Hosting | GitHub Pages |
 | PWA | `manifest.json` + `sw.js`, branded icons in `icons/` |
@@ -23,7 +23,6 @@ stands** — a reference for any future development work, not a changelog.
 
 **Files in the repo:**
 - `index.html` — the admin app (record sessions, manage students, log, stats)
-- `parent-form.html` — lightweight page for parents to view/update their child's contact info
 - `child.html` — read-only, per-child progress page for parents; see §3/§4 for the
   `parentToken`/`publicStats` mechanism behind it
 - `manifest.json`, `sw.js`, `icons/*` — PWA
@@ -86,9 +85,6 @@ work too.
 - **Admin app:** email/password login required before any UI is usable; logout via the 🚪
   button in the header. New admins are added directly in Firebase Console → Authentication →
   Users (no in-app invite flow exists).
-- **`parent-form.html`:** signs in anonymously on load so it can operate under the security
-  rules below. It currently shows every student's record to any visitor with the link — there
-  is no per-student access token, by design choice rather than oversight.
 - **`child.html`:** no sign-in at all. Reads exactly one path, `publicStats/{token}`, where
   `token` is a 20-char random string (`genParentToken()`, ~118 bits of entropy) stored on the
   student record. Knowing a token reveals only that one child's derived summary — never
@@ -110,12 +106,16 @@ work too.
     }
   }
   ```
-  `students`/`records` keep their exact current behavior (any authenticated user — admin or
-  anonymous parent-form visitor — can read/write either tree; unchanged from before). The new
-  `publicStats/$token` rule is the only actual change: public, unauthenticated read of one
-  specific token path, write still admin-only. There's still no per-mosque or per-role
-  restriction on `students`/`records` themselves — appropriate for a single halaqa, and the
-  first thing that needs to change if multi-tenant support is added (see §10).
+  `students`/`records` keep their exact current behavior (any authenticated user can read/write
+  either tree; unchanged from before). The new `publicStats/$token` rule is the only actual
+  change: public, unauthenticated read of one specific token path, write still admin-only.
+  There's still no per-mosque or per-role restriction on `students`/`records` themselves —
+  appropriate for a single halaqa, and the first thing that needs to change if multi-tenant
+  support is added (see §10).
+  **Since `parent-form.html` was the only consumer of the Anonymous auth provider and it has
+  now been removed from the app, the Anonymous provider itself is no longer needed — disabling
+  it in Firebase Console → Authentication → Sign-in method is a safe, optional follow-up
+  cleanup whenever convenient.**
 - **XSS defense:** every value that can originate from user input (student names, notes,
   phone numbers) passes through `esc()` before being placed in `innerHTML`. Sura names from
   the fixed 114-entry `SURAS` constant are the only strings deliberately left unescaped, since
@@ -230,11 +230,7 @@ the الإحصاءات screen, so a parent's link and the admin's leaderboard ne
 | **السجل** | All sessions newest-first, with a name-search box; each entry editable or (undoably) deletable; multi-sura assignments shown joined ("الإخلاص والفلق"), suras with no ayah range shown by name alone |
 | **إحصاءات** | Summary cards (total sessions, ayat, averages), weekly bar chart, top-3 ayat/attendance leaderboards, full per-student table, downloadable/shareable "نجوم الحضور" card |
 
-`parent-form.html` is a separate, standalone page: student dropdown → view/edit that student's
-own profile fields (name, age, grade, school, phone numbers). Renaming a student here cascades
-to their historical records' `studentId` link automatically (see §7).
-
-`child.html` is another separate, standalone page: a permanent, read-only link
+`child.html` is a separate, standalone page: a permanent, read-only link
 (`child.html?t={parentToken}`) showing one student's own attendance %, session count, total
 ayat, average لوح score, current assignment, and last 10 sessions — nothing editable, and no
 sign-in. The link is generated automatically and appended to every WhatsApp session summary
@@ -382,8 +378,9 @@ several-minutes-stale cached response.
   First mosque to migrate: مسجد التيسير (currently the only data in the system). A full
   architecture write-up (data model, rules sketch, admin-role design, migration plan, scale
   analysis) exists as a separate document delivered outside this repo.
-- **Per-student parent-form access tokens** — `parent-form.html` shows every student to any
-  visitor with the link; no per-family scoping exists yet.
+- **Parent-editable profile page** — removed (previously `parent-form.html`); if a
+  parent-facing profile-edit flow is reintroduced later, it must be built with per-family
+  token scoping from the start rather than the old any-visitor-sees-everyone model.
 - **Automatic annual grade promotion** — no such logic exists anywhere in the app.
 - **Server-side/query-based pagination** — `.on('value')` loads the entire `records` tree into
   memory on every change; fine at current data volume (~50 students, low thousands of
@@ -409,5 +406,6 @@ reference only):
 محمود عمرو محمود، يحيى محمد، يارا وليد، انس وليد، زياد جابر شريف
 
 **Firebase project:** `quran-app-abe52` (Realtime Database, Authentication enabled for
-Email/Password + Anonymous providers).
+Email/Password; the Anonymous provider was only used by the now-removed `parent-form.html`
+and can be disabled in Console — see §3).
 
