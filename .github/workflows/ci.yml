@@ -33,7 +33,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17' # required by the Firestore emulator (JVM-based)
+   java-version: '21' # firebase-tools requires Java 21+ (bumped from 17 after CI run failed with "no longer supports Java version before 21")
       - run: npm ci
       # This is the job that could NOT run in the sandboxed environment these
       # rules were authored in (storage.googleapis.com, where the emulator
