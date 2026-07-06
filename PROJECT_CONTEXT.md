@@ -417,5 +417,3 @@ reference only):
 **Firebase project:** `quran-app-abe52` (Realtime Database, Authentication enabled for
 Email/Password; the Anonymous provider was only used by the now-removed `parent-form.html`
 and can be disabled in Console — see §3).
-
-
