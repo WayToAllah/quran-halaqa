@@ -5,6 +5,7 @@ import { LoginScreen } from './features/auth/LoginScreen';
 import { StudentsScreen } from './features/students/StudentsScreen';
 import { LogScreen } from './features/log/LogScreen';
 import { StatsScreen } from './features/stats/StatsScreen';
+import { RecordScreen } from './features/record/RecordScreen';
 
 type Tab = 'record' | 'students' | 'log' | 'stats';
 
@@ -15,17 +16,9 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'stats', label: 'إحصاءات', icon: '📊' },
 ];
 
-function ComingSoon({ label }: { label: string }) {
-  return (
-    <div class="p-8 text-center text-neutral-400 text-sm" dir="rtl">
-      شاشة "{label}" قريباً — المرحلة 3 لسه شغالة عليها.
-    </div>
-  );
-}
-
 function AppShell() {
   const auth = useAuth();
-  const [tab, setTab] = useState<Tab>('students');
+  const [tab, setTab] = useState<Tab>('record');
 
   if (auth.status === 'loading' || auth.status === 'checking-membership') {
     return <LoginScreen auth={auth} />;
@@ -52,7 +45,7 @@ function AppShell() {
       </header>
 
       <main>
-        {tab === 'record' && <ComingSoon label="تسجيل" />}
+        {tab === 'record' && <RecordScreen />}
         {tab === 'students' && <StudentsScreen />}
         {tab === 'log' && <LogScreen />}
         {tab === 'stats' && <StatsScreen />}

@@ -7,3 +7,4 @@ export * from './text';
 export * from './attendance';
 export * from './stats';
 export * from './statsScreen';
+export * from './record';
