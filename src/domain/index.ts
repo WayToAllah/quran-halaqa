@@ -6,3 +6,4 @@ export * from './students';
 export * from './text';
 export * from './attendance';
 export * from './stats';
+export * from './statsScreen';

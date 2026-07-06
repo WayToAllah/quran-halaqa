@@ -4,6 +4,7 @@ import { useAuth } from './features/auth/useAuth';
 import { LoginScreen } from './features/auth/LoginScreen';
 import { StudentsScreen } from './features/students/StudentsScreen';
 import { LogScreen } from './features/log/LogScreen';
+import { StatsScreen } from './features/stats/StatsScreen';
 
 type Tab = 'record' | 'students' | 'log' | 'stats';
 
@@ -54,7 +55,7 @@ function AppShell() {
         {tab === 'record' && <ComingSoon label="تسجيل" />}
         {tab === 'students' && <StudentsScreen />}
         {tab === 'log' && <LogScreen />}
-        {tab === 'stats' && <ComingSoon label="إحصاءات" />}
+        {tab === 'stats' && <StatsScreen />}
       </main>
 
       <nav class="fixed bottom-0 inset-x-0 bg-white border-t border-neutral-200 flex">
