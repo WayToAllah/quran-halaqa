@@ -228,7 +228,17 @@ async function main() {
   console.log('\n✅ Migration complete and verified.');
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+main()
+  .then(() => {
+    // firebase-admin's Realtime Database module keeps a persistent
+    // WebSocket connection open in the background, which otherwise
+    // prevents the Node process from ever exiting naturally — even
+    // though the migration logic above has fully completed. Without
+    // this, the GitHub Actions job hangs indefinitely (observed: 3+
+    // hours) despite the actual migration having succeeded within seconds.
+    process.exit(0);
+  })
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
