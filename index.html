@@ -105,6 +105,7 @@
   /* Mistake counter */
   .mistake-trigger-btn { font-family:inherit; font-size:19px; width:42px; height:42px; flex-shrink:0; background:var(--green-light); color:var(--green); border:1.5px solid var(--border); border-radius:var(--radius-sm); cursor:pointer; }
   .mistake-trigger-btn:active { background:var(--green-tint); }
+  .mistake-modal-sura { font-size:12.5px; color:var(--text-hint); margin-top:2px; font-weight:500; }
   .mistake-score-display { text-align:center; padding:4px 0 20px; }
   .mistake-score-num { font-size:56px; font-weight:800; line-height:1; color:var(--green); transition:color 0.2s; }
   .mistake-score-label { font-size:15px; font-weight:700; margin-top:6px; color:var(--green); transition:color 0.2s; }
@@ -596,7 +597,10 @@
   <div class="modal-sheet">
     <div class="modal-handle"></div>
     <div class="modal-header">
-      <span class="modal-title" id="mistake-modal-title">عداد الأخطاء</span>
+      <div>
+        <div class="modal-title" id="mistake-modal-title">عداد الأخطاء</div>
+        <div class="mistake-modal-sura" id="mistake-modal-sura">—</div>
+      </div>
       <button class="modal-close" onclick="closeMistakeCounter(false)">✕</button>
     </div>
     <div class="modal-body">
@@ -1961,6 +1965,11 @@ function openMistakeCounter(type) {
   mistakeModalType = type;
   document.getElementById('mistake-modal-title').textContent =
     'عداد الأخطاء — تقييم ' + (type === 'prev-loh' ? 'اللوح' : 'الماضي');
+  // بيقرأ نفس نص السورة/الآيات الظاهر بالفعل في بطاقة "ما سمعناه النهارده"
+  // فوق الفورم — مفيش مصدر بيانات جديد، بس بنعرضه تاني جوّه العدّاد عشان
+  // المدرّس يشوفه من غير ما يقفل النافذة يرجع يبص فوق.
+  const suraInfoEl = document.getElementById(type === 'prev-loh' ? 'prev-loh-info' : 'prev-madi-info');
+  document.getElementById('mistake-modal-sura').textContent = suraInfoEl ? suraInfoEl.textContent : '—';
   // مفيش تصفير هنا عمداً — لو المدرّس قفل العدّاد وفتحه تاني في نفس
   // الجلسة، لازم يرجّعله بالظبط نفس عدد الأخطاء اللي كان سجّلها، مش يبدأ
   // من الصفر ولا يخمّن توزيع جديد من الدرجة النهائية.
