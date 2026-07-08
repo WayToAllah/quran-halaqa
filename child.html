@@ -64,6 +64,9 @@
 
 <div class="wrap">
   <div id="content" style="display:none">
+    <select id="month-filter" onchange="onMonthFilterChange()" style="width:100%;padding:10px 12px;margin-bottom:12px;border:1.5px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-family:inherit;font-size:13.5px;display:none">
+      <option value="all">📅 كل الفترة</option>
+    </select>
     <div class="stat-grid" id="stat-grid"></div>
 
     <div class="card" id="badges-card" style="display:none">
@@ -250,9 +253,46 @@ function showStatus(icon, msg) {
   el.innerHTML = '<div class="big">' + icon + '</div>' + esc(msg);
 }
 
+let currentPublicData = null;
+
+function renderStatGrid(stats) {
+  document.getElementById('stat-grid').innerHTML = `
+    <div class="stat-card"><div class="stat-num">${stats.attendPct ?? 0}%</div><div class="stat-lbl">نسبة الحضور</div></div>
+    <div class="stat-card"><div class="stat-num">${stats.sessionsCount ?? 0}</div><div class="stat-lbl">جلسة مسجلة</div></div>
+    <div class="stat-card"><div class="stat-num">${(stats.totalAyat || 0).toLocaleString()}</div><div class="stat-lbl">آية مسمّعة</div></div>
+    <div class="stat-card"><div class="stat-num">${stats.avgLoh != null ? stats.avgLoh + '%' : '—'}</div><div class="stat-lbl">متوسط اللوح</div></div>`;
+}
+
+// الفلتر بيأثر بس على بطاقات الملخص فوق — الرسم البياني والأوسمة وقايمة
+// آخر الجلسات عمداً برّاه، وتفضل شاملة كل الوقت دايماً (قرار مقصود، مش نسيان).
+function onMonthFilterChange() {
+  if (!currentPublicData) return;
+  const month = document.getElementById('month-filter').value;
+  if (month === 'all') {
+    renderStatGrid(currentPublicData);
+  } else {
+    const m = (currentPublicData.monthlyStats || {})[month];
+    renderStatGrid(m || { attendPct: 0, sessionsCount: 0, totalAyat: 0, avgLoh: null });
+  }
+}
+
+function populateMonthFilterOptions(monthlyStats) {
+  const sel = document.getElementById('month-filter');
+  const months = Object.keys(monthlyStats || {}).sort().reverse();
+  if (!months.length) { sel.style.display = 'none'; return; }
+  const MONTH_NAMES = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  sel.innerHTML = '<option value="all">📅 كل الفترة</option>' + months.map(m => {
+    const [y, mo] = m.split('-');
+    return `<option value="${m}">${MONTH_NAMES[parseInt(mo, 10) - 1]} ${y}</option>`;
+  }).join('');
+  sel.style.display = 'block';
+  sel.value = 'all';
+}
+
 function render(data) {
   document.getElementById('status-msg').style.display = 'none';
   document.getElementById('content').style.display = 'block';
+  currentPublicData = data;
 
   document.getElementById('child-name').textContent = data.name || 'الطالب';
   const badgeEl = document.getElementById('child-badge');
@@ -260,11 +300,8 @@ function render(data) {
     ? '<span class="badge-star">🌟 المركز ' + Number(data.rank) + ' في الحضور</span>'
     : '';
 
-  document.getElementById('stat-grid').innerHTML = `
-    <div class="stat-card"><div class="stat-num">${data.attendPct ?? 0}%</div><div class="stat-lbl">نسبة الحضور</div></div>
-    <div class="stat-card"><div class="stat-num">${data.sessionsCount ?? 0}</div><div class="stat-lbl">جلسة مسجلة</div></div>
-    <div class="stat-card"><div class="stat-num">${(data.totalAyat || 0).toLocaleString()}</div><div class="stat-lbl">آية مسمّعة</div></div>
-    <div class="stat-card"><div class="stat-num">${data.avgLoh != null ? data.avgLoh + '%' : '—'}</div><div class="stat-lbl">متوسط اللوح</div></div>`;
+  populateMonthFilterOptions(data.monthlyStats);
+  renderStatGrid(data);
 
   const badges = data.badges || [];
   const badgesCard = document.getElementById('badges-card');
