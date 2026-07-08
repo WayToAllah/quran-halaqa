@@ -102,6 +102,22 @@
   .btn-primary:active { transform:translateY(1px); }
   .btn-secondary { flex:1; padding:14px; background:var(--bg); color:var(--text-muted); border:1.5px solid var(--border-strong); border-radius:var(--radius-sm); font-size:15px; cursor:pointer; font-family:inherit; }
 
+  /* Mistake counter */
+  .mistake-trigger-btn { font-family:inherit; font-size:19px; width:42px; height:42px; flex-shrink:0; background:var(--green-light); color:var(--green); border:1.5px solid var(--border); border-radius:var(--radius-sm); cursor:pointer; }
+  .mistake-trigger-btn:active { background:var(--green-tint); }
+  .mistake-score-display { text-align:center; padding:4px 0 20px; }
+  .mistake-score-num { font-size:56px; font-weight:800; line-height:1; color:var(--green); transition:color 0.2s; }
+  .mistake-score-label { font-size:15px; font-weight:700; margin-top:6px; color:var(--green); transition:color 0.2s; }
+  .mistake-buttons { display:flex; gap:10px; margin-bottom:14px; }
+  .mistake-btn { flex:1; border:none; border-radius:var(--radius-sm); padding:20px 8px; font-family:inherit; font-weight:700; font-size:14.5px; cursor:pointer; color:white; display:flex; flex-direction:column; align-items:center; gap:5px; transition:transform 0.08s; }
+  .mistake-btn:active { transform:scale(0.96); }
+  .mistake-btn-val { font-size:11px; font-weight:600; opacity:0.85; }
+  .mistake-btn-full { background:linear-gradient(135deg,#c0392b,#96271c); box-shadow:0 3px 10px rgba(192,57,43,0.28); }
+  .mistake-btn-tajweed { background:linear-gradient(135deg,#c98a1f,#a06c14); box-shadow:0 3px 10px rgba(184,114,10,0.24); }
+  .mistake-counts-row { display:flex; justify-content:center; gap:22px; font-size:12.5px; color:var(--text-muted); margin-bottom:14px; }
+  .mistake-counts-row b { color:var(--text); }
+  #mistake-undo-btn:disabled, #mistake-reset-btn:disabled { opacity:0.4; cursor:not-allowed; }
+
   /* Log */
   .log-entry { padding:14px 0; border-bottom:1px solid var(--border); }
   .log-entry:last-child { border-bottom:none; }
@@ -289,6 +305,7 @@
         <label>التقييم (من 100)</label>
         <div style="display:flex;align-items:center;gap:10px">
           <input type="number" id="score-prev-loh" min="0" max="100" placeholder="مثلاً 90" oninput="onScoreInput('prev-loh')" style="width:84px;font-size:20px;font-weight:700;text-align:center;padding:10px;border:1.5px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--green-tint);color:var(--green);font-family:inherit">
+          <button type="button" class="mistake-trigger-btn" onclick="openMistakeCounter('prev-loh')" aria-label="عداد الأخطاء">🧮</button>
           <div id="score-prev-loh-display" style="font-size:13px;color:var(--text-hint)">—</div>
         </div>
       </div>
@@ -300,6 +317,7 @@
         <label>التقييم (من 100)</label>
         <div style="display:flex;align-items:center;gap:10px">
           <input type="number" id="score-prev-madi" min="0" max="100" placeholder="مثلاً 85" oninput="onScoreInput('prev-madi')" style="width:84px;font-size:20px;font-weight:700;text-align:center;padding:10px;border:1.5px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--green-tint);color:var(--green);font-family:inherit">
+          <button type="button" class="mistake-trigger-btn" onclick="openMistakeCounter('prev-madi')" aria-label="عداد الأخطاء">🧮</button>
           <div id="score-prev-madi-display" style="font-size:13px;color:var(--text-hint)">—</div>
         </div>
       </div>
@@ -569,6 +587,44 @@
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeAttendanceModal()">إلغاء</button>
       <button class="btn-primary" id="attendance-save-btn" onclick="saveGroupAttendance()">✅ حفظ الحضور</button>
+    </div>
+  </div>
+</div>
+
+<!-- عداد الأخطاء (اللوح/الماضي) -->
+<div class="modal-overlay" id="mistake-modal" onclick="closeMistakeModalOnBg(event)" role="dialog" aria-modal="true" aria-label="عداد الأخطاء">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <span class="modal-title" id="mistake-modal-title">عداد الأخطاء</span>
+      <button class="modal-close" onclick="closeMistakeCounter(false)">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="mistake-score-display">
+        <div class="mistake-score-num" id="mistake-score-num">100</div>
+        <div class="mistake-score-label" id="mistake-score-label">ممتاز</div>
+      </div>
+      <div class="mistake-buttons">
+        <button type="button" class="mistake-btn mistake-btn-full" onclick="addMistake('full')">
+          <span>➖ خطأ</span>
+          <span class="mistake-btn-val">−1 نقطة</span>
+        </button>
+        <button type="button" class="mistake-btn mistake-btn-tajweed" onclick="addMistake('tajweed')">
+          <span>➖ خطأ تجويدي</span>
+          <span class="mistake-btn-val">−0.5 نقطة</span>
+        </button>
+      </div>
+      <div class="mistake-counts-row">
+        <span>خطأ: <b id="mistake-full-count">0</b></span>
+        <span>خطأ تجويدي: <b id="mistake-tajweed-count">0</b></span>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button type="button" class="btn-secondary" id="mistake-undo-btn" onclick="undoLastMistake()" style="padding:11px;font-size:12.5px">↩️ تراجع عن آخر خطأ</button>
+        <button type="button" class="btn-secondary" id="mistake-reset-btn" onclick="resetMistakeCounter()" style="padding:11px;font-size:12.5px">🔄 إعادة من الصفر</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-primary" onclick="closeMistakeCounter(true)">✓ حفظ الدرجة</button>
     </div>
   </div>
 </div>
@@ -1288,6 +1344,9 @@ const SURAS = [
 
 
 let students = [], records = [], starVals = {loh:0, tajweed:0}, starScores = {loh:0, tajweed:0, 'prev-loh':0, 'prev-madi':0};
+// عداد الأخطاء: كل نوع ('prev-loh'/'prev-madi') له مصفوفة تاريخ ('full'/'tajweed')
+// بدل عدّاد رقمي بسيط، عشان "تراجع عن آخر خطأ" يقدر يشيل آخر حاجة بالظبط.
+let mistakeCounts = {'prev-loh':[], 'prev-madi':[]}, mistakeModalType = null;
 let statsPer = [], statsTotalDays = 0, statsSortKey = 'attend';
 let statsMonthFilter = 'all';
 let starsCardData = null;
@@ -1608,6 +1667,7 @@ function onStudentChange() {
     const d=document.getElementById('score-'+id+'-display'); if(d) d.textContent='—';
   });
   starScores['prev-loh']=0; starScores['prev-madi']=0;
+  mistakeCounts = {'prev-loh':[], 'prev-madi':[]};
 }
 
 function init() {
@@ -1884,6 +1944,80 @@ function closeAttendanceModalOnBg(e) {
   if (e.target === document.getElementById('attendance-modal')) closeAttendanceModal();
 }
 
+function closeMistakeModalOnBg(e) {
+  if (e.target === document.getElementById('mistake-modal')) closeMistakeCounter(false);
+}
+
+// درجة اللون حسب المستوى — نفس تدرّجات scoreName بالظبط، لعرض حي داخل العدّاد.
+function mistakeScoreColor(s) {
+  if (s >= 85) return '#15613a';
+  if (s >= 75) return '#3a8a5c';
+  if (s >= 65) return '#b8720a';
+  if (s >= 50) return '#c98a1f';
+  return '#c0392b';
+}
+
+function openMistakeCounter(type) {
+  mistakeModalType = type;
+  document.getElementById('mistake-modal-title').textContent =
+    'عداد الأخطاء — تقييم ' + (type === 'prev-loh' ? 'اللوح' : 'الماضي');
+  // مفيش تصفير هنا عمداً — لو المدرّس قفل العدّاد وفتحه تاني في نفس
+  // الجلسة، لازم يرجّعله بالظبط نفس عدد الأخطاء اللي كان سجّلها، مش يبدأ
+  // من الصفر ولا يخمّن توزيع جديد من الدرجة النهائية.
+  renderMistakeCounter();
+  document.getElementById('mistake-modal').classList.add('open');
+}
+
+function renderMistakeCounter() {
+  const h = mistakeCounts[mistakeModalType] || [];
+  const full = h.filter(x => x === 'full').length;
+  const tajweed = h.filter(x => x === 'tajweed').length;
+  const score = Math.max(0, 100 - full - tajweed * 0.5);
+  const color = mistakeScoreColor(score);
+
+  document.getElementById('mistake-score-num').textContent = (score % 1 === 0) ? score : score.toFixed(1);
+  document.getElementById('mistake-score-num').style.color = color;
+  document.getElementById('mistake-score-label').textContent = scoreName(score) || '—';
+  document.getElementById('mistake-score-label').style.color = color;
+  document.getElementById('mistake-full-count').textContent = full;
+  document.getElementById('mistake-tajweed-count').textContent = tajweed;
+  document.getElementById('mistake-undo-btn').disabled = h.length === 0;
+  document.getElementById('mistake-reset-btn').disabled = h.length === 0;
+}
+
+function addMistake(kind) {
+  mistakeCounts[mistakeModalType].push(kind);
+  if (navigator.vibrate) navigator.vibrate(15);
+  renderMistakeCounter();
+}
+
+function undoLastMistake() {
+  mistakeCounts[mistakeModalType].pop();
+  renderMistakeCounter();
+}
+
+function resetMistakeCounter() {
+  if (!mistakeCounts[mistakeModalType].length) return;
+  if (!confirm('تصفير كل الأخطاء المسجّلة في العدّاد؟')) return;
+  mistakeCounts[mistakeModalType] = [];
+  renderMistakeCounter();
+}
+
+function closeMistakeCounter(save) {
+  if (save) {
+    const h = mistakeCounts[mistakeModalType] || [];
+    const full = h.filter(x => x === 'full').length;
+    const tajweed = h.filter(x => x === 'tajweed').length;
+    // نقرّب لأقرب عدد صحيح — باقي درجات التطبيق كله أعداد صحيحة
+    // (parseInt بيقصّ الكسور في كل مكان تاني)، فمفيش داعي نسيب ".5" غريبة
+    // في الحقل. خطأ تجويدي واحد لوحده هيتقرّب لأقرب عدد، لكن اتنين هيفرقوا فعلياً.
+    const score = Math.round(Math.max(0, 100 - full - tajweed * 0.5));
+    document.getElementById('score-' + mistakeModalType).value = score;
+    onScoreInput(mistakeModalType);
+  }
+  document.getElementById('mistake-modal').classList.remove('open');
+}
+
 function renderAttendanceChecklist() {
   const dateStr = document.getElementById('attendance-date').value;
   const el = document.getElementById('attendance-checklist');
@@ -2117,6 +2251,18 @@ function saveRecord() {
     newMadi: getMadiData().map(m=>({sura:m.sura,from:m.from,to:m.to})),
     note: document.getElementById('general-note').value.trim()
   };
+  // عداد الأخطاء: نضيف mistakes بس لو المدرّس فعلاً استخدم العدّاد لهذا
+  // التقييم — سجلات اتحفظت بالكتابة اليدوية العادية تفضل بدون الحقل ده
+  // خالص، عشان مفيش داعي نملى كل سجل قديم بـ {full:0, tajweed:0} فاضية.
+  function mistakesSummary(type) {
+    const h = mistakeCounts[type] || [];
+    if (!h.length) return null;
+    return { full: h.filter(x=>x==='full').length, tajweed: h.filter(x=>x==='tajweed').length };
+  }
+  const lohMistakes = mistakesSummary('prev-loh');
+  const madiMistakes = mistakesSummary('prev-madi');
+  if (lohMistakes) rec.loh.mistakes = lohMistakes;
+  if (madiMistakes) rec.madi.mistakes = madiMistakes;
   if (document.getElementById('tajweed-toggle').checked) {
     resolveTypedSura('tajweed');
     const tajweedInput = document.getElementById('tajweed-sura-input');
@@ -2179,6 +2325,7 @@ function resetForm() {
   // reset scores
   starVals = {loh:0, tajweed:0};
   starScores = {loh:0, tajweed:0, 'prev-loh':0, 'prev-madi':0};
+  mistakeCounts = {'prev-loh':[], 'prev-madi':[]};
   document.querySelectorAll('.star-btn').forEach(b=>b.classList.remove('on'));
   // clear score inputs
   ['score-prev-loh','score-prev-madi','score-tajweed'].forEach(id=>{
@@ -2285,6 +2432,18 @@ function editRecord(id) {
   // prev-task evaluation scores
   if (hasScore(r.loh)) { document.getElementById('score-prev-loh').value = r.loh.score; onScoreInput('prev-loh'); }
   if (hasScore(r.madi)) { document.getElementById('score-prev-madi').value = r.madi.score; onScoreInput('prev-madi'); }
+  // عداد الأخطاء: لو الجلسة القديمة دي اتسجّلت بالعدّاد، رجّع نفس العدد
+  // بالظبط. سجلات قبل إضافة الميزة دي مالهاش r.loh.mistakes، فالعدّاد
+  // هيبدأ من الصفر لو اتفتح عليها — طبيعي، مفيش تفاصيل نقدر نرجّعها.
+  function rebuildMistakeHistory(mistakes) {
+    if (!mistakes) return [];
+    const h = [];
+    for (let i = 0; i < (mistakes.full||0); i++) h.push('full');
+    for (let i = 0; i < (mistakes.tajweed||0); i++) h.push('tajweed');
+    return h;
+  }
+  mistakeCounts['prev-loh'] = rebuildMistakeHistory(r.loh && r.loh.mistakes);
+  mistakeCounts['prev-madi'] = rebuildMistakeHistory(r.madi && r.madi.mistakes);
   // new task: loh rows
   document.getElementById('loh-rows').innerHTML = ''; lohRows = []; lohRowCount = 0;
   const lohArr = r.newLoh ? (Array.isArray(r.newLoh) ? r.newLoh.filter(l=>l&&l.sura) : (r.newLoh.sura ? [r.newLoh] : [])) : [];
