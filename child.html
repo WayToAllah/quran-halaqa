@@ -71,6 +71,16 @@
       <div class="badges-list" id="badges-list"></div>
     </div>
 
+    <div class="card" id="progress-chart-card" style="display:none">
+      <div class="card-title"><div class="dot"></div> 📈 تقدّم الدرجات</div>
+      <div style="display:flex;gap:14px;margin-bottom:10px;font-size:12px">
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:50%;background:var(--green);display:inline-block"></span> اللوح</span>
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:50%;background:var(--gold);display:inline-block"></span> الماضي</span>
+      </div>
+      <div id="progress-chart-svg"></div>
+      <div id="progress-trend" style="text-align:center;font-size:12.5px;font-weight:700;margin-top:8px"></div>
+    </div>
+
     <div class="card" id="task-card" style="display:none">
       <div class="card-title"><div class="dot"></div> 📝 المهمة الحالية</div>
       <div id="task-body"></div>
@@ -133,6 +143,88 @@ function renderStarsHTML(score) {
     '</span>';
 }
 
+// رسم بياني خفيف بدون مكتبات خارجية — خطين (لوح/ماضي) بتدرّج لوني تحتهم.
+// نفس تقليد الرسم الأسبوعي في التطبيق الرئيسي: الأقدم يمين، الأحدث شمال
+// (SVG دايماً بيرسم من الشمال لليمين داخلياً بغض النظر عن اتجاه الصفحة،
+// فبنعكس ترتيب الـ x يدوياً هنا عشان يطابق اتجاه القراءة العربي).
+function renderProgressChart(history) {
+  const card = document.getElementById('progress-chart-card');
+  const host = document.getElementById('progress-chart-svg');
+  const trendEl = document.getElementById('progress-trend');
+  const valid = (history || []).filter(h => h.loh != null || h.madi != null);
+
+  if (valid.length < 2) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+
+  const W = 340, H = 170, padL = 30, padR = 8, padT = 12, padB = 24;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const n = valid.length;
+
+  const xAt = i => padL + (n === 1 ? innerW / 2 : (n - 1 - i) / (n - 1) * innerW);
+  const yAt = score => padT + (100 - score) / 100 * innerH;
+
+  function buildPts(key) {
+    const pts = [];
+    valid.forEach((h, i) => { if (h[key] != null) pts.push([xAt(i), yAt(h[key])]); });
+    return pts;
+  }
+  const lohPts = buildPts('loh'), madiPts = buildPts('madi');
+
+  function polylineStr(pts) { return pts.map(p => p.join(',')).join(' '); }
+  function areaPath(pts) {
+    if (pts.length < 2) return '';
+    const base = padT + innerH;
+    return `M${pts[0][0]},${base} L${pts.map(p => p.join(',')).join(' L')} L${pts[pts.length - 1][0]},${base} Z`;
+  }
+
+  const gridLines = [0, 25, 50, 75, 100].map(v => {
+    const y = yAt(v);
+    return `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="var(--border)" stroke-width="1"/>` +
+      `<text x="${padL - 5}" y="${y + 3}" font-size="9" fill="var(--text-hint)" text-anchor="end">${v}</text>`;
+  }).join('');
+
+  const fmtDate = d => d ? new Date(d).toLocaleDateString('ar-EG', { day: 'numeric', month: 'numeric' }) : '';
+  const firstDate = fmtDate(valid[0].date), lastDate = fmtDate(valid[n - 1].date);
+
+  host.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="lohGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--green)" stop-opacity="0.22"/>
+          <stop offset="100%" stop-color="var(--green)" stop-opacity="0"/>
+        </linearGradient>
+        <linearGradient id="madiGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--gold)" stop-opacity="0.18"/>
+          <stop offset="100%" stop-color="var(--gold)" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      ${gridLines}
+      ${madiPts.length > 1 ? `<path d="${areaPath(madiPts)}" fill="url(#madiGrad)"/>` : ''}
+      ${lohPts.length > 1 ? `<path d="${areaPath(lohPts)}" fill="url(#lohGrad)"/>` : ''}
+      ${madiPts.length > 1 ? `<polyline points="${polylineStr(madiPts)}" fill="none" stroke="var(--gold)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>` : ''}
+      ${lohPts.length > 1 ? `<polyline points="${polylineStr(lohPts)}" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>` : ''}
+      ${madiPts.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="2.6" fill="var(--gold)"/>`).join('')}
+      ${lohPts.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="2.6" fill="var(--green)"/>`).join('')}
+      <text x="${W - padR}" y="${H - 4}" font-size="10" fill="var(--text-hint)" text-anchor="end">${firstDate}</text>
+      <text x="${padL}" y="${H - 4}" font-size="10" fill="var(--text-hint)" text-anchor="start">${lastDate}</text>
+    </svg>`;
+
+  // اتجاه عام: بنقارن متوسط اللوح في النص الأول من الفترة بالنص التاني —
+  // نفس فكرة "الأكثر تحسناً" في التطبيق الرئيسي، لكن كنص مباشر هنا بدل وسام.
+  const lohScores = valid.map(h => h.loh).filter(v => v != null);
+  if (lohScores.length >= 4) {
+    const mid = Math.floor(lohScores.length / 2);
+    const olderAvg = lohScores.slice(0, mid).reduce((a, b) => a + b, 0) / mid;
+    const newerAvg = lohScores.slice(mid).reduce((a, b) => a + b, 0) / (lohScores.length - mid);
+    const diff = newerAvg - olderAvg;
+    if (diff >= 5) { trendEl.textContent = '📈 في تحسّن مستمر'; trendEl.style.color = 'var(--green)'; }
+    else if (diff <= -5) { trendEl.textContent = '📉 محتاج تشجيع ومتابعة أكتر'; trendEl.style.color = 'var(--red)'; }
+    else { trendEl.textContent = '➡️ مستقر'; trendEl.style.color = 'var(--text-muted)'; }
+  } else {
+    trendEl.textContent = '';
+  }
+}
+
 function scoreName(score) {
   const s = parseInt(score);
   if (isNaN(s)) return '';
@@ -184,6 +276,8 @@ function render(data) {
   } else {
     badgesCard.style.display = 'none';
   }
+
+  renderProgressChart(data.scoreHistory || []);
 
   const task = data.currentTask;
   const taskCard = document.getElementById('task-card');
