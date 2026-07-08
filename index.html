@@ -1015,9 +1015,9 @@ function buildStudentPublicStats(s, totalHalaqaDays, rankByName, halaqaDatesDesc
   let totalAyat = 0;
   realRecs.forEach(r => {
     const lohArr = r.newLoh ? (Array.isArray(r.newLoh) ? r.newLoh : [r.newLoh]) : [];
-    lohArr.forEach(l => { if (l && l.sura) totalAyat += countAyat(l.from, l.to); });
+    lohArr.forEach(l => { if (l && l.sura) totalAyat += countAyat(l.sura, l.from, l.to); });
     const madiArr = r.newMadi ? (Array.isArray(r.newMadi) ? r.newMadi : [r.newMadi]) : [];
-    madiArr.forEach(m => { if (m && m.sura) totalAyat += countAyat(m.from, m.to); });
+    madiArr.forEach(m => { if (m && m.sura) totalAyat += countAyat(m.sura, m.from, m.to); });
   });
 
   const uniqueDays = new Set(allRecs.map(r => r.date)).size;
@@ -2494,10 +2494,17 @@ function editRecord(id) {
 
 /* ---- Stats ---- */
 
-function countAyat(from, to) {
+function countAyat(sura, from, to) {
   const f = parseInt(from), t = parseInt(to);
-  if (!f || !t || t < f) return 0;
-  return t - f + 1;
+  if (f && t && t >= f) return t - f + 1;
+  // من غير أرقام آيات محددة: نرجّع طول السورة كاملة كتقريب، بدل الصفر —
+  // تقريبي (مش بالضرورة الطالب سمّع السورة كلها فعلاً)، أفضل من تجاهل
+  // التكليف تماماً وعدّه صفر آية.
+  if (sura) {
+    const match = SURAS.find(s => s[0] === sura);
+    if (match) return match[1];
+  }
+  return 0;
 }
 
 
@@ -2543,10 +2550,10 @@ function renderStats() {
   filtered.forEach(r => {
     // ayat live in newLoh/newMadi (the assigned task); fall back to legacy loh/madi if present
     const lohArr = r.newLoh ? (Array.isArray(r.newLoh) ? r.newLoh : [r.newLoh]) : (r.loh && r.loh.sura ? [r.loh] : []);
-    lohArr.forEach(l => { if (l && l.sura) lohAyat += countAyat(l.from, l.to); });
+    lohArr.forEach(l => { if (l && l.sura) lohAyat += countAyat(l.sura, l.from, l.to); });
     const madiArr = (r.newMadi && r.newMadi.length) ? r.newMadi : (Array.isArray(r.madi) ? r.madi : (r.madi && r.madi.sura ? [r.madi] : []));
-    madiArr.forEach(m=>{ if (m && m.sura) madiAyat += countAyat(m.from, m.to); });
-    if (r.tajweed && r.tajweed.sura) tajweedAyat += countAyat(r.tajweed.from, r.tajweed.to);
+    madiArr.forEach(m=>{ if (m && m.sura) madiAyat += countAyat(m.sura, m.from, m.to); });
+    if (r.tajweed && r.tajweed.sura) tajweedAyat += countAyat(r.tajweed.sura, r.tajweed.from, r.tajweed.to);
   });
   const totalAyat = lohAyat + madiAyat + tajweedAyat;
 
@@ -2576,9 +2583,9 @@ function renderStats() {
     const ayat = recs.reduce((a,r)=> {
       let sum = a;
       const lohArr2 = r.newLoh ? (Array.isArray(r.newLoh) ? r.newLoh : [r.newLoh]) : (r.loh && r.loh.sura ? [r.loh] : []);
-      lohArr2.forEach(l => { if (l && l.sura) sum += countAyat(l.from, l.to); });
+      lohArr2.forEach(l => { if (l && l.sura) sum += countAyat(l.sura, l.from, l.to); });
       const madiArr = (r.newMadi && r.newMadi.length) ? r.newMadi : (Array.isArray(r.madi) ? r.madi : (r.madi && r.madi.sura ? [r.madi] : []));
-      madiArr.forEach(m=>{ if (m && m.sura) sum += countAyat(m.from, m.to); });
+      madiArr.forEach(m=>{ if (m && m.sura) sum += countAyat(m.sura, m.from, m.to); });
       return sum;
     }, 0);
     // نسبة الحضور: عدد الجلسات الفريدة / إجمالي أيام الحلقة
