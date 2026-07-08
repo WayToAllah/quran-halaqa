@@ -207,9 +207,15 @@ function render(data) {
       const dateStr = r.date ? new Date(r.date + 'T00:00:00').toLocaleDateString('ar-EG', { weekday:'long', day:'numeric', month:'long' }) : '';
       let lines = '';
       if (r.newLoh && r.newLoh.length) lines += `<div class="session-line">📝 لوح جديد: ${joinSuraNames(r.newLoh)}</div>`;
-      if (r.loh) lines += `<div class="session-line">⭐ تقييم اللوح: ${r.loh.score}/100 ${renderStarsHTML(r.loh.score)} ${scoreName(r.loh.score)}</div>`;
+      if (r.loh) {
+        lines += `<div class="session-line">⭐ تقييم اللوح: ${r.loh.score}/100 ${renderStarsHTML(r.loh.score)} ${scoreName(r.loh.score)}</div>`;
+        if (r.loh.mistakes) lines += `<div class="session-line" style="font-size:12px;color:var(--text-hint)">↳ ${r.loh.mistakes.full||0} خطأ، ${r.loh.mistakes.tajweed||0} خطأ تجويدي</div>`;
+      }
       if (r.newMadi && r.newMadi.length) lines += `<div class="session-line">🔄 ماضي جديد: ${joinSuraNames(r.newMadi)}</div>`;
-      if (r.madi) lines += `<div class="session-line">⭐ تقييم الماضي: ${r.madi.score}/100 ${renderStarsHTML(r.madi.score)} ${scoreName(r.madi.score)}</div>`;
+      if (r.madi) {
+        lines += `<div class="session-line">⭐ تقييم الماضي: ${r.madi.score}/100 ${renderStarsHTML(r.madi.score)} ${scoreName(r.madi.score)}</div>`;
+        if (r.madi.mistakes) lines += `<div class="session-line" style="font-size:12px;color:var(--text-hint)">↳ ${r.madi.mistakes.full||0} خطأ، ${r.madi.mistakes.tajweed||0} خطأ تجويدي</div>`;
+      }
       if (r.tajweed) lines += `<div class="session-line">📐 تجويد: ${esc(r.tajweed.sura)}${ayahRange(esc(r.tajweed.from), esc(r.tajweed.to))}</div>`;
       if (r.note) lines += `<div class="session-line" style="font-style:italic">💬 ${esc(r.note)}</div>`;
       return `<div class="session-item"><div class="session-date">${dateStr}</div>${lines}</div>`;
