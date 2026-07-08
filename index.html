@@ -1040,6 +1040,18 @@ function buildStudentPublicStats(s, totalHalaqaDays, rankByName, halaqaDatesDesc
     note: r.note || ''
   }));
 
+  // خفيف عمداً (تاريخ + درجتين بس، بدون تفاصيل السور/الملاحظات) عشان يشمل
+  // كل الجلسات من الأول للرسم البياني، من غير ما يكبّر حجم البيانات
+  // المرسلة زي recentSessions المُفصّلة (اللي تفضل محدودة بـ10 عمداً).
+  // الأقدم أولاً، عشان الرسم يتقرأ من اليمين (الأقدم) للشمال (الأحدث).
+  const scoreHistory = [...realRecs].reverse()
+    .filter(r => hasScore(r.loh) || hasScore(r.madi))
+    .map(r => ({
+      date: r.date || '',
+      loh: hasScore(r.loh) ? r.loh.score : null,
+      madi: hasScore(r.madi) ? r.madi.score : null
+    }));
+
   const badges = buildStudentBadges({
     attendPct,
     allRecs,
@@ -1063,6 +1075,7 @@ function buildStudentPublicStats(s, totalHalaqaDays, rankByName, halaqaDatesDesc
     avgMadi,
     badges,
     currentTask,
+    scoreHistory,
     recentSessions
   };
 }
