@@ -1052,6 +1052,36 @@ function buildStudentPublicStats(s, totalHalaqaDays, rankByName, halaqaDatesDesc
       madi: hasScore(r.madi) ? r.madi.score : null
     }));
 
+  // إحصاءات شهرية جاهزة لفلتر صفحة الطالب — بدل ما نبعت كل السجلات
+  // بالتفصيل ونخلّي الصفحة العامة تحسب بنفسها، بنجهّز رقم كل شهر هنا
+  // مسبقاً (نفس منطق البطاقات فوق، لكن لكل شهر على حدة). الرسم البياني
+  // والأوسمة وقايمة آخر الجلسات عمداً برّه الفلتر ده — تفضل شاملة كل
+  // الوقت دايماً، زي ما اتفقنا.
+  const monthlyStats = {};
+  const allMonths = new Set([
+    ...allRecs.map(r => r.date && r.date.slice(0, 7)).filter(Boolean),
+    ...halaqaDatesDesc.map(d => d.slice(0, 7))
+  ]);
+  allMonths.forEach(month => {
+    const monthHalaqaDays = halaqaDatesDesc.filter(d => d.slice(0, 7) === month).length;
+    const monthAllRecs = allRecs.filter(r => r.date && r.date.slice(0, 7) === month);
+    const monthRealRecs = realRecs.filter(r => r.date && r.date.slice(0, 7) === month);
+    const monthUniqueDays = new Set(monthAllRecs.map(r => r.date)).size;
+    const monthAttendPct = monthHalaqaDays > 0 ? Math.min(100, Math.round(monthUniqueDays / monthHalaqaDays * 100)) : 0;
+    const monthScoredLoh = monthRealRecs.filter(r => hasScore(r.loh));
+    const monthAvgLoh = monthScoredLoh.length
+      ? Math.round(monthScoredLoh.reduce((a, r) => a + r.loh.score, 0) / monthScoredLoh.length)
+      : null;
+    let monthAyat = 0;
+    monthRealRecs.forEach(r => {
+      const lohArr = r.newLoh ? (Array.isArray(r.newLoh) ? r.newLoh : [r.newLoh]) : [];
+      lohArr.forEach(l => { if (l && l.sura) monthAyat += countAyat(l.sura, l.from, l.to); });
+      const madiArr = r.newMadi ? (Array.isArray(r.newMadi) ? r.newMadi : [r.newMadi]) : [];
+      madiArr.forEach(m => { if (m && m.sura) monthAyat += countAyat(m.sura, m.from, m.to); });
+    });
+    monthlyStats[month] = { attendPct: monthAttendPct, sessionsCount: monthAllRecs.length, totalAyat: monthAyat, avgLoh: monthAvgLoh };
+  });
+
   const badges = buildStudentBadges({
     attendPct,
     allRecs,
@@ -1076,6 +1106,7 @@ function buildStudentPublicStats(s, totalHalaqaDays, rankByName, halaqaDatesDesc
     badges,
     currentTask,
     scoreHistory,
+    monthlyStats,
     recentSessions
   };
 }
