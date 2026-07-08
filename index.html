@@ -506,6 +506,10 @@
         </div>
       </div>
       <div class="field">
+        <label>📅 تاريخ الانضمام <span style="color:var(--text-hint);font-size:11px">اختياري</span></label>
+        <input type="date" id="modal-join-date">
+      </div>
+      <div class="field">
         <label>المدرسة</label>
         <input type="text" id="modal-school" placeholder="اسم المدرسة">
       </div>
@@ -1901,11 +1905,12 @@ function openStudentModal(id) {
     document.getElementById('modal-name').value = getStudentName(s);
     document.getElementById('modal-age').value = s.age || '';
     document.getElementById('modal-grade').value = s.grade || '';
+    document.getElementById('modal-join-date').value = s.joinDate || '';
     document.getElementById('modal-school').value = s.school || '';
     document.getElementById('modal-phone-primary').value = s.phonePrimary || s.phoneMom || '';
     document.getElementById('modal-phone-secondary').value = s.phoneSecondary || s.phoneDad || '';
   } else {
-    ['modal-name','modal-age','modal-school','modal-phone-primary','modal-phone-secondary'].forEach(id => document.getElementById(id).value = '');
+    ['modal-name','modal-age','modal-school','modal-phone-primary','modal-phone-secondary','modal-join-date'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('modal-grade').value = '';
   }
   modal.classList.add('open');
@@ -2106,6 +2111,7 @@ function saveStudentModal() {
     name,
     age: document.getElementById('modal-age').value || '',
     grade: document.getElementById('modal-grade').value || '',
+    joinDate: document.getElementById('modal-join-date').value || '',
     school: document.getElementById('modal-school').value.trim(),
     phonePrimary: document.getElementById('modal-phone-primary').value.trim(),
     phoneSecondary: document.getElementById('modal-phone-secondary').value.trim(),
