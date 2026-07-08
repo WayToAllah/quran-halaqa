@@ -1024,8 +1024,8 @@ function buildStudentPublicStats(s, totalHalaqaDays, rankByName, halaqaDatesDesc
 
   const recentSessions = realRecs.slice(0, 10).map(r => ({
     date: r.date || '',
-    loh: hasScore(r.loh) ? { score: r.loh.score } : null,
-    madi: hasScore(r.madi) ? { score: r.madi.score } : null,
+    loh: hasScore(r.loh) ? Object.assign({ score: r.loh.score }, r.loh.mistakes ? { mistakes: r.loh.mistakes } : {}) : null,
+    madi: hasScore(r.madi) ? Object.assign({ score: r.madi.score }, r.madi.mistakes ? { mistakes: r.madi.mistakes } : {}) : null,
     newLoh: (Array.isArray(r.newLoh) ? r.newLoh : (r.newLoh ? [r.newLoh] : [])).filter(l => l && l.sura),
     newMadi: (Array.isArray(r.newMadi) ? r.newMadi : (r.newMadi ? [r.newMadi] : [])).filter(m => m && m.sura),
     tajweed: (r.tajweed && r.tajweed.sura) ? { sura: r.tajweed.sura, from: r.tajweed.from || '', to: r.tajweed.to || '' } : null,
