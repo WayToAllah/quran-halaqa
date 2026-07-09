@@ -2364,6 +2364,14 @@ function saveRecord() {
       if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = '💾 حفظ الجلسة'; }
       resetForm();
       showToast(wasEditing ? '✓ تم التحديث' : '✓ تم الحفظ بنجاح');
+      // U-child fix: this used to run only as a side-effect of showWhatsAppPrompt,
+      // 1.8s after save — if the admin switched apps / locked the phone / closed
+      // the tab inside that window (very common right after tapping "حفظ" on
+      // mobile), the push never fired and the student's child.html page stayed
+      // stale until someone re-copied their link. Firing it right on save
+      // success removes that dependency entirely; the prompt below still does
+      // its own push too, which is harmless (same data, just a redundant write).
+      if (sObj) pushPublicStatsForStudent(sObj);
       setTimeout(() => showWhatsAppPrompt(rec, sObj), 1800);
     })
     .catch(err => {
