@@ -2134,6 +2134,11 @@ function saveGroupAttendance() {
     .then(() => {
       closeAttendanceModal();
       showToast(`✓ تم تسجيل حضور ${toSave.length} طالب`);
+      // U-child fix: group attendance had no immediate publicStats push at
+      // all — it relied purely on the debounced recompute (only runs while
+      // an admin tab stays open), so newly-added attendance days could be
+      // missing from a student's child.html page indefinitely.
+      toSave.forEach(s => pushPublicStatsForStudent(s));
     })
     .catch(err => {
       console.error('saveGroupAttendance failed:', err);
@@ -2472,7 +2477,15 @@ function deleteRecord(id) {
   if (!r) return;
   const label = r.attendance_only ? `حضور ${displayStudentName(r)}` : `جلسة ${displayStudentName(r)}`;
   if (!confirm(`حذف "${label}"؟`)) return;
-  scheduleUndoableDelete(pendingDeleteRecordIds, id, `🗑 تم حذف ${label}`, () => deleteRecordFromFirebase(id));
+  // U-child fix: publicStats/{token} for this student must be refreshed the
+  // moment the delete actually happens (after the undo grace period), not
+  // left to the debounced recompute alone — that one only fires while an
+  // admin tab is open, so a stale (too-high) session count could otherwise
+  // persist on the parent's child.html page indefinitely.
+  const sObj = r.studentId ? students.find(st => st.id === r.studentId) : null;
+  scheduleUndoableDelete(pendingDeleteRecordIds, id, `🗑 تم حذف ${label}`, () =>
+    deleteRecordFromFirebase(id).then(() => { if (sObj) pushPublicStatsForStudent(sObj); })
+  );
 }
 
 function editRecord(id) {
