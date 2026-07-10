@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { SURAS, suraNumber, suraPageLabel, findSuraByName, type SuraInfo } from '../../domain/suras';
 import { validateAyahRange } from '../../domain/record';
 import { normAr } from '../../domain/text';
@@ -16,6 +16,14 @@ export function SuraRow({ value, onChange, onRemove, label }: Props) {
   const [query, setQuery] = useState(value.sura || '');
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Keep the visible text in sync when the committed sura changes from OUTSIDE
+  // this component — e.g. when the record screen pre-fills rows for an edit, or
+  // resets the form. Without this, the input keeps its initial (often empty)
+  // query even though value.sura was updated, so the field looks blank.
+  useEffect(() => {
+    setQuery(value.sura || '');
+  }, [value.sura]);
 
   // The currently-committed sura's info, for the ayah-count/page hint under the field.
   const selectedInfo: SuraInfo | undefined = value.sura ? findSuraByName(value.sura) : undefined;

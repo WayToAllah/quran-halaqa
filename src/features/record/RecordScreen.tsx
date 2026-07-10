@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useStudents } from '../../hooks/useStudents';
 import { usePreviousSession } from '../../hooks/usePreviousSession';
 import { saveRecord } from '../../data/records.repo';
@@ -78,6 +78,8 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   const [saving, setSaving] = useState(false);
   const [showGroupAttendance, setShowGroupAttendance] = useState(false);
   const [whatsAppPreview, setWhatsAppPreview] = useState<{ message: string; phone: string } | null>(null);
+  // Guards the edit-prefill effect so it fires once per distinct record id.
+  const consumedEditIdRef = useRef<string | null>(null);
 
   const studentMatches = useMemo(() => {
     const q = studentQuery.trim();
@@ -121,22 +123,27 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     setTajweedStars(0);
     setTajweedNote('');
     setNote('');
+    // Allow the same record to be re-opened for edit later (e.g. cancel then
+    // tap ✏️ again on the same session).
+    consumedEditIdRef.current = null;
     // date is deliberately NOT reset — matches the live app: the admin
     // usually records several students in a row for the same session date.
   }
 
-  // Populate the form when the log screen hands us a record to edit. Runs once
-  // per distinct record id; consumes the prop so switching tabs later doesn't
-  // re-enter edit mode. Attendance-only records aren't editable (no edit button
-  // is shown for them), so we only handle full sessions here.
+  // Populate the form when the log screen hands us a record to edit. Guarded by
+  // a ref so it runs exactly once per distinct record id — NOT re-run when the
+  // students list arrives or changes (which would clobber the user's edits).
   useEffect(() => {
     if (!editRecord) return;
+    if (consumedEditIdRef.current === editRecord.id) return;
+    consumedEditIdRef.current = editRecord.id;
     const r = editRecord;
     setEditingId(r.id);
     setEditingRecordData(r);
     // Resolve the student via studentId so this stays correct even if the
     // student was renamed after the session was recorded; fall back to the
-    // name snapshot on the record.
+    // name snapshot on the record. If students haven't loaded yet, a separate
+    // effect below fills selectedStudent in once they arrive.
     const student =
       students.find((s) => s.id === r.studentId) ??
       (r.student ? students.find((s) => getStudentName(s) === r.student) : undefined) ??
@@ -173,7 +180,24 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     showToast('✏️ وضع التعديل');
     onEditConsumed?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editRecord?.id, students]);
+  }, [editRecord?.id]);
+
+  // If we entered edit mode before the students list had loaded, the student
+  // couldn't be resolved yet — link it up as soon as students arrive so the
+  // evaluation card (which needs selectedStudent) appears.
+  useEffect(() => {
+    if (!editingId || selectedStudent || !editingRecordData) return;
+    const r = editingRecordData;
+    const student =
+      students.find((s) => s.id === r.studentId) ??
+      (r.student ? students.find((s) => getStudentName(s) === r.student) : undefined) ??
+      null;
+    if (student) {
+      setSelectedStudent(student);
+      setStudentQuery(getStudentName(student));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [students, editingId, selectedStudent, editingRecordData]);
 
   function cancelEdit() {
     resetForm();

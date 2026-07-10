@@ -10,11 +10,14 @@ const students: Student[] = [
   { id: 's_2', name: 'محمد علي' },
 ];
 
+// Controllable so a test can simulate students arriving AFTER edit mode starts.
+let studentsForHook: Student[] = students;
+
 const saveRecordMock = vi.fn().mockResolvedValue(undefined);
 let previousSessionForS1: SessionRecord | null = null;
 
 vi.mock('../../hooks/useStudents', () => ({
-  useStudents: () => ({ students, loaded: true }),
+  useStudents: () => ({ students: studentsForHook, loaded: true }),
 }));
 vi.mock('../../hooks/usePreviousSession', () => ({
   usePreviousSession: (_m: string, _h: string, student: Student | null) => ({
@@ -56,6 +59,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('confirm', vi.fn(() => true));
   previousSessionForS1 = null;
+  studentsForHook = students;
 });
 
 describe('RecordScreen — student picker', () => {
@@ -263,8 +267,36 @@ describe('RecordScreen — edit mode', () => {
     expect(screen.getByDisplayValue('90')).toBeInTheDocument();
     expect(screen.getByDisplayValue('80')).toBeInTheDocument();
     expect(screen.getByDisplayValue('ملاحظة قديمة')).toBeInTheDocument();
+    // the assigned suras must appear in the SuraRow inputs (regression: the
+    // combobox kept its empty initial query and showed only the tiny page hint)
+    expect(screen.getByDisplayValue('البقرة')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('الفاتحة')).toBeInTheDocument();
     // the loh mistake counter carries its restored tally (2 full + 1 tajweed = 3)
     expect(screen.getByRole('button', { name: /عدّاد الأخطاء.*\(3\)/ })).toBeInTheDocument();
+  });
+
+  it('still fills the form when the students list loads AFTER edit mode starts', async () => {
+    // Reproduce the real bug: opening ✏️ from a search result hands the record
+    // in before useStudents has resolved. The evaluation card (which needs
+    // selectedStudent) and the scores must still appear once students arrive.
+    studentsForHook = []; // students not loaded yet
+    const { rerender } = renderScreen({ editRecord: editRec });
+    // edit mode engaged, but student not resolvable yet
+    expect(await screen.findByText(/تعديل جلسة محفوظة/)).toBeInTheDocument();
+
+    // students arrive
+    studentsForHook = students;
+    rerender(
+      <ToastProvider>
+        <RecordScreen editRecord={null} onEditConsumed={() => {}} />
+      </ToastProvider>,
+    );
+
+    // the evaluation card + prefilled values now show
+    expect(await screen.findByText('📋 ما سمعناه النهارده')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('زيد احمد')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('90')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('البقرة')).toBeInTheDocument();
   });
 
   it('overwrites the same record id on save and does not create a new one', async () => {
