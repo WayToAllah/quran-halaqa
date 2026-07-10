@@ -57,7 +57,7 @@ export interface AyahRangeErrors {
 export function validateAyahRange(suraName: string, from: string, to: string): AyahRangeErrors {
   const sura = findSuraByName(suraName);
   if (!sura) return {};
-  const max = sura[1];
+  const max = sura.count;
   const fromNum = parseInt(from);
   const toNum = parseInt(to);
   const errors: AyahRangeErrors = {};

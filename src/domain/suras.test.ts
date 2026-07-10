@@ -1,29 +1,68 @@
 import { describe, it, expect } from 'vitest';
-import { SURAS, ayahRange, countAyat, findSuraByName, joinSuraNames } from './suras';
+import {
+  SURAS,
+  ayahRange,
+  countAyat,
+  findSuraByName,
+  joinSuraNames,
+  suraNumber,
+  suraPageLabel,
+} from './suras';
 
 describe('SURAS', () => {
   it('has exactly 114 suras', () => {
     expect(SURAS.length).toBe(114);
   });
   it('starts with الفاتحة (7 ayat) and ends with الناس (6 ayat)', () => {
-    expect(SURAS[0]).toEqual(['الفاتحة', 7]);
-    expect(SURAS[113]).toEqual(['الناس', 6]);
+    expect(SURAS[0]).toEqual({ name: 'الفاتحة', count: 7, pageStart: 1, pageEnd: 1 });
+    expect(SURAS[113]).toEqual({ name: 'الناس', count: 6, pageStart: 604, pageEnd: 604 });
   });
   it('has no duplicate sura names', () => {
-    const names = SURAS.map(([n]) => n);
+    const names = SURAS.map((s) => s.name);
     expect(new Set(names).size).toBe(names.length);
+  });
+  it('carries Madinah-Mushaf page ranges (البقرة 2-49, الكهف 293-304)', () => {
+    expect(findSuraByName('البقرة')).toMatchObject({ pageStart: 2, pageEnd: 49 });
+    expect(findSuraByName('الكهف')).toMatchObject({ pageStart: 293, pageEnd: 304 });
+  });
+  it('every page range is valid (1..604, start ≤ end)', () => {
+    for (const s of SURAS) {
+      expect(s.pageStart).toBeGreaterThanOrEqual(1);
+      expect(s.pageEnd).toBeLessThanOrEqual(604);
+      expect(s.pageStart).toBeLessThanOrEqual(s.pageEnd);
+    }
   });
 });
 
 describe('findSuraByName', () => {
   it('finds an exact match', () => {
-    expect(findSuraByName('البقرة')).toEqual(['البقرة', 286]);
+    expect(findSuraByName('البقرة')).toMatchObject({ name: 'البقرة', count: 286 });
   });
   it('normalizes collapsed whitespace', () => {
-    expect(findSuraByName('آل   عمران')).toEqual(['آل عمران', 200]);
+    expect(findSuraByName('آل   عمران')).toMatchObject({ name: 'آل عمران', count: 200 });
   });
   it('returns undefined for a non-existent name', () => {
     expect(findSuraByName('سورة غير موجودة')).toBeUndefined();
+  });
+});
+
+describe('suraNumber', () => {
+  it('returns the 1-based Mushaf ordinal', () => {
+    expect(suraNumber('الفاتحة')).toBe(1);
+    expect(suraNumber('البقرة')).toBe(2);
+    expect(suraNumber('الناس')).toBe(114);
+  });
+  it('returns 0 for an unknown name', () => {
+    expect(suraNumber('غير موجودة')).toBe(0);
+  });
+});
+
+describe('suraPageLabel', () => {
+  it('single page shows "صفحة N"', () => {
+    expect(suraPageLabel(findSuraByName('الفاتحة')!)).toBe('صفحة 1');
+  });
+  it('multi-page shows "صفحات A-B"', () => {
+    expect(suraPageLabel(findSuraByName('البقرة')!)).toBe('صفحات 2-49');
   });
 });
 

@@ -41,6 +41,17 @@ async function selectStudent(name: string) {
   await userEvent.click(screen.getByRole('button', { name }));
 }
 
+/** Pick a sura through the searchable combobox (replaces the old <select>).
+ * `index` selects which sura input to use when several rows are present. */
+async function pickSura(name: string, index = 0) {
+  const inputs = screen.getAllByPlaceholderText('اكتب اسم السورة…');
+  await userEvent.click(inputs[index]);
+  await userEvent.type(inputs[index], name);
+  // dropdown option button reads "N. الاسم  count آية · صفحة…" — match on the name
+  const option = await screen.findByRole('button', { name: new RegExp(`\\d+\\. ${name}`) });
+  await userEvent.click(option);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('confirm', vi.fn(() => true));
@@ -139,8 +150,7 @@ describe('RecordScreen — save flow', () => {
     await selectStudent('زيد احمد');
 
     // fill first loh row
-    const suraSelects = screen.getAllByDisplayValue('— السورة —') as HTMLSelectElement[];
-    await userEvent.selectOptions(suraSelects[0], 'البقرة');
+    await pickSura('البقرة');
     const fromInputs = screen.getAllByPlaceholderText('من آية');
     const toInputs = screen.getAllByPlaceholderText('إلى آية');
     await userEvent.type(fromInputs[0], '1');
@@ -203,8 +213,7 @@ describe('RecordScreen — save flow', () => {
   it('rejects an out-of-range ayah before calling saveRecord', async () => {
     renderScreen();
     await selectStudent('زيد احمد');
-    const suraSelects = screen.getAllByDisplayValue('— السورة —') as HTMLSelectElement[];
-    await userEvent.selectOptions(suraSelects[0], 'الفاتحة'); // only 7 ayat
+    await pickSura('الفاتحة'); // only 7 ayat
     const fromInputs = screen.getAllByPlaceholderText('من آية');
     await userEvent.type(fromInputs[0], '1');
     const toInputs = screen.getAllByPlaceholderText('إلى آية');
