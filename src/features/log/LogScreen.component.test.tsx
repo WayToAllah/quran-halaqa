@@ -143,12 +143,18 @@ describe('LogScreen — delete with undo', () => {
   });
 });
 
-describe('LogScreen — edit (stub)', () => {
-  it('shows a "coming soon" toast instead of navigating (تسجيل screen not built yet)', async () => {
-    renderScreen();
+describe('LogScreen — edit', () => {
+  it('hands the clicked record up to onEditRecord', async () => {
+    const onEditRecord = vi.fn();
+    render(
+      <ToastProvider>
+        <LogScreen onEditRecord={onEditRecord} />
+      </ToastProvider>,
+    );
     const row = screen.getByText('زيد احمد').closest('.rounded-xl') as HTMLElement;
     await userEvent.click(within(row).getByRole('button', { name: 'تعديل' }));
-    expect(screen.getByText(/قريباً/)).toBeInTheDocument();
+    expect(onEditRecord).toHaveBeenCalledTimes(1);
+    expect(onEditRecord.mock.calls[0][0].id).toBe('r1');
   });
 });
 

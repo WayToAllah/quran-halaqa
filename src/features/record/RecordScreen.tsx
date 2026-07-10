@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { useStudents } from '../../hooks/useStudents';
 import { usePreviousSession } from '../../hooks/usePreviousSession';
 import { saveRecord } from '../../data/records.repo';
@@ -12,7 +12,7 @@ import { SuraRow } from './SuraRow';
 import { GroupAttendanceModal } from './GroupAttendanceModal';
 import { MistakeCounterModal } from './MistakeCounterModal';
 import { WhatsAppModal } from './WhatsAppModal';
-import { summarizeMistakes, type MistakeKind } from '../../domain/mistakes';
+import { summarizeMistakes, rebuildMistakeHistory, type MistakeKind } from '../../domain/mistakes';
 import { StarPicker } from '../../ui/StarPicker';
 import { useToast } from '../../ui/ToastProvider';
 import { MOSQUE_ID, HALAQA_ID } from '../../config';
@@ -34,7 +34,16 @@ function readScoreField(raw: string): number | null {
 
 const emptyRow = (): SuraAssignment => ({ sura: '', from: '', to: '' });
 
-export function RecordScreen() {
+interface Props {
+  /** When set, the screen opens in edit mode pre-filled with this record and
+   * saving overwrites it (same id/studentId) instead of creating a new one. */
+  editRecord?: SessionRecord | null;
+  /** Called once the incoming editRecord has been consumed (so the parent can
+   * clear it and a later tab switch doesn't re-trigger edit mode). */
+  onEditConsumed?: () => void;
+}
+
+export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) {
   const { students } = useStudents(MOSQUE_ID, HALAQA_ID);
   const { showToast } = useToast();
 
@@ -42,6 +51,11 @@ export function RecordScreen() {
   const [studentQuery, setStudentQuery] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  // When set, handleSave overwrites this record id instead of minting a new one.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  // The record currently being edited (kept so the evaluation card can render
+  // its loh/madi even when there's no live "previous session" to evaluate).
+  const [editingRecordData, setEditingRecordData] = useState<SessionRecord | null>(null);
 
   const { prev: prevSession } = usePreviousSession(MOSQUE_ID, HALAQA_ID, selectedStudent);
   const [prevLohScore, setPrevLohScore] = useState('');
@@ -73,8 +87,12 @@ export function RecordScreen() {
     return list.slice(0, 30);
   }, [students, studentQuery]);
 
-  const prevLohInfo = prevSession ? fmtSuraInfo(extractAssignedSuras(prevSession.newLoh, prevSession.loh)) : '—';
-  const prevMadiList = prevSession ? extractAssignedSuras(prevSession.newMadi, prevSession.madi) : [];
+  // The session whose loh/madi assignment is being evaluated. Normally the
+  // student's previous session; in edit mode it's the record itself, so the
+  // evaluation fields (and their existing scores) still render.
+  const evalSource = editingId ? editingRecordData : prevSession;
+  const prevLohInfo = evalSource ? fmtSuraInfo(extractAssignedSuras(evalSource.newLoh, evalSource.loh)) : '—';
+  const prevMadiList = evalSource ? extractAssignedSuras(evalSource.newMadi, evalSource.madi) : [];
   const prevMadiInfo = fmtSuraInfo(prevMadiList);
 
   function selectStudent(s: Student) {
@@ -90,6 +108,8 @@ export function RecordScreen() {
   function resetForm() {
     setSelectedStudent(null);
     setStudentQuery('');
+    setEditingId(null);
+    setEditingRecordData(null);
     setPrevLohScore('');
     setPrevMadiScore('');
     setLohMistakes([]);
@@ -103,6 +123,61 @@ export function RecordScreen() {
     setNote('');
     // date is deliberately NOT reset — matches the live app: the admin
     // usually records several students in a row for the same session date.
+  }
+
+  // Populate the form when the log screen hands us a record to edit. Runs once
+  // per distinct record id; consumes the prop so switching tabs later doesn't
+  // re-enter edit mode. Attendance-only records aren't editable (no edit button
+  // is shown for them), so we only handle full sessions here.
+  useEffect(() => {
+    if (!editRecord) return;
+    const r = editRecord;
+    setEditingId(r.id);
+    setEditingRecordData(r);
+    // Resolve the student via studentId so this stays correct even if the
+    // student was renamed after the session was recorded; fall back to the
+    // name snapshot on the record.
+    const student =
+      students.find((s) => s.id === r.studentId) ??
+      (r.student ? students.find((s) => getStudentName(s) === r.student) : undefined) ??
+      null;
+    setSelectedStudent(student);
+    setStudentQuery(student ? getStudentName(student) : r.student ?? '');
+    if (r.date) setDate(r.date);
+
+    setPrevLohScore(r.loh?.score != null ? String(r.loh.score) : '');
+    setPrevMadiScore(r.madi?.score != null ? String(r.madi.score) : '');
+    // Restore the exact mistake tally if this session was recorded with the
+    // counter; pre-feature records have no tally, so the counter starts empty.
+    setLohMistakes(rebuildMistakeHistory(r.loh?.mistakes));
+    setMadiMistakes(rebuildMistakeHistory(r.madi?.mistakes));
+
+    const lohArr = (r.newLoh ?? []).filter((l) => l?.sura);
+    setLohRows(lohArr.length ? lohArr.map((l) => ({ ...l })) : [emptyRow()]);
+    const madiArr = (r.newMadi ?? []).filter((m) => m?.sura);
+    setMadiRows(madiArr.length ? madiArr.map((m) => ({ ...m })) : [emptyRow()]);
+
+    if (r.tajweed?.sura) {
+      setTajweedEnabled(true);
+      setTajweed({ sura: r.tajweed.sura, from: r.tajweed.from ?? '', to: r.tajweed.to ?? '' });
+      setTajweedStars(r.tajweed.stars ?? 0);
+      setTajweedNote(r.tajweed.note ?? '');
+    } else {
+      setTajweedEnabled(false);
+      setTajweed(emptyRow());
+      setTajweedStars(0);
+      setTajweedNote('');
+    }
+    setNote(r.note ?? '');
+
+    showToast('✏️ وضع التعديل');
+    onEditConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editRecord?.id, students]);
+
+  function cancelEdit() {
+    resetForm();
+    showToast('تم إلغاء التعديل');
   }
 
   async function handleSave() {
@@ -126,8 +201,11 @@ export function RecordScreen() {
     const lohScore = readScoreField(prevLohScore);
     const madiScore = readScoreField(prevMadiScore);
 
+    const isEditing = editingId !== null;
     const rec: SessionRecord = {
-      id: genId('r'),
+      // Overwrite the same document when editing so the session is corrected
+      // in place rather than duplicated; keep the original studentId.
+      id: editingId ?? genId('r'),
       studentId: selectedStudent.id,
       student: getStudentName(selectedStudent),
       date,
@@ -157,11 +235,18 @@ export function RecordScreen() {
     setSaving(true);
     try {
       await saveRecord(MOSQUE_ID, HALAQA_ID, rec);
-      showToast('✓ تم الحفظ بنجاح');
-      const message = buildWhatsAppMessage(rec, prevSession, selectedStudent.parentToken);
-      const phone = normalizeWhatsAppPhone(selectedStudent.phonePrimary);
-      resetForm();
-      setWhatsAppPreview({ message, phone });
+      if (isEditing) {
+        // An edit is a correction to an existing session, not a fresh
+        // assignment — don't pop the WhatsApp "new homework" message.
+        showToast('✓ تم تحديث الجلسة');
+        resetForm();
+      } else {
+        showToast('✓ تم الحفظ بنجاح');
+        const message = buildWhatsAppMessage(rec, prevSession, selectedStudent.parentToken);
+        const phone = normalizeWhatsAppPhone(selectedStudent.phonePrimary);
+        resetForm();
+        setWhatsAppPreview({ message, phone });
+      }
     } catch (err) {
       console.error('saveRecord failed:', err);
       showToast('⚠️ فشل الحفظ — تأكد من الإنترنت وحاول تاني', true);
@@ -172,6 +257,14 @@ export function RecordScreen() {
 
   return (
     <div class="p-4 space-y-4 pb-8" dir="rtl">
+      {editingId && (
+        <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center justify-between gap-2">
+          <span class="text-sm font-semibold text-amber-800">✏️ تعديل جلسة محفوظة</span>
+          <button class="text-xs font-semibold text-amber-700 underline" onClick={cancelEdit}>
+            إلغاء
+          </button>
+        </div>
+      )}
       <div class="bg-white rounded-2xl border border-neutral-200 p-4">
         <label class="text-xs font-semibold text-neutral-600 block mb-1">📅 تاريخ الجلسة</label>
         <input
@@ -221,11 +314,11 @@ export function RecordScreen() {
         )}
       </div>
 
-      {selectedStudent && prevSession && (
+      {selectedStudent && evalSource && (
         <div class="bg-white rounded-2xl border border-neutral-200 p-4 space-y-3">
           <div class="font-bold text-neutral-900">📋 ما سمعناه النهارده</div>
           <div class="text-xs text-neutral-400">
-            من جلسة {new Date(prevSession.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}
+            {editingId ? 'تقييم هذه الجلسة' : `من جلسة ${new Date(evalSource.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}`}
           </div>
 
           <div>
@@ -371,8 +464,18 @@ export function RecordScreen() {
         disabled={saving}
         onClick={handleSave}
       >
-        {saving ? '⏳ جاري الحفظ…' : '💾 حفظ الجلسة'}
+        {saving ? '⏳ جاري الحفظ…' : editingId ? '💾 تحديث الجلسة' : '💾 حفظ الجلسة'}
       </button>
+
+      {editingId && (
+        <button
+          type="button"
+          class="w-full py-2.5 rounded-xl border border-neutral-300 text-neutral-600 text-sm font-semibold"
+          onClick={cancelEdit}
+        >
+          إلغاء التعديل
+        </button>
+      )}
 
       {showGroupAttendance && (
         <GroupAttendanceModal

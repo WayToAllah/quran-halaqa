@@ -26,10 +26,10 @@ vi.mock('../../data/records.repo', () => ({
   saveRecord: (...args: unknown[]) => saveRecordMock(...args),
 }));
 
-function renderScreen() {
+function renderScreen(props: { editRecord?: SessionRecord | null; onEditConsumed?: () => void } = {}) {
   return render(
     <ToastProvider>
-      <RecordScreen />
+      <RecordScreen editRecord={props.editRecord ?? null} onEditConsumed={props.onEditConsumed} />
     </ToastProvider>,
   );
 }
@@ -236,5 +236,68 @@ describe('RecordScreen — tajweed toggle', () => {
     const toggle = screen.getByRole('checkbox');
     await userEvent.click(toggle);
     expect(screen.getByText('سورة التجويد')).toBeInTheDocument();
+  });
+});
+
+describe('RecordScreen — edit mode', () => {
+  const editRec: SessionRecord = {
+    id: 'r_edit_1',
+    studentId: 's_1',
+    student: 'زيد احمد',
+    date: '2026-07-05',
+    loh: { score: 90, stars: 4, mistakes: { full: 2, tajweed: 1 } },
+    madi: { score: 80, stars: 4 },
+    newLoh: [{ sura: 'البقرة', from: '1', to: '10' }],
+    newMadi: [{ sura: 'الفاتحة', from: '1', to: '7' }],
+    note: 'ملاحظة قديمة',
+  };
+
+  it('pre-fills the form from the record being edited', async () => {
+    renderScreen({ editRecord: editRec });
+    // edit banner + updated save label
+    expect(await screen.findByText(/تعديل جلسة محفوظة/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /تحديث الجلسة/ })).toBeInTheDocument();
+    // student, date, scores, note prefilled
+    expect(screen.getByDisplayValue('زيد احمد')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('2026-07-05')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('90')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('80')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('ملاحظة قديمة')).toBeInTheDocument();
+    // the loh mistake counter carries its restored tally (2 full + 1 tajweed = 3)
+    expect(screen.getByRole('button', { name: /عدّاد الأخطاء.*\(3\)/ })).toBeInTheDocument();
+  });
+
+  it('overwrites the same record id on save and does not create a new one', async () => {
+    const onEditConsumed = vi.fn();
+    renderScreen({ editRecord: editRec, onEditConsumed });
+    await screen.findByText(/تعديل جلسة محفوظة/);
+    expect(onEditConsumed).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(screen.getByRole('button', { name: /تحديث الجلسة/ }));
+    await waitFor(() => expect(saveRecordMock).toHaveBeenCalledTimes(1));
+    const saved = saveRecordMock.mock.calls[0][2];
+    expect(saved.id).toBe('r_edit_1'); // same id — overwrite, not new
+    expect(saved.studentId).toBe('s_1');
+    expect(saved.loh.score).toBe(90);
+    expect(saved.loh.mistakes).toEqual({ full: 2, tajweed: 1 });
+  });
+
+  it('does not open the WhatsApp preview after an edit save', async () => {
+    renderScreen({ editRecord: editRec });
+    await screen.findByText(/تعديل جلسة محفوظة/);
+    await userEvent.click(screen.getByRole('button', { name: /تحديث الجلسة/ }));
+    await waitFor(() => expect(saveRecordMock).toHaveBeenCalledTimes(1));
+    // WhatsApp modal (new-homework message) must not appear on a correction
+    expect(screen.queryByText(/واتساب|WhatsApp/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/تم تحديث الجلسة/)).toBeInTheDocument();
+  });
+
+  it('cancel edit clears the form back to a blank new session', async () => {
+    renderScreen({ editRecord: editRec });
+    await screen.findByText(/تعديل جلسة محفوظة/);
+    await userEvent.click(screen.getByRole('button', { name: 'إلغاء التعديل' }));
+    expect(screen.queryByText(/تعديل جلسة محفوظة/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /حفظ الجلسة/ })).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('ملاحظة قديمة')).not.toBeInTheDocument();
   });
 });

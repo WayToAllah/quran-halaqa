@@ -6,6 +6,7 @@ import { StudentsScreen } from './features/students/StudentsScreen';
 import { LogScreen } from './features/log/LogScreen';
 import { StatsScreen } from './features/stats/StatsScreen';
 import { RecordScreen } from './features/record/RecordScreen';
+import type { SessionRecord } from './types';
 
 type Tab = 'record' | 'students' | 'log' | 'stats';
 
@@ -19,12 +20,19 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
 function AppShell() {
   const auth = useAuth();
   const [tab, setTab] = useState<Tab>('record');
+  // A session handed off from the log screen's ✏️ button to the record screen.
+  const [editingRecord, setEditingRecord] = useState<SessionRecord | null>(null);
 
   if (auth.status === 'loading' || auth.status === 'checking-membership') {
     return <LoginScreen auth={auth} />;
   }
   if (auth.status === 'signed-out' || auth.status === 'denied') {
     return <LoginScreen auth={auth} />;
+  }
+
+  function handleEditRecord(rec: SessionRecord) {
+    setEditingRecord(rec);
+    setTab('record');
   }
 
   return (
@@ -45,9 +53,11 @@ function AppShell() {
       </header>
 
       <main>
-        {tab === 'record' && <RecordScreen />}
+        {tab === 'record' && (
+          <RecordScreen editRecord={editingRecord} onEditConsumed={() => setEditingRecord(null)} />
+        )}
         {tab === 'students' && <StudentsScreen />}
-        {tab === 'log' && <LogScreen />}
+        {tab === 'log' && <LogScreen onEditRecord={handleEditRecord} />}
         {tab === 'stats' && <StatsScreen />}
       </main>
 

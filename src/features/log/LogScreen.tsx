@@ -97,7 +97,12 @@ function LogEntry({
   );
 }
 
-export function LogScreen() {
+interface LogScreenProps {
+  /** Hands a session up to the record screen for editing. */
+  onEditRecord?: (record: SessionRecord) => void;
+}
+
+export function LogScreen({ onEditRecord }: LogScreenProps = {}) {
   const { records, loaded, loadMore, loadingMore, hasMore } = useRecentRecords(MOSQUE_ID, HALAQA_ID);
   const { students } = useStudents(MOSQUE_ID, HALAQA_ID);
   const { pendingIds, requestDelete } = useUndoableDelete();
@@ -126,11 +131,13 @@ export function LogScreen() {
     requestDelete(r.id, `🗑 تم حذف ${label}`, (id) => deleteRecordDoc(MOSQUE_ID, HALAQA_ID, id));
   }
 
-  function handleEdit() {
-    // TODO(phase 3.2): the تسجيل screen (session recording/editing) hasn't
-    // been built yet in v2 — see app.tsx's placeholder tab. Editing a past
-    // session isn't possible until that screen exists.
-    showToast('تعديل الجلسات هيكون متاح قريباً مع شاشة "تسجيل"');
+  function handleEdit(r: SessionRecord) {
+    if (onEditRecord) {
+      onEditRecord(r);
+    } else {
+      // No handler wired (shouldn't happen in the app shell) — fail gracefully.
+      showToast('تعذّر فتح شاشة التعديل');
+    }
   }
 
   return (
@@ -165,7 +172,7 @@ export function LogScreen() {
               key={r.id}
               record={r}
               studentName={displayStudentName(r, students)}
-              onEdit={handleEdit}
+              onEdit={() => handleEdit(r)}
               onDelete={() => handleDelete(r)}
             />
           ))}
