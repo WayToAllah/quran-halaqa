@@ -259,18 +259,13 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     setSaving(true);
     try {
       await saveRecord(MOSQUE_ID, HALAQA_ID, rec);
-      if (isEditing) {
-        // An edit is a correction to an existing session, not a fresh
-        // assignment — don't pop the WhatsApp "new homework" message.
-        showToast('✓ تم تحديث الجلسة');
-        resetForm();
-      } else {
-        showToast('✓ تم الحفظ بنجاح');
-        const message = buildWhatsAppMessage(rec, prevSession, selectedStudent.parentToken);
-        const phone = normalizeWhatsAppPhone(selectedStudent.phonePrimary);
-        resetForm();
-        setWhatsAppPreview({ message, phone });
-      }
+      showToast(isEditing ? '✓ تم تحديث الجلسة' : '✓ تم الحفظ بنجاح');
+      // In both new-session and edit mode, offer the WhatsApp message so the
+      // teacher can (re)send the parent the updated homework/evaluation.
+      const message = buildWhatsAppMessage(rec, prevSession, selectedStudent.parentToken);
+      const phone = normalizeWhatsAppPhone(selectedStudent.phonePrimary);
+      resetForm();
+      setWhatsAppPreview({ message, phone });
     } catch (err) {
       console.error('saveRecord failed:', err);
       showToast('⚠️ فشل الحفظ — تأكد من الإنترنت وحاول تاني', true);

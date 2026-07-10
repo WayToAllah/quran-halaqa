@@ -314,13 +314,13 @@ describe('RecordScreen — edit mode', () => {
     expect(saved.loh.mistakes).toEqual({ full: 2, tajweed: 1 });
   });
 
-  it('does not open the WhatsApp preview after an edit save', async () => {
+  it('opens the WhatsApp preview after an edit save (same as a new session)', async () => {
     renderScreen({ editRecord: editRec });
     await screen.findByText(/تعديل جلسة محفوظة/);
     await userEvent.click(screen.getByRole('button', { name: /تحديث الجلسة/ }));
     await waitFor(() => expect(saveRecordMock).toHaveBeenCalledTimes(1));
-    // WhatsApp modal (new-homework message) must not appear on a correction
-    expect(screen.queryByText(/واتساب|WhatsApp/i)).not.toBeInTheDocument();
+    // WhatsApp modal appears so the teacher can resend the updated summary
+    expect(await screen.findByText('إرسال ملخص الجلسة')).toBeInTheDocument();
     expect(screen.getByText(/تم تحديث الجلسة/)).toBeInTheDocument();
   });
 
