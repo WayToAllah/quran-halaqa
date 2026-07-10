@@ -30,6 +30,12 @@ let hasMoreValue = true;
 const loadMoreMock = vi.fn();
 const deleteRecordMock = vi.fn().mockResolvedValue(undefined);
 
+// Server-side search fetches every matching student's full history. The mock
+// returns the fixture records filtered by studentId, simulating Firestore.
+const getAllRecordsForStudentMock = vi.fn((_m: string, _h: string, studentId: string) =>
+  Promise.resolve(records.filter((r) => r.studentId === studentId)),
+);
+
 vi.mock('../../hooks/useRecentRecords', () => ({
   useRecentRecords: () => ({
     records,
@@ -44,6 +50,7 @@ vi.mock('../../hooks/useStudents', () => ({
 }));
 vi.mock('../../data/records.repo', () => ({
   deleteRecord: (...args: unknown[]) => deleteRecordMock(...args),
+  getAllRecordsForStudent: (m: string, h: string, id: string) => getAllRecordsForStudentMock(m, h, id),
 }));
 
 function renderScreen() {
@@ -86,11 +93,25 @@ describe('LogScreen — rendering', () => {
 });
 
 describe('LogScreen — search', () => {
-  it('filters entries by student name, normalized', async () => {
+  it('fetches and shows every matching student (server-side, not loaded-only)', async () => {
     renderScreen();
     await userEvent.type(screen.getByPlaceholderText('🔍 ابحث باسم الطالب...'), 'احمد');
-    expect(screen.getByText('زيد احمد')).toBeInTheDocument();
+    // resolves after the debounce + fetch
+    expect(await screen.findByText('زيد احمد')).toBeInTheDocument();
     expect(screen.queryByText('محمد علي')).not.toBeInTheDocument();
+    expect(getAllRecordsForStudentMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      's_1',
+    );
+  });
+
+  it('shows a no-results message when no student name matches', async () => {
+    renderScreen();
+    await userEvent.type(screen.getByPlaceholderText('🔍 ابحث باسم الطالب...'), 'اسم غير موجود');
+    expect(await screen.findByText(/لا يوجد نتائج/)).toBeInTheDocument();
+    // no student matched, so no Firestore fetch is issued
+    expect(getAllRecordsForStudentMock).not.toHaveBeenCalled();
   });
 
   it('hides the load-more button while a search is active', async () => {

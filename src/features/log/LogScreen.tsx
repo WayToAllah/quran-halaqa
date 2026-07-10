@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'preact/hooks';
 import { useRecentRecords } from '../../hooks/useRecentRecords';
+import { useRecordSearch } from '../../hooks/useRecordSearch';
 import { useStudents } from '../../hooks/useStudents';
 import { useUndoableDelete } from '../../hooks/useUndoableDelete';
 import { deleteRecord as deleteRecordDoc } from '../../data/records.repo';
-import { normAr, esc } from '../../domain/text';
+import { esc } from '../../domain/text';
 import { displayStudentName } from '../../domain/students';
 import { hasScore, scoreName } from '../../domain/scoring';
 import { ayahRange, joinSuraNames } from '../../domain/suras';
@@ -103,15 +104,20 @@ export function LogScreen() {
   const { showToast } = useToast();
   const [query, setQuery] = useState('');
 
+  const isSearching = query.trim().length > 0;
+  // When searching, results come from Firestore (every matching student's full
+  // history), not just the paginated slice already in memory.
+  const search = useRecordSearch(MOSQUE_ID, HALAQA_ID, query, students);
+
   const visibleRecords = useMemo(() => {
-    let list = records.filter((r) => !pendingIds.has(r.id));
-    const q = query.trim();
-    if (q) {
-      const nq = normAr(q);
-      list = list.filter((r) => normAr(displayStudentName(r, students)).includes(nq));
-    }
-    return list;
-  }, [records, pendingIds, query, students]);
+    const source = isSearching ? search.results : records;
+    return source.filter((r) => !pendingIds.has(r.id));
+  }, [isSearching, search.results, records, pendingIds]);
+
+  // Skeleton shows for the initial paginated load, or while a search resolves.
+  const showSkeleton = isSearching ? search.searching : !loaded;
+  // "No results" only after the relevant load has actually finished.
+  const showEmpty = isSearching ? search.resolved && visibleRecords.length === 0 : loaded && visibleRecords.length === 0;
 
   function handleDelete(r: SessionRecord) {
     const name = displayStudentName(r, students);
@@ -139,7 +145,7 @@ export function LogScreen() {
           onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
         />
 
-        {!loaded && (
+        {showSkeleton && (
           <div class="space-y-2">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} class="h-16 rounded-lg bg-neutral-100 animate-pulse" />
@@ -147,7 +153,7 @@ export function LogScreen() {
           </div>
         )}
 
-        {loaded && visibleRecords.length === 0 && (
+        {showEmpty && (
           <div class="text-center text-sm text-neutral-400 py-8">
             {query ? `لا يوجد نتائج لـ "${esc(query)}"` : 'لا يوجد جلسات مسجلة بعد'}
           </div>
@@ -165,7 +171,7 @@ export function LogScreen() {
           ))}
         </div>
 
-        {loaded && hasMore && !query && (
+        {loaded && hasMore && !isSearching && (
           <button
             class="w-full mt-3 py-2.5 rounded-lg border border-neutral-200 text-sm text-neutral-600 disabled:opacity-60"
             disabled={loadingMore}
@@ -173,12 +179,6 @@ export function LogScreen() {
           >
             {loadingMore ? 'جاري التحميل…' : 'تحميل المزيد'}
           </button>
-        )}
-        {query && (
-          <div class="text-center text-xs text-neutral-400 mt-3">
-            البحث يشمل الجلسات المحمّلة حالياً فقط — دوس "تحميل المزيد" (بعد مسح البحث) لتوسيع
-            النطاق قبل البحث تاني.
-          </div>
         )}
       </div>
     </div>
