@@ -53,10 +53,10 @@ vi.mock('../../data/records.repo', () => ({
   getAllRecordsForStudent: (m: string, h: string, id: string) => getAllRecordsForStudentMock(m, h, id),
 }));
 
-function renderScreen() {
+function renderScreen(props: { onEditRecord?: (r: SessionRecord) => void } = {}) {
   return render(
     <ToastProvider>
-      <LogScreen />
+      <LogScreen onEditRecord={props.onEditRecord} />
     </ToastProvider>,
   );
 }
@@ -83,6 +83,15 @@ describe('LogScreen — rendering', () => {
     expect(screen.getByText('✅ حضور فقط')).toBeInTheDocument();
     const row = screen.getByText('محمد علي').closest('.rounded-xl') as HTMLElement;
     expect(within(row).queryByRole('button', { name: 'تعديل' })).not.toBeInTheDocument();
+  });
+
+  it('hands the session up to onEditRecord when ✏️ is tapped', async () => {
+    const onEditRecord = vi.fn();
+    renderScreen({ onEditRecord });
+    const row = screen.getByText('زيد احمد').closest('.rounded-xl') as HTMLElement;
+    await userEvent.click(within(row).getByRole('button', { name: 'تعديل' }));
+    expect(onEditRecord).toHaveBeenCalledTimes(1);
+    expect(onEditRecord.mock.calls[0][0].id).toBe('r1');
   });
 
   it('resolves student names via displayStudentName', () => {
