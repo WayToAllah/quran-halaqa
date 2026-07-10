@@ -157,6 +157,37 @@ describe('RecordScreen — save flow', () => {
     expect(screen.getByPlaceholderText('اكتب اسم الطالب...')).toHaveValue('');
   });
 
+  it('mistake counter fills the loh score and saves the tally into the record', async () => {
+    previousSessionForS1 = {
+      id: 'r_prev',
+      studentId: 's_1',
+      date: '2026-07-01',
+      newLoh: [{ sura: 'البقرة', from: '1', to: '10' }],
+    };
+    renderScreen();
+    await selectStudent('زيد احمد');
+
+    // open the loh mistake counter, tap two full + two tajweed mistakes
+    await userEvent.click(screen.getByRole('button', { name: /عدّاد الأخطاء/ }));
+    await userEvent.click(screen.getByText('➖ خطأ'));
+    await userEvent.click(screen.getByText('➖ خطأ'));
+    await userEvent.click(screen.getByText('➖ خطأ تجويدي'));
+    await userEvent.click(screen.getByText('➖ خطأ تجويدي'));
+    // 100 - 2 - 1 = 97
+    await userEvent.click(screen.getByRole('button', { name: /حفظ الدرجة/ }));
+
+    // score field now shows 97
+    expect(screen.getByDisplayValue('97')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /حفظ الجلسة/ }));
+    await waitFor(() => expect(saveRecordMock).toHaveBeenCalledTimes(1));
+    const savedRecord = saveRecordMock.mock.calls[0][2];
+    expect(savedRecord.loh.score).toBe(97);
+    expect(savedRecord.loh.mistakes).toEqual({ full: 2, tajweed: 2 });
+    // madi eval was untouched, so it carries no mistakes field
+    expect(savedRecord.madi.mistakes).toBeUndefined();
+  });
+
   it('shows an error toast and keeps form data on failure', async () => {
     saveRecordMock.mockRejectedValueOnce(new Error('network'));
     renderScreen();

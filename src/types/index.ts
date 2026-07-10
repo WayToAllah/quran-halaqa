@@ -28,9 +28,20 @@ export interface SuraAssignment {
 /** Evaluation of a *previous* session's assignment. `score` is null/undefined
  * when nothing has been evaluated yet — distinct from a genuine zero grade.
  * Never use a plain truthy check on `.score` (0 is falsy in JS); use hasScore(). */
+/** Tally of mistakes recorded via the mistake counter for one evaluation.
+ * Present only when the counter was actually used for that evaluation —
+ * scores entered by hand carry no `mistakes` field at all (so old records
+ * are never backfilled with empty {full:0, tajweed:0}). Ported verbatim
+ * from the live index.html's mistakesSummary() contract. */
+export interface MistakeTally {
+  full: number;
+  tajweed: number;
+}
+
 export interface ScoreEval {
   score?: number | null;
   stars?: number;
+  mistakes?: MistakeTally;
 }
 
 export interface TajweedEval {

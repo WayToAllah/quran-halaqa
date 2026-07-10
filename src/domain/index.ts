@@ -9,3 +9,4 @@ export * from './stats';
 export * from './statsScreen';
 export * from './record';
 export * from './whatsapp';
+export * from './mistakes';

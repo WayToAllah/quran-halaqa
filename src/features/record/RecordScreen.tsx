@@ -10,7 +10,9 @@ import { extractAssignedSuras, validateAyahRange } from '../../domain/record';
 import { buildWhatsAppMessage, normalizeWhatsAppPhone } from '../../domain/whatsapp';
 import { SuraRow } from './SuraRow';
 import { GroupAttendanceModal } from './GroupAttendanceModal';
+import { MistakeCounterModal } from './MistakeCounterModal';
 import { WhatsAppModal } from './WhatsAppModal';
+import { summarizeMistakes, type MistakeKind } from '../../domain/mistakes';
 import { StarPicker } from '../../ui/StarPicker';
 import { useToast } from '../../ui/ToastProvider';
 import { MOSQUE_ID, HALAQA_ID } from '../../config';
@@ -44,6 +46,11 @@ export function RecordScreen() {
   const { prev: prevSession } = usePreviousSession(MOSQUE_ID, HALAQA_ID, selectedStudent);
   const [prevLohScore, setPrevLohScore] = useState('');
   const [prevMadiScore, setPrevMadiScore] = useState('');
+  // Mistake-counter history per evaluation. Preserved so reopening the counter
+  // shows the same taps; committed to the record's loh/madi.mistakes on save.
+  const [lohMistakes, setLohMistakes] = useState<MistakeKind[]>([]);
+  const [madiMistakes, setMadiMistakes] = useState<MistakeKind[]>([]);
+  const [mistakeModal, setMistakeModal] = useState<'loh' | 'madi' | null>(null);
 
   const [lohRows, setLohRows] = useState<SuraAssignment[]>([emptyRow()]);
   const [madiRows, setMadiRows] = useState<SuraAssignment[]>([emptyRow()]);
@@ -76,6 +83,8 @@ export function RecordScreen() {
     setDropdownOpen(false);
     setPrevLohScore('');
     setPrevMadiScore('');
+    setLohMistakes([]);
+    setMadiMistakes([]);
   }
 
   function resetForm() {
@@ -83,6 +92,8 @@ export function RecordScreen() {
     setStudentQuery('');
     setPrevLohScore('');
     setPrevMadiScore('');
+    setLohMistakes([]);
+    setMadiMistakes([]);
     setLohRows([emptyRow()]);
     setMadiRows([emptyRow()]);
     setTajweedEnabled(false);
@@ -126,6 +137,13 @@ export function RecordScreen() {
       newMadi: activeMadiRows,
       note: note.trim(),
     };
+    // Attach the mistake tally only when the counter was actually used for
+    // that evaluation — hand-typed scores stay free of an empty mistakes field
+    // (matches mistakesSummary()'s null-on-empty contract in the live app).
+    const lohTally = summarizeMistakes(lohMistakes);
+    const madiTally = summarizeMistakes(madiMistakes);
+    if (lohTally) rec.loh!.mistakes = lohTally;
+    if (madiTally) rec.madi!.mistakes = madiTally;
     if (tajweedEnabled && tajweed.sura) {
       rec.tajweed = { sura: tajweed.sura, from: tajweed.from, to: tajweed.to, stars: tajweedStars, note: tajweedNote.trim() };
     }
@@ -225,6 +243,14 @@ export function RecordScreen() {
                 onInput={(e) => setPrevLohScore((e.target as HTMLInputElement).value)}
               />
               <span class="text-xs text-neutral-400">{prevLohScore === '' ? '—' : `${prevLohScore}/100`}</span>
+              <button
+                type="button"
+                class="mr-auto text-xs font-semibold text-emerald-700 border border-emerald-200 rounded-lg px-2.5 py-2"
+                onClick={() => setMistakeModal('loh')}
+              >
+                🧮 عدّاد الأخطاء
+                {lohMistakes.length > 0 ? ` (${lohMistakes.length})` : ''}
+              </button>
             </div>
           </div>
 
@@ -244,6 +270,14 @@ export function RecordScreen() {
                   onInput={(e) => setPrevMadiScore((e.target as HTMLInputElement).value)}
                 />
                 <span class="text-xs text-neutral-400">{prevMadiScore === '' ? '—' : `${prevMadiScore}/100`}</span>
+                <button
+                  type="button"
+                  class="mr-auto text-xs font-semibold text-emerald-700 border border-emerald-200 rounded-lg px-2.5 py-2"
+                  onClick={() => setMistakeModal('madi')}
+                >
+                  🧮 عدّاد الأخطاء
+                  {madiMistakes.length > 0 ? ` (${madiMistakes.length})` : ''}
+                </button>
               </div>
             </div>
           )}
@@ -345,6 +379,24 @@ export function RecordScreen() {
           initialDate={date}
           students={students}
           onClose={() => setShowGroupAttendance(false)}
+        />
+      )}
+
+      {mistakeModal && (
+        <MistakeCounterModal
+          label={mistakeModal === 'loh' ? 'اللوح' : 'الماضي'}
+          suraInfo={mistakeModal === 'loh' ? prevLohInfo : prevMadiInfo}
+          initialHistory={mistakeModal === 'loh' ? lohMistakes : madiMistakes}
+          onSave={(score, history) => {
+            if (mistakeModal === 'loh') {
+              setLohMistakes(history);
+              setPrevLohScore(String(score));
+            } else {
+              setMadiMistakes(history);
+              setPrevMadiScore(String(score));
+            }
+          }}
+          onClose={() => setMistakeModal(null)}
         />
       )}
 
