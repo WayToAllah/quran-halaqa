@@ -13,6 +13,7 @@ const students: Student[] = [
     age: '10',
     grade: 'الصف الرابع الابتدائي',
     phonePrimary: '01000000000',
+    joinDate: '2026-01-15',
     parentToken: 'EXISTING_TOKEN_123',
   },
   { id: 's_2', name: 'محمد علي', age: '12' },
@@ -108,6 +109,26 @@ describe('StudentsScreen — add student', () => {
     const savedArg = saveStudentMock.mock.calls[0][2];
     expect(savedArg.name).toBe('طالب جديد');
     expect(savedArg.parentToken).toBeTruthy(); // a new token was minted
+  });
+
+  it('saves an optional join date, and defaults to empty when left blank', async () => {
+    renderScreen();
+    await userEvent.click(screen.getByRole('button', { name: 'إضافة طالب' }));
+    await userEvent.type(screen.getByPlaceholderText('اسم الطالب'), 'طالب بتاريخ انضمام');
+
+    const dateInput = screen.getByLabelText(/تاريخ الانضمام/) as HTMLInputElement;
+    await userEvent.type(dateInput, '2026-07-01');
+    await userEvent.click(screen.getByRole('button', { name: 'حفظ' }));
+
+    await waitFor(() => expect(saveStudentMock).toHaveBeenCalledTimes(1));
+    expect(saveStudentMock.mock.calls[0][2].joinDate).toBe('2026-07-01');
+  });
+
+  it('pre-fills the join date when editing an existing student', async () => {
+    renderScreen();
+    await userEvent.click(await screen.findByText('زيد احمد'));
+    const dateInput = screen.getByLabelText(/تاريخ الانضمام/) as HTMLInputElement;
+    expect(dateInput.value).toBe('2026-01-15');
   });
 
   it('rejects an empty name without calling saveStudent', async () => {

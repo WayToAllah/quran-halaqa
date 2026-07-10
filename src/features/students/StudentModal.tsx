@@ -33,6 +33,7 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
   const [name, setName] = useState(student?.name ?? '');
   const [age, setAge] = useState(student?.age ?? '');
   const [grade, setGrade] = useState(student?.grade ?? '');
+  const [joinDate, setJoinDate] = useState(student?.joinDate ?? '');
   const [school, setSchool] = useState(student?.school ?? '');
   const [phonePrimary, setPhonePrimary] = useState(student?.phonePrimary ?? '');
   const [phoneSecondary, setPhoneSecondary] = useState(student?.phoneSecondary ?? '');
@@ -60,6 +61,7 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
       name: trimmedName,
       age: age || '',
       grade: grade || '',
+      joinDate: joinDate || '',
       school: school.trim(),
       phonePrimary: phonePrimary.trim(),
       phoneSecondary: phoneSecondary.trim(),
@@ -138,6 +140,19 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
                 ))}
               </select>
             </div>
+          </div>
+
+          <div class="space-y-1">
+            <label for="modal-join-date" class="text-xs font-semibold text-neutral-600">
+              📅 تاريخ الانضمام <span class="text-neutral-400 font-normal">اختياري</span>
+            </label>
+            <input
+              id="modal-join-date"
+              type="date"
+              class="w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm"
+              value={joinDate}
+              onInput={(e) => setJoinDate((e.target as HTMLInputElement).value)}
+            />
           </div>
 
           <div class="space-y-1">

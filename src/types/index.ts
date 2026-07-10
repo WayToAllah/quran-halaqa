@@ -14,6 +14,9 @@ export interface Student {
   phoneType?: string;
   phonePrimary?: string;
   phoneSecondary?: string;
+  /** ISO date (YYYY-MM-DD) the student joined the halaqa. Optional — many
+   * legacy students predate this field being collected. */
+  joinDate?: string;
   /** Random high-entropy token used in child.html?t={parentToken} links. */
   parentToken?: string;
 }
