@@ -124,11 +124,20 @@ export interface PublicStats {
   } | null;
   recentSessions: Array<{
     date: string;
-    loh: { score: number } | null;
-    madi: { score: number } | null;
+    loh: { score: number; mistakes?: MistakeTally } | null;
+    madi: { score: number; mistakes?: MistakeTally } | null;
     newLoh: SuraAssignment[];
     newMadi: SuraAssignment[];
     tajweed: { sura: string; from: string; to: string } | null;
     note: string;
   }>;
+  /** Every scored session, oldest-first, lightweight (date + two scores only)
+   * — powers child.html's progress chart across the whole history. */
+  scoreHistory: Array<{ date: string; loh: number | null; madi: number | null }>;
+  /** Pre-aggregated per-month figures for child.html's month filter, keyed by
+   * 'YYYY-MM'. The chart, badges, and session list stay outside this filter. */
+  monthlyStats: Record<
+    string,
+    { attendPct: number; sessionsCount: number; totalAyat: number; avgLoh: number | null }
+  >;
 }

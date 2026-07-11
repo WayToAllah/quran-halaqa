@@ -148,6 +148,14 @@ export async function getRecordsByDate(mosqueId: string, halaqaId: string, dateS
   return snap.docs.map((d) => d.data());
 }
 
+/** One-shot fetch of every record in the halaqa. Used when recomputing a
+ * student's publicStats projection (needs the whole set for halaqa-day counts
+ * and cross-student ranking), not for the paginated log view. */
+export async function getAllRecords(mosqueId: string, halaqaId: string): Promise<SessionRecord[]> {
+  const snap = await getDocs(recordsCollection(mosqueId, halaqaId));
+  return snap.docs.map((d) => d.data());
+}
+
 export function saveRecord(mosqueId: string, halaqaId: string, record: SessionRecord): Promise<void> {
   return setDoc(recordDocRef(mosqueId, halaqaId, record.id), record);
 }

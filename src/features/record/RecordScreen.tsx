@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useStudents } from '../../hooks/useStudents';
 import { usePreviousSession } from '../../hooks/usePreviousSession';
 import { saveRecord } from '../../data/records.repo';
+import { republishPublicStatsFor } from '../../data/publishStats';
 import { normAr } from '../../domain/text';
 import { getStudentName } from '../../domain/students';
 import { localDateStr, genId } from '../../domain';
@@ -260,6 +261,9 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     try {
       await saveRecord(MOSQUE_ID, HALAQA_ID, rec);
       showToast(isEditing ? '✓ تم تحديث الجلسة' : '✓ تم الحفظ بنجاح');
+      // Refresh the parent-facing projection immediately (fire-and-forget; a
+      // failure here must not block the save that already succeeded).
+      void republishPublicStatsFor([selectedStudent.id]);
       // In both new-session and edit mode, offer the WhatsApp message so the
       // teacher can (re)send the parent the updated homework/evaluation.
       const message = buildWhatsAppMessage(rec, prevSession, selectedStudent.parentToken);

@@ -8,11 +8,15 @@ rules_version = '2';
 // members/{uid} doc under that mosque — there is no blanket "any signed-in
 // user can read/write anything" rule like the old RTDB `auth != null` grant.
 //
-// publicStats/{token} is the one deliberately public exception: child.html
-// reads a single doc by a high-entropy token, with no sign-in at all. `get`
-// is allowed, `list` is denied (tokens can never be enumerated), and `write`
-// is denied to every client — only a trusted server context (Cloud Function
-// or Admin SDK migration script) may write it.
+// publicStats/{token} is the one deliberately public read exception:
+// child.html reads a single doc by a high-entropy token, with no sign-in at
+// all. `get` is allowed, `list` is denied (tokens can never be enumerated).
+//
+// WRITE is currently allowed to any signed-in user (the admin app recomputes
+// and publishes the projection on every save/delete — same trust model as the
+// live RTDB app today). This is a TRANSITIONAL grant: Phase 5 moves the write
+// into a Cloud Function and flips this back to `write: if false` so no client
+// can write it at all. Tracked in PROJECT_CONTEXT.md.
 //
 // Verify with the Rules Playground in Firebase Console, or (preferred, and
 // what the CI workflow in .github/workflows/ci.yml runs automatically)
@@ -59,7 +63,10 @@ service cloud.firestore {
     match /publicStats/{token} {
       allow get: if true;
       allow list: if false;
-      allow write: if false;
+      // Transitional: admin app writes the projection. Moves to Cloud Function
+      // (write: if false) in Phase 5. Never writable by an unauthenticated
+      // parent — the child page only ever reads.
+      allow write: if isSignedIn();
     }
   }
 }

@@ -165,4 +165,36 @@ describe('buildStudentPublicStats', () => {
     expect(result.avgLoh).toBeNull();
     expect(result.avgMadi).toBeNull();
   });
+
+  it('builds scoreHistory oldest-first, only for scored sessions', () => {
+    const result = buildStudentPublicStats(zaid, records, 2, 1, ['2026-07-03', '2026-07-01']);
+    expect(result.scoreHistory).toEqual([
+      { date: '2026-07-01', loh: 0, madi: null },
+      { date: '2026-07-03', loh: 90, madi: 80 },
+    ]);
+  });
+
+  it('aggregates monthlyStats keyed by YYYY-MM', () => {
+    const result = buildStudentPublicStats(zaid, records, 2, 1, ['2026-07-03', '2026-07-01']);
+    expect(result.monthlyStats['2026-07']).toEqual({
+      attendPct: 100, // 2 unique days / 2 halaqa days
+      sessionsCount: 2,
+      totalAyat: 20,
+      avgLoh: 45,
+    });
+  });
+
+  it('carries the mistake tally into recentSessions when present', () => {
+    const withMistakes: SessionRecord[] = [
+      {
+        id: 'r1',
+        studentId: 's_1',
+        date: '2026-07-01',
+        loh: { score: 97, mistakes: { full: 2, tajweed: 2 } },
+        newLoh: [{ sura: 'البقرة', from: '1', to: '5' }],
+      },
+    ];
+    const result = buildStudentPublicStats(zaid, withMistakes, 1, 1, ['2026-07-01']);
+    expect(result.recentSessions[0].loh).toEqual({ score: 97, mistakes: { full: 2, tajweed: 2 } });
+  });
 });

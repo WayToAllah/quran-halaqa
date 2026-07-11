@@ -4,6 +4,7 @@ import { useRecordSearch } from '../../hooks/useRecordSearch';
 import { useStudents } from '../../hooks/useStudents';
 import { useUndoableDelete } from '../../hooks/useUndoableDelete';
 import { deleteRecord as deleteRecordDoc } from '../../data/records.repo';
+import { republishPublicStatsFor } from '../../data/publishStats';
 import { esc } from '../../domain/text';
 import { displayStudentName } from '../../domain/students';
 import { hasScore, scoreName } from '../../domain/scoring';
@@ -128,7 +129,11 @@ export function LogScreen({ onEditRecord }: LogScreenProps = {}) {
     const name = displayStudentName(r, students);
     const label = r.attendance_only ? `حضور ${name}` : `جلسة ${name}`;
     if (!confirm(`حذف "${label}"؟`)) return;
-    requestDelete(r.id, `🗑 تم حذف ${label}`, (id) => deleteRecordDoc(MOSQUE_ID, HALAQA_ID, id));
+    requestDelete(r.id, `🗑 تم حذف ${label}`, async (id) => {
+      await deleteRecordDoc(MOSQUE_ID, HALAQA_ID, id);
+      // Refresh the parent projection now that this session is gone.
+      if (r.studentId) void republishPublicStatsFor([r.studentId]);
+    });
   }
 
   function handleEdit(r: SessionRecord) {

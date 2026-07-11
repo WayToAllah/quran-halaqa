@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { getRecordsByDate, saveRecord } from '../../data/records.repo';
+import { republishPublicStatsFor } from '../../data/publishStats';
 import { getStudentName, studentHasRecordOnDate } from '../../domain/students';
 import { genId } from '../../domain/ids';
 import { useToast } from '../../ui/ToastProvider';
@@ -81,6 +82,9 @@ export function GroupAttendanceModal({ initialDate, students, onClose }: Props) 
         ),
       );
       showToast(`✓ تم تسجيل حضور ${toSave.length} طالب`);
+      // One batched recompute for everyone just checked in (fetches the halaqa
+      // once, not per-student).
+      void republishPublicStatsFor(toSave.map((s) => s.id));
       onClose();
     } catch (err) {
       console.error('saveGroupAttendance failed:', err);

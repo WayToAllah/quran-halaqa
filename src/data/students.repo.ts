@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getDocs,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -39,6 +40,14 @@ export function subscribeStudents(
     (snap) => onChange(snap.docs.map((d) => d.data())),
     onError,
   );
+}
+
+/** One-shot fetch of the full student list — used when recomputing publicStats
+ * (needs all students for cross-student ranking), where a live subscription
+ * isn't wanted. */
+export async function getAllStudents(mosqueId: string, halaqaId: string): Promise<Student[]> {
+  const snap = await getDocs(studentsCollection(mosqueId, halaqaId));
+  return snap.docs.map((d) => d.data());
 }
 
 export function saveStudent(mosqueId: string, halaqaId: string, student: Student): Promise<void> {

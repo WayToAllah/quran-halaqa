@@ -127,13 +127,60 @@ export function buildStudentPublicStats(
 
   const recentSessions = realRecs.slice(0, 10).map((r) => ({
     date: r.date || '',
-    loh: hasScore(r.loh) ? { score: r.loh!.score! } : null,
-    madi: hasScore(r.madi) ? { score: r.madi!.score! } : null,
+    loh: hasScore(r.loh) ? { score: r.loh!.score!, ...(r.loh!.mistakes ? { mistakes: r.loh!.mistakes } : {}) } : null,
+    madi: hasScore(r.madi)
+      ? { score: r.madi!.score!, ...(r.madi!.mistakes ? { mistakes: r.madi!.mistakes } : {}) }
+      : null,
     newLoh: (r.newLoh ?? []).filter((l) => l?.sura),
     newMadi: (r.newMadi ?? []).filter((m) => m?.sura),
     tajweed: r.tajweed?.sura ? { sura: r.tajweed.sura, from: r.tajweed.from || '', to: r.tajweed.to || '' } : null,
     note: r.note || '',
   }));
+
+  // Lightweight full-history series for the progress chart — oldest first so
+  // the chart reads right-to-left (oldest → newest) in RTL.
+  const scoreHistory = [...realRecs]
+    .reverse()
+    .filter((r) => hasScore(r.loh) || hasScore(r.madi))
+    .map((r) => ({
+      date: r.date || '',
+      loh: hasScore(r.loh) ? r.loh!.score! : null,
+      madi: hasScore(r.madi) ? r.madi!.score! : null,
+    }));
+
+  // Per-month pre-aggregation for the page's month filter. Every month that
+  // appears in the student's records OR in the halaqa calendar gets an entry.
+  const monthlyStats: PublicStats['monthlyStats'] = {};
+  const allMonths = new Set<string>([
+    ...allRecs.map((r) => r.date?.slice(0, 7)).filter((m): m is string => !!m),
+    ...halaqaDatesDesc.map((d) => d.slice(0, 7)),
+  ]);
+  allMonths.forEach((month) => {
+    const monthHalaqaDays = halaqaDatesDesc.filter((d) => d.slice(0, 7) === month).length;
+    const monthAllRecs = allRecs.filter((r) => r.date?.slice(0, 7) === month);
+    const monthRealRecs = realRecs.filter((r) => r.date?.slice(0, 7) === month);
+    const monthUniqueDays = new Set(monthAllRecs.map((r) => r.date)).size;
+    const monthAttendPct = monthHalaqaDays > 0 ? Math.min(100, Math.round((monthUniqueDays / monthHalaqaDays) * 100)) : 0;
+    const monthScoredLoh = monthRealRecs.filter((r) => hasScore(r.loh));
+    const monthAvgLoh = monthScoredLoh.length
+      ? Math.round(monthScoredLoh.reduce((a, r) => a + r.loh!.score!, 0) / monthScoredLoh.length)
+      : null;
+    let monthAyat = 0;
+    monthRealRecs.forEach((r) => {
+      (r.newLoh ?? []).forEach((l) => {
+        if (l?.sura) monthAyat += countAyat(l.from, l.to);
+      });
+      (r.newMadi ?? []).forEach((m) => {
+        if (m?.sura) monthAyat += countAyat(m.from, m.to);
+      });
+    });
+    monthlyStats[month] = {
+      attendPct: monthAttendPct,
+      sessionsCount: monthAllRecs.length,
+      totalAyat: monthAyat,
+      avgLoh: monthAvgLoh,
+    };
+  });
 
   const badges = buildStudentBadges({
     attendPct,
@@ -159,5 +206,7 @@ export function buildStudentPublicStats(
     badges,
     currentTask,
     recentSessions,
+    scoreHistory,
+    monthlyStats,
   };
 }

@@ -115,17 +115,19 @@ describe('mosques/{id} and members/{uid} — no client writes ever', () => {
   });
 });
 
-describe('publicStats/{token} — public get, no list, no client write', () => {
+describe('publicStats/{token} — public get, no list, signed-in write (transitional)', () => {
   it('allows an unauthenticated read of a single known token', async () => {
     const db = testEnv.unauthenticatedContext().firestore();
     await assertSucceeds(getDoc(doc(db, 'publicStats', TOKEN)));
   });
 
-  it('denies any client (even an authenticated admin) from writing publicStats directly', async () => {
+  it('denies an UNauthenticated client (a parent) from writing publicStats', async () => {
     const dbAnon = testEnv.unauthenticatedContext().firestore();
     await assertFails(setDoc(doc(dbAnon, 'publicStats', TOKEN), { name: 'مزوّر' }));
+  });
 
+  it('allows a signed-in admin to write publicStats (transitional — moves to Cloud Function in Phase 5)', async () => {
     const dbAdmin = testEnv.authenticatedContext(ADMIN_UID).firestore();
-    await assertFails(setDoc(doc(dbAdmin, 'publicStats', TOKEN), { name: 'مزوّر' }));
+    await assertSucceeds(setDoc(doc(dbAdmin, 'publicStats', TOKEN), { name: 'زيد احمد', attendPct: 80 }));
   });
 });
