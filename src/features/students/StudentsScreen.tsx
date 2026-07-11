@@ -12,12 +12,7 @@ import { MOSQUE_ID, HALAQA_ID } from '../../config';
 import { StudentModal } from './StudentModal';
 import type { Student } from '../../types';
 
-// TODO(phase 5): this is a placeholder pointing at the *production*
-// child.html — it works today because parentTokens are preserved exactly
-// through migration (scripts/migrate-rtdb-to-firestore.ts), but the real
-// v2 parent portal (reading from Firestore, not RTDB) hasn't been built yet.
-// Swap this once it exists.
-const CHILD_STATS_BASE_URL = 'https://waytoallah.github.io/quran-halaqa/child.html';
+import { CHILD_STATS_BASE_URL } from '../../config';
 
 function initialsOf(name: string): string {
   return name

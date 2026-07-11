@@ -1,4 +1,5 @@
 import type { SessionRecord } from '../types';
+import { CHILD_STATS_BASE_URL } from '../config';
 import { hasScore, scoreName, scoreToHalfStars } from './scoring';
 import { extractAssignedSuras } from './record';
 import { joinSuraNames } from './suras';
@@ -19,8 +20,6 @@ function starsTextFromCount(count: number): string {
   const full = Math.max(0, Math.min(5, Math.round(count)));
   return '★'.repeat(full) + '☆'.repeat(5 - full);
 }
-
-const CHILD_STATS_BASE_URL = 'https://waytoallah.github.io/quran-halaqa/child.html';
 
 /**
  * Builds the parent-facing WhatsApp progress message for a just-saved
