@@ -51,25 +51,32 @@ export function SuraRow({ value, onChange, onRemove, label }: Props) {
   }
 
   return (
-    <div class="p-3 rounded-xl border border-neutral-100 space-y-2">
-      <div class="flex items-center justify-between">
-        <span class="text-xs font-semibold text-neutral-500">{label}</span>
+    <div class="pb-4 mb-4 border-b border-dashed border-hairline last:border-b-0 last:mb-0 last:pb-0">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-semibold text-taupe">{label}</span>
         {onRemove && (
-          <button type="button" class="text-xs text-red-500" onClick={onRemove}>
-            ✕ حذف
+          <button
+            type="button"
+            class="w-[38px] h-[38px] shrink-0 border border-hairline bg-white rounded-[10px] flex items-center justify-center"
+            onClick={onRemove}
+            aria-label="حذف"
+          >
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#B24A3A" stroke-width="1.8" stroke-linecap="round">
+              <path d="M5 6.5h14M9.5 6.5V4.8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1.7M7 6.5l.8 12.7a1.5 1.5 0 0 0 1.5 1.4h5.4a1.5 1.5 0 0 0 1.5-1.4l.8-12.7" />
+            </svg>
           </button>
         )}
       </div>
 
-      <div class="grid grid-cols-3 gap-2">
+      <div class="flex items-center gap-2 mb-3">
         {/* Searchable sura combobox */}
-        <div class="col-span-3 sm:col-span-1 relative">
+        <div class="flex-1 min-w-0 relative">
           <input
             type="text"
             placeholder="اكتب اسم السورة…"
             class={
-              'w-full border rounded-lg px-2 py-2 text-sm bg-white ' +
-              (query && !value.sura ? 'border-amber-400' : 'border-neutral-300')
+              'w-full border rounded-[11px] px-3.5 py-3 text-sm text-ink-dark ' +
+              (query && !value.sura ? 'border-amber-400' : 'border-hairline')
             }
             value={query}
             onFocus={() => setOpen(true)}
@@ -80,15 +87,15 @@ export function SuraRow({ value, onChange, onRemove, label }: Props) {
             }}
           />
           {open && (
-            <div class="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-neutral-200 rounded-lg shadow-lg">
+            <div class="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-hairline rounded-[11px] shadow-lg">
               {matches.length === 0 ? (
-                <div class="px-3 py-2 text-xs text-neutral-400">لا توجد نتائج</div>
+                <div class="px-3 py-2 text-xs text-taupe">لا توجد نتائج</div>
               ) : (
                 matches.map((s) => (
                   <button
                     type="button"
                     key={s.name}
-                    class="w-full text-right px-3 py-2 text-sm hover:bg-brand-cream flex items-center justify-between gap-2"
+                    class="w-full text-right px-3 py-2 text-sm hover:bg-parchment flex items-center justify-between gap-2"
                     onMouseDown={(e) => {
                       e.preventDefault();
                       if (blurTimer.current) clearTimeout(blurTimer.current);
@@ -98,7 +105,7 @@ export function SuraRow({ value, onChange, onRemove, label }: Props) {
                     <span>
                       {suraNumber(s.name)}. {s.name}
                     </span>
-                    <span class="text-[11px] text-neutral-400 whitespace-nowrap">
+                    <span class="text-[11px] text-taupe whitespace-nowrap">
                       {s.count} آية · {suraPageLabel(s)}
                     </span>
                   </button>
@@ -107,7 +114,9 @@ export function SuraRow({ value, onChange, onRemove, label }: Props) {
             </div>
           )}
         </div>
+      </div>
 
+      <div class="grid grid-cols-2 gap-2">
         <div>
           <input
             type="number"
@@ -115,8 +124,8 @@ export function SuraRow({ value, onChange, onRemove, label }: Props) {
             max={selectedInfo?.count}
             placeholder="من آية"
             class={
-              'w-full border rounded-lg px-2 py-2 text-sm ' +
-              (errors.fromError ? 'border-red-400' : 'border-neutral-300')
+              'w-full border rounded-[11px] px-2.5 py-2.5 text-sm text-ink-dark ' +
+              (errors.fromError ? 'border-red-400' : 'border-hairline')
             }
             value={value.from || ''}
             onInput={(e) => onChange({ ...value, from: (e.target as HTMLInputElement).value })}
@@ -130,7 +139,8 @@ export function SuraRow({ value, onChange, onRemove, label }: Props) {
             max={selectedInfo?.count}
             placeholder="إلى آية"
             class={
-              'w-full border rounded-lg px-2 py-2 text-sm ' + (errors.toError ? 'border-red-400' : 'border-neutral-300')
+              'w-full border rounded-[11px] px-2.5 py-2.5 text-sm text-ink-dark ' +
+              (errors.toError ? 'border-red-400' : 'border-hairline')
             }
             value={value.to || ''}
             onInput={(e) => onChange({ ...value, to: (e.target as HTMLInputElement).value })}
@@ -140,7 +150,7 @@ export function SuraRow({ value, onChange, onRemove, label }: Props) {
       </div>
 
       {selectedInfo && (
-        <div class="text-[11px] text-neutral-500">
+        <div class="text-[11px] text-taupe mt-2">
           عدد آيات السورة: {selectedInfo.count} · {suraPageLabel(selectedInfo)} (مصحف المدينة)
         </div>
       )}

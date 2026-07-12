@@ -57,11 +57,12 @@ export function ToastProvider({ children }: { children: ComponentChildren }) {
       {toast && (
         <div
           class={
-            'fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-full px-4 py-2.5 text-sm shadow-lg flex items-center gap-3 ' +
-            (toast.isError ? 'bg-red-600 text-white' : 'bg-neutral-900 text-white')
+            'fixed bottom-24 left-1/2 -translate-x-1/2 z-50 rounded-full px-5 py-3 text-[13.5px] font-semibold shadow-lg flex items-center gap-3 whitespace-nowrap ' +
+            (toast.isError ? 'bg-red-600 text-white' : 'bg-ink-dark text-parchment')
           }
           style={{ pointerEvents: toast.undo ? 'auto' : 'none' }}
         >
+          {!toast.isError && <span class="text-mustard">✓</span>}
           <span>{toast.message}</span>
           {toast.undo && (
             <button

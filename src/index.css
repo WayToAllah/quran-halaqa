@@ -12,6 +12,17 @@
   --color-brand-copper: #B8722E;
   --color-brand-cream: #FAF6ED;
   --color-brand-gold: #E8B84B;
+
+  /* New design pass (screen-by-screen rollout) — distinct token names so
+     screens not yet redesigned keep using brand-teal/copper/cream untouched.
+     Once every screen is migrated, these can replace brand-* directly. */
+  --color-forest: #0F3D2E;
+  --color-forest-deep: #0A2E22;
+  --color-mustard: #C9A227;
+  --color-parchment: #FAF7F0;
+  --color-ink-dark: #1E2A24;
+  --color-taupe: #8A8372;
+  --color-hairline: #ECE6D6;
 }
 
 html {

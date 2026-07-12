@@ -7,14 +7,14 @@ export function StarPicker({ value, onChange }: { value: number; onChange: (v: n
         <button
           key={n}
           type="button"
-          class={'text-xl leading-none ' + (n <= value ? 'text-amber-500' : 'text-neutral-300')}
+          class={'text-xl leading-none ' + (n <= value ? 'text-mustard' : 'text-[#E7E1D3]')}
           aria-label={`${n} نجوم`}
           onClick={() => onChange(n)}
         >
           ★
         </button>
       ))}
-      <span class="text-xs text-neutral-400 mr-1" dir="rtl">
+      <span class="text-xs text-taupe mr-1" dir="rtl">
         {value ? LABELS[value] : '—'}
       </span>
     </div>

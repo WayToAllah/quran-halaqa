@@ -38,7 +38,7 @@ function renderScreen(props: { editRecord?: SessionRecord | null; onEditConsumed
 }
 
 async function selectStudent(name: string) {
-  const input = screen.getByPlaceholderText('اكتب اسم الطالب...');
+  const input = screen.getByPlaceholderText('ابحث أو اختر اسم الطالب…');
   await userEvent.click(input);
   await userEvent.type(input, name);
   await userEvent.click(screen.getByRole('button', { name }));
@@ -71,7 +71,7 @@ describe('RecordScreen — student picker', () => {
 
   it('filters and selects a student, normalizing Arabic hamza forms', async () => {
     renderScreen();
-    const input = screen.getByPlaceholderText('اكتب اسم الطالب...');
+    const input = screen.getByPlaceholderText('ابحث أو اختر اسم الطالب…');
     await userEvent.click(input);
     await userEvent.type(input, 'احمد'); // no hamza, must still match "زيد احمد"
     await userEvent.click(screen.getByRole('button', { name: 'زيد احمد' }));
@@ -118,7 +118,7 @@ describe('RecordScreen — multi-sura rows', () => {
     const addButtons = screen.getAllByRole('button', { name: '+ إضافة سورة' });
     await userEvent.click(addButtons[0]); // loh add button
     expect(screen.getAllByText(/سورة \d/).length).toBeGreaterThan(0); // "سورة 2" row label appeared
-    await userEvent.click(screen.getAllByRole('button', { name: '✕ حذف' })[0]);
+    await userEvent.click(screen.getAllByRole('button', { name: 'حذف' })[0]);
     expect(screen.queryByText('سورة 2')).not.toBeInTheDocument();
   });
 });
@@ -142,7 +142,7 @@ describe('RecordScreen — save validation', () => {
   it('saves without confirmation when a note is present (non-empty session)', async () => {
     renderScreen();
     await selectStudent('زيد احمد');
-    await userEvent.type(screen.getByPlaceholderText('اختيارية', { exact: false }), 'ملاحظة تجريبية');
+    await userEvent.type(screen.getByPlaceholderText('أي ملاحظة عن أداء الطالب اليوم…'), 'ملاحظة تجريبية');
     await userEvent.click(screen.getByRole('button', { name: /حفظ الجلسة/ }));
     await waitFor(() => expect(saveRecordMock).toHaveBeenCalledTimes(1));
   });
@@ -168,7 +168,7 @@ describe('RecordScreen — save flow', () => {
     expect(savedRecord.newLoh).toEqual([{ sura: 'البقرة', from: '1', to: '10' }]);
 
     // form resets: student field clears
-    expect(screen.getByPlaceholderText('اكتب اسم الطالب...')).toHaveValue('');
+    expect(screen.getByPlaceholderText('ابحث أو اختر اسم الطالب…')).toHaveValue('');
   });
 
   it('mistake counter fills the loh score and saves the tally into the record', async () => {
@@ -206,12 +206,12 @@ describe('RecordScreen — save flow', () => {
     saveRecordMock.mockRejectedValueOnce(new Error('network'));
     renderScreen();
     await selectStudent('زيد احمد');
-    await userEvent.type(screen.getByPlaceholderText('اختيارية', { exact: false }), 'ملاحظة');
+    await userEvent.type(screen.getByPlaceholderText('أي ملاحظة عن أداء الطالب اليوم…'), 'ملاحظة');
     await userEvent.click(screen.getByRole('button', { name: /حفظ الجلسة/ }));
 
     await waitFor(() => expect(screen.getByText(/فشل الحفظ/)).toBeInTheDocument());
     // student selection preserved after failure
-    expect(screen.getByPlaceholderText('اكتب اسم الطالب...')).toHaveValue('زيد احمد');
+    expect(screen.getByPlaceholderText('ابحث أو اختر اسم الطالب…')).toHaveValue('زيد احمد');
   });
 
   it('rejects an out-of-range ayah before calling saveRecord', async () => {
@@ -237,7 +237,7 @@ describe('RecordScreen — tajweed toggle', () => {
 
   it('shows tajweed fields once toggled on', async () => {
     renderScreen();
-    const toggle = screen.getByRole('checkbox');
+    const toggle = screen.getByRole('switch');
     await userEvent.click(toggle);
     expect(screen.getByText('سورة التجويد')).toBeInTheDocument();
   });

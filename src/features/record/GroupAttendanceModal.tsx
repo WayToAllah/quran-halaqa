@@ -101,19 +101,19 @@ export function GroupAttendanceModal({ initialDate, students, onClose }: Props) 
         onClick={(e) => e.stopPropagation()}
         dir="rtl"
       >
-        <div class="flex items-center justify-between px-5 py-4 border-b border-neutral-100">
-          <span class="font-bold text-neutral-900">✅ تسجيل حضور جماعي</span>
-          <button class="text-neutral-400 text-lg" onClick={onClose}>
+        <div class="flex items-center justify-between px-5 py-4 border-b border-hairline">
+          <span class="font-bold text-ink-dark">✅ تسجيل حضور جماعي</span>
+          <button class="text-taupe text-lg" onClick={onClose}>
             ✕
           </button>
         </div>
 
         <div class="p-5 space-y-3 overflow-y-auto flex-1">
           <div>
-            <label class="text-xs font-semibold text-neutral-600 block mb-1">📅 التاريخ</label>
+            <label class="text-xs font-semibold text-[#5B5646] block mb-1">📅 التاريخ</label>
             <input
               type="date"
-              class="w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm"
+              class="w-full border border-hairline rounded-[11px] px-3 py-2.5 text-sm text-ink-dark"
               value={date}
               onInput={(e) => {
                 setDate((e.target as HTMLInputElement).value);
@@ -123,8 +123,8 @@ export function GroupAttendanceModal({ initialDate, students, onClose }: Props) 
           </div>
 
           <div class="flex items-center justify-between">
-            <span class="text-xs text-neutral-500">{checked.size} محدد</span>
-            <button type="button" class="text-xs font-bold text-brand-teal" onClick={toggleAll}>
+            <span class="text-xs text-taupe">{checked.size} محدد</span>
+            <button type="button" class="text-xs font-bold text-forest" onClick={toggleAll}>
               تحديد الكل / إلغاء
             </button>
           </div>
@@ -132,11 +132,11 @@ export function GroupAttendanceModal({ initialDate, students, onClose }: Props) 
           {dayRecords === null ? (
             <div class="space-y-2">
               {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} class="h-10 rounded-lg bg-neutral-100 animate-pulse" />
+                <div key={i} class="h-10 rounded-lg bg-[#F1ECDD] animate-pulse" />
               ))}
             </div>
           ) : (
-            <div class="max-h-[48vh] overflow-y-auto divide-y divide-neutral-100">
+            <div class="max-h-[48vh] overflow-y-auto divide-y divide-hairline">
               {sorted.map((s) => {
                 const already = studentHasRecordOnDate(s, date, dayRecords);
                 return (
@@ -149,7 +149,7 @@ export function GroupAttendanceModal({ initialDate, students, onClose }: Props) 
                       onChange={(e) => toggle(s.id, (e.target as HTMLInputElement).checked)}
                     />
                     <span class="flex-1 text-sm">{getStudentName(s)}</span>
-                    {already && <span class="text-[11px] text-neutral-400">مسجّل بالفعل</span>}
+                    {already && <span class="text-[11px] text-taupe">مسجّل بالفعل</span>}
                   </label>
                 );
               })}
@@ -157,12 +157,12 @@ export function GroupAttendanceModal({ initialDate, students, onClose }: Props) 
           )}
         </div>
 
-        <div class="flex gap-3 px-5 py-4 border-t border-neutral-100">
-          <button class="flex-1 py-2.5 rounded-lg border border-neutral-300 text-sm font-semibold" onClick={onClose}>
+        <div class="flex gap-3 px-5 py-4 border-t border-hairline">
+          <button class="flex-1 py-2.5 rounded-lg border border-hairline text-sm font-semibold text-[#5B5646]" onClick={onClose}>
             إلغاء
           </button>
           <button
-            class="flex-1 py-2.5 rounded-lg bg-brand-teal text-white text-sm font-bold disabled:opacity-60"
+            class="flex-1 py-2.5 rounded-lg bg-forest text-parchment text-sm font-bold disabled:opacity-60"
             disabled={saving || dayRecords === null}
             onClick={handleSave}
           >

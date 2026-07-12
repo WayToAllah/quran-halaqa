@@ -57,12 +57,12 @@ export function MistakeCounterModal({ label, suraInfo, initialHistory, onSave, o
         onClick={(e) => e.stopPropagation()}
         dir="rtl"
       >
-        <div class="flex items-start justify-between px-5 py-4 border-b border-neutral-100">
+        <div class="flex items-start justify-between px-5 py-4 border-b border-hairline">
           <div>
-            <div class="font-bold text-neutral-900">عداد الأخطاء — تقييم {label}</div>
-            <div class="text-xs text-neutral-400 mt-0.5">{suraInfo || '—'}</div>
+            <div class="font-bold text-ink-dark">عداد الأخطاء — تقييم {label}</div>
+            <div class="text-xs text-taupe mt-0.5">{suraInfo || '—'}</div>
           </div>
-          <button class="text-neutral-400 text-lg" onClick={onClose}>
+          <button class="text-taupe text-lg" onClick={onClose}>
             ✕
           </button>
         </div>
@@ -96,19 +96,19 @@ export function MistakeCounterModal({ label, suraInfo, initialHistory, onSave, o
             </button>
           </div>
 
-          <div class="flex items-center justify-center gap-6 text-sm text-neutral-600">
+          <div class="flex items-center justify-center gap-6 text-sm text-[#5B5646]">
             <span>
-              خطأ: <b class="text-neutral-900">{full}</b>
+              خطأ: <b class="text-ink-dark">{full}</b>
             </span>
             <span>
-              خطأ تجويدي: <b class="text-neutral-900">{tajweed}</b>
+              خطأ تجويدي: <b class="text-ink-dark">{tajweed}</b>
             </span>
           </div>
 
           <div class="flex gap-2.5">
             <button
               type="button"
-              class="flex-1 py-2.5 rounded-lg border border-neutral-200 text-xs font-semibold text-neutral-600 disabled:opacity-40"
+              class="flex-1 py-2.5 rounded-lg border border-hairline text-xs font-semibold text-[#5B5646] disabled:opacity-40"
               onClick={undoLast}
               disabled={history.length === 0}
             >
@@ -116,7 +116,7 @@ export function MistakeCounterModal({ label, suraInfo, initialHistory, onSave, o
             </button>
             <button
               type="button"
-              class="flex-1 py-2.5 rounded-lg border border-neutral-200 text-xs font-semibold text-neutral-600 disabled:opacity-40"
+              class="flex-1 py-2.5 rounded-lg border border-hairline text-xs font-semibold text-[#5B5646] disabled:opacity-40"
               onClick={resetAll}
               disabled={history.length === 0}
             >
@@ -125,10 +125,10 @@ export function MistakeCounterModal({ label, suraInfo, initialHistory, onSave, o
           </div>
         </div>
 
-        <div class="px-5 py-4 border-t border-neutral-100">
+        <div class="px-5 py-4 border-t border-hairline">
           <button
             type="button"
-            class="w-full py-3 rounded-xl bg-brand-teal text-white font-bold active:scale-[0.99] transition-transform"
+            class="w-full py-3 rounded-xl bg-forest text-parchment font-bold active:scale-[0.99] transition-transform"
             onClick={handleSave}
           >
             ✓ حفظ الدرجة

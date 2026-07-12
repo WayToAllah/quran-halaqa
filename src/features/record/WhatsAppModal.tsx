@@ -31,22 +31,22 @@ export function WhatsAppModal({ message, phone, onClose }: Props) {
         onClick={(e) => e.stopPropagation()}
         dir="rtl"
       >
-        <div class="flex items-center justify-between px-5 py-4 border-b border-neutral-100">
-          <span class="font-bold text-neutral-900">إرسال ملخص الجلسة</span>
-          <button class="text-neutral-400 text-lg" onClick={onClose}>
+        <div class="flex items-center justify-between px-5 py-4 border-b border-hairline">
+          <span class="font-bold text-ink-dark">إرسال ملخص الجلسة</span>
+          <button class="text-taupe text-lg" onClick={onClose}>
             ✕
           </button>
         </div>
 
         <div class="p-5 overflow-y-auto flex-1">
-          <div class="bg-neutral-50 rounded-lg p-3.5 text-[13px] leading-relaxed whitespace-pre-wrap">{message}</div>
+          <div class="bg-parchment rounded-lg p-3.5 text-[13px] leading-relaxed whitespace-pre-wrap">{message}</div>
         </div>
 
-        <div class="flex gap-2 px-5 py-4 border-t border-neutral-100">
-          <button class="flex-1 py-2.5 rounded-lg border border-neutral-300 text-sm font-semibold" onClick={onClose}>
+        <div class="flex gap-2 px-5 py-4 border-t border-hairline">
+          <button class="flex-1 py-2.5 rounded-lg border border-hairline text-sm font-semibold text-[#5B5646]" onClick={onClose}>
             تخطي
           </button>
-          <button class="px-4 py-2.5 rounded-lg border border-neutral-300 text-sm" aria-label="نسخ" onClick={handleCopy}>
+          <button class="px-4 py-2.5 rounded-lg border border-hairline text-sm" aria-label="نسخ" onClick={handleCopy}>
             📋
           </button>
           {phone && (

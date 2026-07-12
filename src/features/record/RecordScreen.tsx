@@ -6,7 +6,7 @@ import { republishPublicStatsFor } from '../../data/publishStats';
 import { normAr } from '../../domain/text';
 import { getStudentName } from '../../domain/students';
 import { localDateStr, genId } from '../../domain';
-import { scoreToStars } from '../../domain/scoring';
+import { scoreToStars, scoreName } from '../../domain/scoring';
 import { extractAssignedSuras, validateAyahRange } from '../../domain/record';
 import { buildWhatsAppMessage, normalizeWhatsAppPhone } from '../../domain/whatsapp';
 import { SuraRow } from './SuraRow';
@@ -31,6 +31,22 @@ function fmtSuraInfo(list: SuraAssignment[]): string {
 function readScoreField(raw: string): number | null {
   if (raw === '') return null;
   return Math.min(100, Math.max(0, parseInt(raw) || 0));
+}
+
+/** Tier badge colors ported from the approved design, keyed by the real
+ * scoreName() bands (85/75/65/50 — see domain/scoring.ts), not re-derived. */
+const TIER_COLORS: Record<string, { bg: string; color: string }> = {
+  'ممتاز': { bg: '#E7F2EC', color: '#0F3D2E' },
+  'جيد جداً': { bg: '#EFF6E8', color: '#3E6B22' },
+  'جيد': { bg: '#FFF8E6', color: '#8A6A15' },
+  'مقبول': { bg: '#FBEEE3', color: '#9A5A24' },
+  'إعادة': { bg: '#FBEAE7', color: '#B24A3A' },
+};
+function tierBadge(score: string): { label: string; bg: string; color: string } | null {
+  if (score === '') return null;
+  const label = scoreName(readScoreField(score));
+  const c = TIER_COLORS[label] ?? { bg: '#F1ECDD', color: '#5B5646' };
+  return { label, ...c };
 }
 
 const emptyRow = (): SuraAssignment => ({ sura: '', from: '', to: '' });
@@ -97,6 +113,9 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   const prevLohInfo = evalSource ? fmtSuraInfo(extractAssignedSuras(evalSource.newLoh, evalSource.loh)) : '—';
   const prevMadiList = evalSource ? extractAssignedSuras(evalSource.newMadi, evalSource.madi) : [];
   const prevMadiInfo = fmtSuraInfo(prevMadiList);
+
+  const lohTier = tierBadge(prevLohScore);
+  const madiTier = tierBadge(prevMadiScore);
 
   function selectStudent(s: Student) {
     setSelectedStudent(s);
@@ -278,8 +297,12 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     }
   }
 
+  const cardCls = 'bg-white border border-hairline rounded-2xl p-[18px]';
+
   return (
-    <div class="p-4 space-y-4 pb-8" dir="rtl">
+    <div class="p-[18px] pb-[100px] space-y-3" dir="rtl">
+      <div class="text-[19px] font-extrabold text-ink-dark mb-1">تسجيل جلسة</div>
+
       {editingId && (
         <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center justify-between gap-2">
           <span class="text-sm font-semibold text-amber-800">✏️ تعديل جلسة محفوظة</span>
@@ -288,46 +311,66 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
           </button>
         </div>
       )}
-      <div class="bg-white rounded-2xl border border-neutral-200 p-4">
-        <label class="text-xs font-semibold text-neutral-600 block mb-1">📅 تاريخ الجلسة</label>
-        <input
-          type="date"
-          class="w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm"
-          value={date}
-          onInput={(e) => setDate((e.target as HTMLInputElement).value)}
-        />
+
+      <div class={cardCls + ' flex items-center justify-between gap-2.5'}>
+        <div class="flex items-center gap-2.5 min-w-0 flex-1">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#0F3D2E" stroke-width="1.8" class="shrink-0">
+            <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
+            <path d="M3.5 9.5h17M8 3v3.5M16 3v3.5" />
+          </svg>
+          <input
+            type="date"
+            class="flex-1 min-w-0 text-sm font-semibold text-ink-dark bg-transparent border-none outline-none"
+            value={date}
+            onInput={(e) => setDate((e.target as HTMLInputElement).value)}
+          />
+        </div>
       </div>
 
       <button
         type="button"
-        class="w-full py-3 rounded-xl border-2 border-dashed border-brand-teal/30 text-brand-teal text-sm font-bold"
+        class="w-full py-3 rounded-xl border-[1.5px] border-dashed border-mustard bg-[#FFFCF3] text-[#8A6A15] text-sm font-bold"
         onClick={() => setShowGroupAttendance(true)}
       >
         ✅ تسجيل حضور جماعي
       </button>
 
-      <div class="bg-white rounded-2xl border border-neutral-200 p-4 relative">
-        <label class="text-xs font-semibold text-neutral-600 block mb-1">الطالب</label>
-        <input
-          type="text"
-          class="w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm"
-          placeholder="اكتب اسم الطالب..."
-          value={studentQuery}
-          onInput={(e) => {
-            setStudentQuery((e.target as HTMLInputElement).value);
-            setDropdownOpen(true);
-            if (selectedStudent) setSelectedStudent(null);
-          }}
-          onFocus={() => setDropdownOpen(true)}
-        />
+      <div class={cardCls + ' relative'}>
+        <label class="text-xs font-semibold text-[#5B5646] block mb-2">الطالب</label>
+        <div class="relative">
+          <input
+            type="text"
+            class="w-full border border-hairline rounded-xl px-3.5 py-3 pr-10 text-sm text-ink-dark"
+            placeholder="ابحث أو اختر اسم الطالب…"
+            value={studentQuery}
+            onInput={(e) => {
+              setStudentQuery((e.target as HTMLInputElement).value);
+              setDropdownOpen(true);
+              if (selectedStudent) setSelectedStudent(null);
+            }}
+            onFocus={() => setDropdownOpen(true)}
+          />
+          <svg
+            viewBox="0 0 24 24"
+            width="17"
+            height="17"
+            fill="none"
+            stroke="#8A8372"
+            stroke-width="2"
+            class="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="M21 21l-4.3-4.3" />
+          </svg>
+        </div>
         {dropdownOpen && (
-          <div class="absolute z-10 inset-x-4 top-full mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-            {studentMatches.length === 0 && <div class="p-3 text-xs text-neutral-400">لا يوجد نتائج</div>}
+          <div class="absolute z-10 inset-x-[18px] top-full mt-1 bg-white border border-hairline rounded-xl shadow-lg max-h-56 overflow-y-auto">
+            {studentMatches.length === 0 && <div class="p-3 text-xs text-taupe">لا يوجد نتائج</div>}
             {studentMatches.map((s) => (
               <button
                 key={s.id}
                 type="button"
-                class="w-full text-right px-3 py-2 text-sm hover:bg-neutral-50"
+                class="w-full text-right px-3.5 py-2.5 text-sm hover:bg-parchment"
                 onMouseDown={() => selectStudent(s)}
               >
                 {getStudentName(s)}
@@ -338,30 +381,41 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
       </div>
 
       {selectedStudent && evalSource && (
-        <div class="bg-white rounded-2xl border border-neutral-200 p-4 space-y-3">
-          <div class="font-bold text-neutral-900">📋 ما سمعناه النهارده</div>
-          <div class="text-xs text-neutral-400">
-            {editingId ? 'تقييم هذه الجلسة' : `من جلسة ${new Date(evalSource.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}`}
+        <div class={cardCls + ' space-y-3.5'}>
+          <div>
+            <div class="font-extrabold text-ink-dark text-[13.5px]">📋 ما سمعناه النهارده</div>
+            <div class="text-[11px] text-taupe mt-0.5">
+              {editingId
+                ? 'تقييم هذه الجلسة'
+                : `من جلسة ${new Date(evalSource.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}`}
+            </div>
           </div>
 
           <div>
-            <div class="text-xs font-semibold text-neutral-500 mb-1">اللوح</div>
-            <div class="text-sm mb-2">{prevLohInfo}</div>
-            <label class="text-xs text-neutral-500">التقييم (من 100)</label>
-            <div class="flex items-center gap-2 mt-1">
+            <div class="text-xs font-semibold text-[#5B5646] mb-1">اللوح</div>
+            <div class="text-sm mb-2 text-ink-dark">{prevLohInfo}</div>
+            <label class="text-xs text-taupe">التقييم (من 100)</label>
+            <div class="flex items-center gap-2 mt-1 flex-wrap">
               <input
                 type="number"
                 min={0}
                 max={100}
                 placeholder="مثلاً 90"
-                class="w-20 text-center font-bold text-lg border border-brand-teal/30 bg-brand-cream text-brand-teal rounded-lg py-2"
+                class="w-20 text-center font-extrabold text-lg border border-mustard/50 bg-[#FFFCF3] text-forest rounded-xl py-2"
                 value={prevLohScore}
                 onInput={(e) => setPrevLohScore((e.target as HTMLInputElement).value)}
               />
-              <span class="text-xs text-neutral-400">{prevLohScore === '' ? '—' : `${prevLohScore}/100`}</span>
+              {lohTier && (
+                <span
+                  class="text-[11px] font-bold px-2.5 py-1 rounded-full"
+                  style={{ background: lohTier.bg, color: lohTier.color }}
+                >
+                  {lohTier.label}
+                </span>
+              )}
               <button
                 type="button"
-                class="mr-auto text-xs font-semibold text-brand-teal border border-brand-teal/20 rounded-lg px-2.5 py-2"
+                class="mr-auto text-xs font-semibold text-forest border border-forest/20 rounded-lg px-2.5 py-2"
                 onClick={() => setMistakeModal('loh')}
               >
                 🧮 عدّاد الأخطاء
@@ -371,24 +425,31 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
           </div>
 
           {prevMadiList.length > 0 && (
-            <div class="pt-3 border-t border-neutral-100">
-              <div class="text-xs font-semibold text-neutral-500 mb-1">الماضي</div>
-              <div class="text-sm mb-2">{prevMadiInfo}</div>
-              <label class="text-xs text-neutral-500">التقييم (من 100)</label>
-              <div class="flex items-center gap-2 mt-1">
+            <div class="pt-3.5 border-t border-hairline">
+              <div class="text-xs font-semibold text-[#5B5646] mb-1">الماضي</div>
+              <div class="text-sm mb-2 text-ink-dark">{prevMadiInfo}</div>
+              <label class="text-xs text-taupe">التقييم (من 100)</label>
+              <div class="flex items-center gap-2 mt-1 flex-wrap">
                 <input
                   type="number"
                   min={0}
                   max={100}
                   placeholder="مثلاً 85"
-                  class="w-20 text-center font-bold text-lg border border-brand-teal/30 bg-brand-cream text-brand-teal rounded-lg py-2"
+                  class="w-20 text-center font-extrabold text-lg border border-mustard/50 bg-[#FFFCF3] text-forest rounded-xl py-2"
                   value={prevMadiScore}
                   onInput={(e) => setPrevMadiScore((e.target as HTMLInputElement).value)}
                 />
-                <span class="text-xs text-neutral-400">{prevMadiScore === '' ? '—' : `${prevMadiScore}/100`}</span>
+                {madiTier && (
+                  <span
+                    class="text-[11px] font-bold px-2.5 py-1 rounded-full"
+                    style={{ background: madiTier.bg, color: madiTier.color }}
+                  >
+                    {madiTier.label}
+                  </span>
+                )}
                 <button
                   type="button"
-                  class="mr-auto text-xs font-semibold text-brand-teal border border-brand-teal/20 rounded-lg px-2.5 py-2"
+                  class="mr-auto text-xs font-semibold text-forest border border-forest/20 rounded-lg px-2.5 py-2"
                   onClick={() => setMistakeModal('madi')}
                 >
                   🧮 عدّاد الأخطاء
@@ -400,8 +461,11 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
         </div>
       )}
 
-      <div class="bg-white rounded-2xl border border-neutral-200 p-4 space-y-2">
-        <div class="font-bold text-neutral-900">📝 المهمة الجديدة — اللوح</div>
+      <div class={cardCls}>
+        <div class="flex items-center gap-2 mb-3.5">
+          <div class="w-2 h-2 rounded-full bg-forest" />
+          <div class="text-[13.5px] font-extrabold text-ink-dark">اللوح الجديد</div>
+        </div>
         {lohRows.map((row, i) => (
           <SuraRow
             key={i}
@@ -413,15 +477,18 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
         ))}
         <button
           type="button"
-          class="w-full py-2 rounded-lg border border-dashed border-neutral-300 text-sm text-neutral-500"
+          class="w-full py-2.5 rounded-[11px] border-[1.5px] border-dashed border-mustard bg-[#FFFCF3] text-[#8A6A15] text-[13px] font-bold"
           onClick={() => setLohRows((rows) => [...rows, emptyRow()])}
         >
           + إضافة سورة
         </button>
       </div>
 
-      <div class="bg-white rounded-2xl border border-neutral-200 p-4 space-y-2">
-        <div class="font-bold text-neutral-900">📝 المهمة الجديدة — الماضي</div>
+      <div class={cardCls}>
+        <div class="flex items-center gap-2 mb-3.5">
+          <div class="w-2 h-2 rounded-full bg-mustard" />
+          <div class="text-[13.5px] font-extrabold text-ink-dark">مراجعة الماضي</div>
+        </div>
         {madiRows.map((row, i) => (
           <SuraRow
             key={i}
@@ -433,34 +500,45 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
         ))}
         <button
           type="button"
-          class="w-full py-2 rounded-lg border border-dashed border-neutral-300 text-sm text-neutral-500"
+          class="w-full py-2.5 rounded-[11px] border-[1.5px] border-dashed border-mustard bg-[#FFFCF3] text-[#8A6A15] text-[13px] font-bold"
           onClick={() => setMadiRows((rows) => [...rows, emptyRow()])}
         >
           + إضافة سورة
         </button>
       </div>
 
-      <div class="bg-white rounded-2xl border border-neutral-200 p-4 space-y-3">
+      <div class={cardCls + ' space-y-3'}>
         <label class="flex items-center justify-between">
-          <span class="font-bold text-neutral-900">مراجعة التجويد</span>
-          <input
-            type="checkbox"
-            checked={tajweedEnabled}
-            onChange={(e) => setTajweedEnabled((e.target as HTMLInputElement).checked)}
-          />
+          <div>
+            <div class="text-[13.5px] font-bold text-ink-dark">تسجيل ملاحظات التجويد</div>
+            <div class="text-[11.5px] text-taupe mt-0.5">اختياري — لتتبع أخطاء التجويد الشائعة</div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={tajweedEnabled}
+            class="w-[46px] h-[26px] rounded-full relative shrink-0 transition-colors"
+            style={{ background: tajweedEnabled ? '#0F3D2E' : '#E7E1D3' }}
+            onClick={() => setTajweedEnabled((v) => !v)}
+          >
+            <span
+              class="absolute top-[3px] w-5 h-5 rounded-full bg-white shadow transition-all"
+              style={{ right: tajweedEnabled ? '23px' : '3px' }}
+            />
+          </button>
         </label>
         {tajweedEnabled && (
-          <div class="space-y-3">
+          <div class="space-y-3 pt-1">
             <SuraRow label="سورة التجويد" value={tajweed} onChange={setTajweed} />
             <div>
-              <label class="text-xs text-neutral-500 block mb-1">التقييم</label>
+              <label class="text-xs text-taupe block mb-1">التقييم</label>
               <StarPicker value={tajweedStars} onChange={setTajweedStars} />
             </div>
             <div>
-              <label class="text-xs text-neutral-500 block mb-1">ملاحظة</label>
+              <label class="text-xs text-taupe block mb-1">ملاحظة</label>
               <input
                 type="text"
-                class="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                class="w-full border border-hairline rounded-[11px] px-3.5 py-2.5 text-sm text-ink-dark"
                 placeholder="اختيارية"
                 value={tajweedNote}
                 onInput={(e) => setTajweedNote((e.target as HTMLInputElement).value)}
@@ -470,12 +548,12 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
         )}
       </div>
 
-      <div class="bg-white rounded-2xl border border-neutral-200 p-4">
-        <label class="text-xs font-semibold text-neutral-600 block mb-1">ملاحظة عامة</label>
+      <div class={cardCls}>
+        <label class="text-xs font-semibold text-[#5B5646] block mb-2">ملاحظة (اختياري)</label>
         <textarea
-          class="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
-          rows={2}
-          placeholder="اختيارية"
+          class="w-full border border-hairline rounded-[11px] px-3.5 py-3 text-[13.5px] text-ink-dark resize-none"
+          rows={3}
+          placeholder="أي ملاحظة عن أداء الطالب اليوم…"
           value={note}
           onInput={(e) => setNote((e.target as HTMLTextAreaElement).value)}
         />
@@ -483,17 +561,18 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
 
       <button
         type="button"
-        class="w-full py-3.5 rounded-xl bg-brand-teal text-white font-bold shadow-lg disabled:opacity-60"
+        class="w-full py-4 rounded-2xl bg-forest text-parchment font-extrabold text-[15px] shadow-[0_8px_20px_rgba(15,61,46,0.28)] disabled:opacity-60 flex items-center justify-center gap-2"
         disabled={saving}
         onClick={handleSave}
       >
-        {saving ? '⏳ جاري الحفظ…' : editingId ? '💾 تحديث الجلسة' : '💾 حفظ الجلسة'}
+        <span>{saving ? '⏳' : '💾'}</span>
+        {saving ? 'جاري الحفظ…' : editingId ? 'تحديث الجلسة' : 'حفظ الجلسة'}
       </button>
 
       {editingId && (
         <button
           type="button"
-          class="w-full py-2.5 rounded-xl border border-neutral-300 text-neutral-600 text-sm font-semibold"
+          class="w-full py-2.5 rounded-xl border border-hairline text-[#5B5646] text-sm font-semibold"
           onClick={cancelEdit}
         >
           إلغاء التعديل
