@@ -300,7 +300,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
 
       <button
         type="button"
-        class="w-full py-3 rounded-xl border-2 border-dashed border-emerald-300 text-emerald-700 text-sm font-bold"
+        class="w-full py-3 rounded-xl border-2 border-dashed border-brand-teal/30 text-brand-teal text-sm font-bold"
         onClick={() => setShowGroupAttendance(true)}
       >
         ✅ تسجيل حضور جماعي
@@ -354,14 +354,14 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
                 min={0}
                 max={100}
                 placeholder="مثلاً 90"
-                class="w-20 text-center font-bold text-lg border border-emerald-300 bg-emerald-50 text-emerald-700 rounded-lg py-2"
+                class="w-20 text-center font-bold text-lg border border-brand-teal/30 bg-brand-cream text-brand-teal rounded-lg py-2"
                 value={prevLohScore}
                 onInput={(e) => setPrevLohScore((e.target as HTMLInputElement).value)}
               />
               <span class="text-xs text-neutral-400">{prevLohScore === '' ? '—' : `${prevLohScore}/100`}</span>
               <button
                 type="button"
-                class="mr-auto text-xs font-semibold text-emerald-700 border border-emerald-200 rounded-lg px-2.5 py-2"
+                class="mr-auto text-xs font-semibold text-brand-teal border border-brand-teal/20 rounded-lg px-2.5 py-2"
                 onClick={() => setMistakeModal('loh')}
               >
                 🧮 عدّاد الأخطاء
@@ -381,14 +381,14 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
                   min={0}
                   max={100}
                   placeholder="مثلاً 85"
-                  class="w-20 text-center font-bold text-lg border border-emerald-300 bg-emerald-50 text-emerald-700 rounded-lg py-2"
+                  class="w-20 text-center font-bold text-lg border border-brand-teal/30 bg-brand-cream text-brand-teal rounded-lg py-2"
                   value={prevMadiScore}
                   onInput={(e) => setPrevMadiScore((e.target as HTMLInputElement).value)}
                 />
                 <span class="text-xs text-neutral-400">{prevMadiScore === '' ? '—' : `${prevMadiScore}/100`}</span>
                 <button
                   type="button"
-                  class="mr-auto text-xs font-semibold text-emerald-700 border border-emerald-200 rounded-lg px-2.5 py-2"
+                  class="mr-auto text-xs font-semibold text-brand-teal border border-brand-teal/20 rounded-lg px-2.5 py-2"
                   onClick={() => setMistakeModal('madi')}
                 >
                   🧮 عدّاد الأخطاء
@@ -483,7 +483,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
 
       <button
         type="button"
-        class="w-full py-3.5 rounded-xl bg-emerald-700 text-white font-bold shadow-lg disabled:opacity-60"
+        class="w-full py-3.5 rounded-xl bg-brand-teal text-white font-bold shadow-lg disabled:opacity-60"
         disabled={saving}
         onClick={handleSave}
       >

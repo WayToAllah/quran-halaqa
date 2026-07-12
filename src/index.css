@@ -1,7 +1,17 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Segoe UI", Tahoma, Arial, sans-serif;
+  --font-sans: "Tajawal", "Segoe UI", Tahoma, Arial, sans-serif;
+  /* Brand palette — same teal/copper/cream language established in the
+     parent page (ParentPage.tsx) and the نجوم الحضور share card
+     (attendanceCard.ts). Single named colors rather than a full 50-900
+     scale: tints are built with Tailwind's opacity modifier (e.g.
+     bg-brand-teal/10) instead of hand-picked shade steps. */
+  --color-brand-teal: #1B4D5C;
+  --color-brand-teal-deep: #123842;
+  --color-brand-copper: #B8722E;
+  --color-brand-cream: #FAF6ED;
+  --color-brand-gold: #E8B84B;
 }
 
 html {

@@ -92,6 +92,6 @@ describe('StatsScreen — student table', () => {
     await userEvent.click(screen.getByRole('button', { name: 'الاسم' }));
     // No assertion error thrown means the click handled cleanly; deeper
     // order assertions are covered at the domain level (sortStudentStatsRows).
-    expect(screen.getByRole('button', { name: 'الاسم' })).toHaveClass('bg-emerald-700');
+    expect(screen.getByRole('button', { name: 'الاسم' })).toHaveClass('bg-brand-teal');
   });
 });

@@ -37,11 +37,11 @@ function AppShell() {
 
   return (
     <div class="min-h-screen bg-neutral-50 pb-20" dir="rtl">
-      <header class="bg-emerald-700 text-white px-4 py-4 flex items-center gap-3">
+      <header class="bg-brand-teal text-white px-4 py-4 flex items-center gap-3">
         <div class="text-2xl">📖</div>
         <div class="flex-1">
           <h1 class="font-bold text-sm">متابعة حفظ القرآن</h1>
-          <div class="text-xs text-emerald-100">{auth.user?.email}</div>
+          <div class="text-xs text-white/70">{auth.user?.email}</div>
         </div>
         <button
           class="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center"
@@ -67,7 +67,7 @@ function AppShell() {
             key={t.id}
             class={
               'flex-1 py-2.5 flex flex-col items-center gap-0.5 text-xs ' +
-              (tab === t.id ? 'text-emerald-700 font-bold' : 'text-neutral-400')
+              (tab === t.id ? 'text-brand-teal font-bold' : 'text-neutral-400')
             }
             onClick={() => setTab(t.id)}
           >

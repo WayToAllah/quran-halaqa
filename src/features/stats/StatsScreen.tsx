@@ -20,15 +20,15 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 const RANK_CLASS = ['text-amber-500', 'text-neutral-400', 'text-amber-700'];
 
 const SCORE_COLORS: Record<string, string> = {
-  'ممتاز': 'bg-emerald-600',
-  'جيد جداً': 'bg-emerald-500',
+  'ممتاز': 'bg-brand-teal',
+  'جيد جداً': 'bg-brand-teal/70',
   'جيد': 'bg-amber-500',
   'مقبول': 'bg-orange-500',
   'إعادة': 'bg-red-500',
 };
 
 function barColorClass(pct: number): string {
-  if (pct >= 80) return 'bg-emerald-600 text-emerald-600';
+  if (pct >= 80) return 'bg-brand-teal text-brand-teal';
   if (pct >= 50) return 'bg-amber-500 text-amber-500';
   return 'bg-red-500 text-red-500';
 }
@@ -159,7 +159,7 @@ export function StatsScreen() {
               return (
                 <div key={w.weekStart} class="flex-1 flex flex-col items-center gap-1">
                   <div class="text-[11px] text-neutral-500">{w.count}</div>
-                  <div class="w-full bg-emerald-600 rounded-t" style={{ height: `${h}%` }} />
+                  <div class="w-full bg-brand-teal rounded-t" style={{ height: `${h}%` }} />
                   <div class="text-[10px] text-neutral-400">{label}</div>
                 </div>
               );
@@ -226,7 +226,7 @@ export function StatsScreen() {
                     المركز {x.rank} · {x.uniqueDays} يوم حضور من {summary.totalHalaqaDays}
                   </div>
                 </div>
-                <div class="font-bold text-emerald-700">{x.attendPct}%</div>
+                <div class="font-bold text-brand-teal">{x.attendPct}%</div>
               </div>
             ))}
           </div>
@@ -259,7 +259,7 @@ export function StatsScreen() {
               class={
                 'flex-1 py-1.5 rounded-full text-xs font-semibold border ' +
                 (sortKey === tab.key
-                  ? 'bg-emerald-700 text-white border-emerald-700'
+                  ? 'bg-brand-teal text-white border-brand-teal'
                   : 'border-neutral-200 text-neutral-500')
               }
               onClick={() => setSortKey(tab.key)}
@@ -315,7 +315,7 @@ export function StatsScreen() {
                 type="button"
                 onClick={handleShareCard}
                 disabled={cardBusy}
-                class="flex-1 py-2.5 rounded-xl bg-emerald-700 text-white font-bold text-sm disabled:opacity-50"
+                class="flex-1 py-2.5 rounded-xl bg-brand-teal text-white font-bold text-sm disabled:opacity-50"
               >
                 {cardBusy ? '⏳ جارٍ التحضير…' : '📤 مشاركة / تحميل'}
               </button>

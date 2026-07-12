@@ -124,7 +124,7 @@ export function StudentsScreen() {
             const rank = topRanks[name];
             return (
               <div key={s.id} class="flex items-start gap-3 p-3 rounded-xl border border-neutral-100">
-                <div class="w-10 h-10 shrink-0 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-sm">
+                <div class="w-10 h-10 shrink-0 rounded-full bg-brand-teal/10 text-brand-teal-deep font-bold flex items-center justify-center text-sm">
                   {initialsOf(name)}
                 </div>
                 <div class="flex-1 min-w-0 cursor-pointer" onClick={() => openEditModal(s)}>
@@ -170,7 +170,7 @@ export function StudentsScreen() {
       </div>
 
       <button
-        class="fixed bottom-6 left-6 w-14 h-14 rounded-full bg-emerald-700 text-white text-2xl shadow-lg flex items-center justify-center"
+        class="fixed bottom-6 left-6 w-14 h-14 rounded-full bg-brand-teal text-white text-2xl shadow-lg flex items-center justify-center"
         aria-label="إضافة طالب"
         onClick={openAddModal}
       >

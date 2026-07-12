@@ -124,7 +124,7 @@ export function GroupAttendanceModal({ initialDate, students, onClose }: Props) 
 
           <div class="flex items-center justify-between">
             <span class="text-xs text-neutral-500">{checked.size} محدد</span>
-            <button type="button" class="text-xs font-bold text-emerald-700" onClick={toggleAll}>
+            <button type="button" class="text-xs font-bold text-brand-teal" onClick={toggleAll}>
               تحديد الكل / إلغاء
             </button>
           </div>
@@ -162,7 +162,7 @@ export function GroupAttendanceModal({ initialDate, students, onClose }: Props) 
             إلغاء
           </button>
           <button
-            class="flex-1 py-2.5 rounded-lg bg-emerald-700 text-white text-sm font-bold disabled:opacity-60"
+            class="flex-1 py-2.5 rounded-lg bg-brand-teal text-white text-sm font-bold disabled:opacity-60"
             disabled={saving || dayRecords === null}
             onClick={handleSave}
           >

@@ -197,7 +197,7 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
             إلغاء
           </button>
           <button
-            class="flex-1 py-2.5 rounded-lg bg-emerald-700 text-white text-sm font-bold disabled:opacity-60"
+            class="flex-1 py-2.5 rounded-lg bg-brand-teal text-white text-sm font-bold disabled:opacity-60"
             disabled={saving}
             onClick={handleSave}
           >

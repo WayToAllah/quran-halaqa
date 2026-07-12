@@ -88,7 +88,7 @@ export function SuraRow({ value, onChange, onRemove, label }: Props) {
                   <button
                     type="button"
                     key={s.name}
-                    class="w-full text-right px-3 py-2 text-sm hover:bg-emerald-50 flex items-center justify-between gap-2"
+                    class="w-full text-right px-3 py-2 text-sm hover:bg-brand-cream flex items-center justify-between gap-2"
                     onMouseDown={(e) => {
                       e.preventDefault();
                       if (blurTimer.current) clearTimeout(blurTimer.current);

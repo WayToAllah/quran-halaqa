@@ -128,7 +128,7 @@ export function MistakeCounterModal({ label, suraInfo, initialHistory, onSave, o
         <div class="px-5 py-4 border-t border-neutral-100">
           <button
             type="button"
-            class="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold active:scale-[0.99] transition-transform"
+            class="w-full py-3 rounded-xl bg-brand-teal text-white font-bold active:scale-[0.99] transition-transform"
             onClick={handleSave}
           >
             ✓ حفظ الدرجة

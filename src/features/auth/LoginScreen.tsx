@@ -54,7 +54,7 @@ export function LoginScreen({ auth }: Props) {
 
   return (
     <div
-      class="fixed inset-0 z-50 flex items-center justify-center p-6 bg-gradient-to-br from-emerald-800 to-emerald-600"
+      class="fixed inset-0 z-50 flex items-center justify-center p-6 bg-gradient-to-br from-brand-teal-deep to-brand-teal-deep"
       dir="rtl"
     >
       <div class="w-full max-w-sm bg-white rounded-2xl shadow-xl p-8 text-center space-y-4">
@@ -79,7 +79,7 @@ export function LoginScreen({ auth }: Props) {
                 type="email"
                 required
                 dir="ltr"
-                class="w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm text-left focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                class="w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm text-left focus:outline-none focus:ring-2 focus:ring-brand-teal"
                 value={email}
                 onInput={(e) => setEmail((e.target as HTMLInputElement).value)}
                 autocomplete="username"
@@ -91,7 +91,7 @@ export function LoginScreen({ auth }: Props) {
                 type="password"
                 required
                 dir="ltr"
-                class="w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm text-left focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                class="w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm text-left focus:outline-none focus:ring-2 focus:ring-brand-teal"
                 value={password}
                 onInput={(e) => setPassword((e.target as HTMLInputElement).value)}
                 autocomplete="current-password"
@@ -100,13 +100,13 @@ export function LoginScreen({ auth }: Props) {
 
             {error && <div class="text-xs text-red-600">{error}</div>}
             {resetSent && (
-              <div class="text-xs text-emerald-600">تم إرسال رابط إعادة التعيين إلى بريدك.</div>
+              <div class="text-xs text-brand-teal">تم إرسال رابط إعادة التعيين إلى بريدك.</div>
             )}
 
             <button
               type="submit"
               disabled={submitting}
-              class="w-full bg-emerald-700 text-white rounded-lg py-2.5 text-sm font-bold disabled:opacity-60"
+              class="w-full bg-brand-teal text-white rounded-lg py-2.5 text-sm font-bold disabled:opacity-60"
             >
               {submitting ? 'جاري الدخول…' : 'دخول'}
             </button>
