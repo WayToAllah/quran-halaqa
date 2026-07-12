@@ -90,18 +90,18 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
         onClick={(e) => e.stopPropagation()}
         dir="rtl"
       >
-        <div class="flex items-center justify-between px-5 py-4 border-b border-neutral-100 sticky top-0 bg-white">
-          <span class="font-bold text-neutral-900">{student ? 'تعديل بيانات الطالب' : 'إضافة طالب جديد'}</span>
-          <button class="text-neutral-400 text-lg" onClick={onClose}>
+        <div class="flex items-center justify-between px-5 py-4 border-b border-hairline sticky top-0 bg-white">
+          <span class="font-extrabold text-ink-dark">{student ? 'تعديل بيانات الطالب' : 'إضافة طالب جديد'}</span>
+          <button class="text-taupe text-lg" onClick={onClose}>
             ✕
           </button>
         </div>
 
         <div class="p-5 space-y-4">
           <div class="space-y-1">
-            <label class="text-xs font-semibold text-neutral-600">الاسم الكامل *</label>
+            <label class="text-xs font-semibold text-[#5B5646]">الاسم الكامل *</label>
             <input
-              class="w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm"
+              class="w-full border border-hairline rounded-xl px-3.5 py-2.5 text-sm text-ink-dark"
               placeholder="اسم الطالب"
               value={name}
               onInput={(e) => {
@@ -114,21 +114,21 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
 
           <div class="grid grid-cols-2 gap-3">
             <div class="space-y-1">
-              <label class="text-xs font-semibold text-neutral-600">السن</label>
+              <label class="text-xs font-semibold text-[#5B5646]">السن</label>
               <input
                 type="number"
                 min={4}
                 max={25}
-                class="w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm"
+                class="w-full border border-hairline rounded-xl px-3.5 py-2.5 text-sm text-ink-dark"
                 placeholder="مثلاً 10"
                 value={age}
                 onInput={(e) => setAge((e.target as HTMLInputElement).value)}
               />
             </div>
             <div class="space-y-1">
-              <label class="text-xs font-semibold text-neutral-600">السنة الدراسية</label>
+              <label class="text-xs font-semibold text-[#5B5646]">السنة الدراسية</label>
               <select
-                class="w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm bg-white"
+                class="w-full border border-hairline rounded-xl px-3.5 py-2.5 text-sm bg-white text-ink-dark"
                 value={grade}
                 onChange={(e) => setGrade((e.target as HTMLSelectElement).value)}
               >
@@ -143,22 +143,22 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
           </div>
 
           <div class="space-y-1">
-            <label for="modal-join-date" class="text-xs font-semibold text-neutral-600">
-              📅 تاريخ الانضمام <span class="text-neutral-400 font-normal">اختياري</span>
+            <label for="modal-join-date" class="text-xs font-semibold text-[#5B5646]">
+              📅 تاريخ الانضمام <span class="text-taupe font-normal">اختياري</span>
             </label>
             <input
               id="modal-join-date"
               type="date"
-              class="w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm"
+              class="w-full border border-hairline rounded-xl px-3.5 py-2.5 text-sm text-ink-dark"
               value={joinDate}
               onInput={(e) => setJoinDate((e.target as HTMLInputElement).value)}
             />
           </div>
 
           <div class="space-y-1">
-            <label class="text-xs font-semibold text-neutral-600">المدرسة</label>
+            <label class="text-xs font-semibold text-[#5B5646]">المدرسة</label>
             <input
-              class="w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm"
+              class="w-full border border-hairline rounded-xl px-3.5 py-2.5 text-sm text-ink-dark"
               placeholder="اسم المدرسة"
               value={school}
               onInput={(e) => setSchool((e.target as HTMLInputElement).value)}
@@ -166,11 +166,11 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
           </div>
 
           <div class="space-y-1">
-            <label class="text-xs font-semibold text-neutral-600">📱 رقم الواتساب</label>
+            <label class="text-xs font-semibold text-[#5B5646]">📱 رقم الواتساب</label>
             <input
               type="tel"
               dir="ltr"
-              class="w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm text-left"
+              class="w-full border border-hairline rounded-xl px-3.5 py-2.5 text-sm text-left text-ink-dark"
               placeholder="01XXXXXXXXX"
               value={phonePrimary}
               onInput={(e) => setPhonePrimary((e.target as HTMLInputElement).value)}
@@ -178,13 +178,13 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
           </div>
 
           <div class="space-y-1">
-            <label class="text-xs font-semibold text-neutral-600">
-              📱 الرقم الثانوي <span class="text-neutral-400 font-normal">اختياري</span>
+            <label class="text-xs font-semibold text-[#5B5646]">
+              📱 الرقم الثانوي <span class="text-taupe font-normal">اختياري</span>
             </label>
             <input
               type="tel"
               dir="ltr"
-              class="w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm text-left"
+              class="w-full border border-hairline rounded-xl px-3.5 py-2.5 text-sm text-left text-ink-dark"
               placeholder="01XXXXXXXXX"
               value={phoneSecondary}
               onInput={(e) => setPhoneSecondary((e.target as HTMLInputElement).value)}
@@ -192,12 +192,12 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
           </div>
         </div>
 
-        <div class="flex gap-3 px-5 py-4 border-t border-neutral-100 sticky bottom-0 bg-white">
-          <button class="flex-1 py-2.5 rounded-lg border border-neutral-300 text-sm font-semibold" onClick={onClose}>
+        <div class="flex gap-3 px-5 py-4 border-t border-hairline sticky bottom-0 bg-white">
+          <button class="flex-1 py-2.5 rounded-xl border border-hairline text-sm font-semibold text-[#5B5646]" onClick={onClose}>
             إلغاء
           </button>
           <button
-            class="flex-1 py-2.5 rounded-lg bg-brand-teal text-white text-sm font-bold disabled:opacity-60"
+            class="flex-1 py-2.5 rounded-xl bg-forest text-parchment text-sm font-bold disabled:opacity-60"
             disabled={saving}
             onClick={handleSave}
           >

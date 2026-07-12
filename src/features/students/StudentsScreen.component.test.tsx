@@ -74,7 +74,7 @@ describe('StudentsScreen — list rendering', () => {
 describe('StudentsScreen — search', () => {
   it('filters the list as the user types', async () => {
     renderScreen();
-    const input = screen.getByPlaceholderText('🔍 ابحث باسم الطالب...');
+    const input = screen.getByPlaceholderText('ابحث بالاسم…');
     await userEvent.type(input, 'محمد');
     expect(screen.queryByText('زيد احمد')).not.toBeInTheDocument();
     expect(screen.getByText('محمد علي')).toBeInTheDocument();
@@ -82,14 +82,14 @@ describe('StudentsScreen — search', () => {
 
   it('normalizes Arabic hamza forms when searching', async () => {
     renderScreen();
-    const input = screen.getByPlaceholderText('🔍 ابحث باسم الطالب...');
+    const input = screen.getByPlaceholderText('ابحث بالاسم…');
     await userEvent.type(input, 'احمد'); // no hamza, should still match "زيد احمد"
     expect(screen.getByText('زيد احمد')).toBeInTheDocument();
   });
 
   it('shows a no-results message for an unmatched query', async () => {
     renderScreen();
-    const input = screen.getByPlaceholderText('🔍 ابحث باسم الطالب...');
+    const input = screen.getByPlaceholderText('ابحث بالاسم…');
     await userEvent.type(input, 'اسم غير موجود');
     expect(screen.getByText(/لا يوجد نتائج/)).toBeInTheDocument();
   });
@@ -98,7 +98,7 @@ describe('StudentsScreen — search', () => {
 describe('StudentsScreen — add student', () => {
   it('opens the modal via the FAB and saves a new student', async () => {
     renderScreen();
-    await userEvent.click(screen.getByRole('button', { name: 'إضافة طالب' }));
+    await userEvent.click(screen.getByRole('button', { name: '+ إضافة طالب جديد' }));
     expect(screen.getByText('إضافة طالب جديد')).toBeInTheDocument();
 
     const nameInput = screen.getByPlaceholderText('اسم الطالب');
@@ -113,7 +113,7 @@ describe('StudentsScreen — add student', () => {
 
   it('saves an optional join date, and defaults to empty when left blank', async () => {
     renderScreen();
-    await userEvent.click(screen.getByRole('button', { name: 'إضافة طالب' }));
+    await userEvent.click(screen.getByRole('button', { name: '+ إضافة طالب جديد' }));
     await userEvent.type(screen.getByPlaceholderText('اسم الطالب'), 'طالب بتاريخ انضمام');
 
     const dateInput = screen.getByLabelText(/تاريخ الانضمام/) as HTMLInputElement;
@@ -133,7 +133,7 @@ describe('StudentsScreen — add student', () => {
 
   it('rejects an empty name without calling saveStudent', async () => {
     renderScreen();
-    await userEvent.click(screen.getByRole('button', { name: 'إضافة طالب' }));
+    await userEvent.click(screen.getByRole('button', { name: '+ إضافة طالب جديد' }));
     await userEvent.click(screen.getByRole('button', { name: 'حفظ' }));
     expect(screen.getByText('الاسم مطلوب')).toBeInTheDocument();
     expect(saveStudentMock).not.toHaveBeenCalled();
@@ -141,7 +141,7 @@ describe('StudentsScreen — add student', () => {
 
   it('rejects a duplicate name (excluding the student being edited)', async () => {
     renderScreen();
-    await userEvent.click(screen.getByRole('button', { name: 'إضافة طالب' }));
+    await userEvent.click(screen.getByRole('button', { name: '+ إضافة طالب جديد' }));
     await userEvent.type(screen.getByPlaceholderText('اسم الطالب'), 'زيد احمد');
     await userEvent.click(screen.getByRole('button', { name: 'حفظ' }));
     expect(screen.getByText('الاسم موجود بالفعل')).toBeInTheDocument();
@@ -152,7 +152,7 @@ describe('StudentsScreen — add student', () => {
 describe('StudentsScreen — edit student', () => {
   it('opens the modal pre-filled and preserves the existing parentToken on save', async () => {
     renderScreen();
-    const row = screen.getByText('زيد احمد').closest('.rounded-xl') as HTMLElement;
+    const row = screen.getByText('زيد احمد').closest('.rounded-2xl') as HTMLElement;
     await userEvent.click(within(row).getByRole('button', { name: 'تعديل' }));
 
     expect(screen.getByText('تعديل بيانات الطالب')).toBeInTheDocument();
@@ -169,7 +169,7 @@ describe('StudentsScreen — edit student', () => {
 describe('StudentsScreen — delete with undo', () => {
   it('hides the student immediately and shows an undo toast', async () => {
     renderScreen();
-    const row = screen.getByText('محمد علي').closest('.rounded-xl') as HTMLElement;
+    const row = screen.getByText('محمد علي').closest('.rounded-2xl') as HTMLElement;
     await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));
 
     expect(screen.queryByText('محمد علي')).not.toBeInTheDocument();
@@ -179,7 +179,7 @@ describe('StudentsScreen — delete with undo', () => {
 
   it('restores the student if "تراجع" is clicked before the timer fires', async () => {
     renderScreen();
-    const row = screen.getByText('محمد علي').closest('.rounded-xl') as HTMLElement;
+    const row = screen.getByText('محمد علي').closest('.rounded-2xl') as HTMLElement;
     await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));
     await userEvent.click(screen.getByText('تراجع'));
 
@@ -190,7 +190,7 @@ describe('StudentsScreen — delete with undo', () => {
   it('does not ask for confirmation twice, and respects a cancelled confirm()', async () => {
     vi.stubGlobal('confirm', vi.fn(() => false));
     renderScreen();
-    const row = screen.getByText('زيد احمد').closest('.rounded-xl') as HTMLElement;
+    const row = screen.getByText('زيد احمد').closest('.rounded-2xl') as HTMLElement;
     await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));
     expect(screen.getByText('زيد احمد')).toBeInTheDocument(); // still there — confirm() was declined
   });
@@ -199,7 +199,7 @@ describe('StudentsScreen — delete with undo', () => {
 describe('StudentsScreen — copy link', () => {
   it('copies the existing parentToken link to the clipboard', async () => {
     renderScreen();
-    const row = screen.getByText('زيد احمد').closest('.rounded-xl') as HTMLElement;
+    const row = screen.getByText('زيد احمد').closest('.rounded-2xl') as HTMLElement;
     await userEvent.click(within(row).getByRole('button', { name: 'نسخ رابط المتابعة' }));
 
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1));
@@ -210,7 +210,7 @@ describe('StudentsScreen — copy link', () => {
 
   it('mints and persists a new token for a student without one', async () => {
     renderScreen();
-    const row = screen.getByText('محمد علي').closest('.rounded-xl') as HTMLElement; // s_2 has no parentToken
+    const row = screen.getByText('محمد علي').closest('.rounded-2xl') as HTMLElement; // s_2 has no parentToken
     await userEvent.click(within(row).getByRole('button', { name: 'نسخ رابط المتابعة' }));
 
     await waitFor(() => expect(updateStudentMock).toHaveBeenCalledTimes(1));
