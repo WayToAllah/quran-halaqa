@@ -1,5 +1,6 @@
 import type { PublicStats } from '../../types';
 import { joinSuraNames } from '../../domain/suras';
+import { toArabicDigits, formatArabicNumber } from '../../domain/text';
 
 /**
  * Pure transforms for the parent (child) page. Kept DOM-free so the chart
@@ -9,22 +10,11 @@ import { joinSuraNames } from '../../domain/suras';
  * exactly gets drawn".
  */
 
-// ---- Arabic-Indic numeral formatting -------------------------------------
+// Re-exported for existing importers of these helpers from parentView.
+export { toArabicDigits, formatArabicNumber };
 
-const AR_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-
-/** Convert every ASCII digit in a string to its Arabic-Indic form. */
-export function toArabicDigits(input: string | number): string {
-  return String(input).replace(/[0-9]/g, (d) => AR_DIGITS[Number(d)]);
-}
-
-/** Group thousands with the Arabic thousands separator and Arabic digits. */
-export function formatArabicNumber(n: number): string {
-  const grouped = Math.round(n)
-    .toString()
-    .replace(/\B(?=(\d{3})+(?!\d))/g, '٬');
-  return toArabicDigits(grouped);
-}
+// ---- Arabic-Indic numeral formatting (shared via domain/text) ------------
+// toArabicDigits / formatArabicNumber are imported and re-exported above.
 
 // ---- Theme ---------------------------------------------------------------
 

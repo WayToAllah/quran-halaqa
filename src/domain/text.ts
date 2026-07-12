@@ -34,3 +34,18 @@ export function normAr(s: unknown): string {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+const AR_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+
+/** Convert every ASCII digit in a value to its Arabic-Indic form. */
+export function toArabicDigits(input: string | number): string {
+  return String(input).replace(/[0-9]/g, (d) => AR_DIGITS[Number(d)]);
+}
+
+/** Group thousands with the Arabic separator and render Arabic-Indic digits. */
+export function formatArabicNumber(n: number): string {
+  const grouped = Math.round(n)
+    .toString()
+    .replace(/\B(?=(\d{3})+(?!\d))/g, '٬');
+  return toArabicDigits(grouped);
+}

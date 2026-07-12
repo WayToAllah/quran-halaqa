@@ -13,6 +13,8 @@ import {
   type StatsSortKey,
 } from '../../domain/statsScreen';
 import { MOSQUE_ID, HALAQA_ID } from '../../config';
+import { buildAttendanceCardData, buildAttendanceCardSvg } from '../../domain/attendanceCard';
+import { svgToPngBlob, shareOrDownloadPng } from './shareCard';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 const RANK_CLASS = ['text-amber-500', 'text-neutral-400', 'text-amber-700'];
@@ -45,6 +47,8 @@ export function StatsScreen() {
   const [monthFilter, setMonthFilter] = useState('all');
   const [sortKey, setSortKey] = useState<StatsSortKey>('attend');
   const [search, setSearch] = useState('');
+  const [cardOpen, setCardOpen] = useState(false);
+  const [cardBusy, setCardBusy] = useState(false);
 
   const availableMonths = useMemo(() => {
     const months = new Set(records.map((r) => r.date?.slice(0, 7)).filter(Boolean) as string[]);
@@ -75,6 +79,24 @@ export function StatsScreen() {
   }, [studentRows, search, sortKey]);
 
   const maxWeekly = Math.max(1, ...weeklyBuckets.map((w) => w.count));
+  const cardData = useMemo(
+    () => buildAttendanceCardData(students, filteredRecords),
+    [students, filteredRecords],
+  );
+  const cardSvg = useMemo(() => buildAttendanceCardSvg(cardData), [cardData]);
+
+  async function handleShareCard() {
+    setCardBusy(true);
+    try {
+      const png = await svgToPngBlob(cardSvg, 1080, 1350);
+      await shareOrDownloadPng(png, 'نجوم-الحضور.png');
+    } catch (err) {
+      console.error('share card failed:', err);
+    } finally {
+      setCardBusy(false);
+    }
+  }
+
   const loaded = studentsLoaded && recordsLoaded;
 
   if (!loaded) {
@@ -211,6 +233,16 @@ export function StatsScreen() {
         )}
       </div>
 
+      <button
+        type="button"
+        onClick={() => setCardOpen(true)}
+        disabled={cardData.count === 0}
+        class="w-full rounded-2xl p-4 font-bold text-white shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+        style={{ background: 'linear-gradient(165deg, #1B4D5C, #123842)' }}
+      >
+        🌟 بطاقة نجوم الحضور — للمشاركة
+      </button>
+
       <div class="bg-white rounded-2xl border border-neutral-200 p-4">
         <div class="font-bold text-neutral-900 mb-3">تفصيل الطلاب</div>
         <input
@@ -263,6 +295,41 @@ export function StatsScreen() {
           </div>
         )}
       </div>
+
+      {cardOpen && (
+        <div
+          class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4"
+          onClick={() => setCardOpen(false)}
+        >
+          <div
+            class="w-full max-w-sm bg-white rounded-2xl p-4 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div class="font-bold text-neutral-900">بطاقة نجوم الحضور</div>
+            <div
+              class="rounded-xl overflow-hidden border border-neutral-200"
+              dangerouslySetInnerHTML={{ __html: cardSvg }}
+            />
+            <div class="flex gap-2">
+              <button
+                type="button"
+                onClick={handleShareCard}
+                disabled={cardBusy}
+                class="flex-1 py-2.5 rounded-xl bg-emerald-700 text-white font-bold text-sm disabled:opacity-50"
+              >
+                {cardBusy ? '⏳ جارٍ التحضير…' : '📤 مشاركة / تحميل'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCardOpen(false)}
+                class="py-2.5 px-4 rounded-xl bg-neutral-100 text-neutral-700 font-bold text-sm"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
