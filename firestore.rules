@@ -63,10 +63,22 @@ service cloud.firestore {
     match /publicStats/{token} {
       allow get: if true;
       allow list: if false;
-      // Transitional: admin app writes the projection. Moves to Cloud Function
-      // (write: if false) in Phase 5. Never writable by an unauthenticated
-      // parent — the child page only ever reads.
-      allow write: if isSignedIn();
+      // Transitional: the admin app writes the projection; moves to a Cloud
+      // Function (write: if false) in Phase 5.
+      //
+      // ⚠️ Deliberately NOT `isSignedIn()`: this Firebase project has the
+      // Anonymous auth provider enabled (production parent-form.html uses it),
+      // and email/password self-signup is reachable via the public Auth REST
+      // API — so "any signed-in user" effectively means "anyone". A parent
+      // knows their own token from the WhatsApp link and could overwrite
+      // their child's published stats. Writes therefore require actual
+      // mosque membership.
+      //
+      // The mosque id is hardcoded because publicStats/{token} carries no
+      // mosque context by design (see publicStats.repo.ts). Single tenant
+      // today (mirrors MOSQUE_ID in src/config.ts); Phase 5 removes client
+      // writes entirely, so this never needs to become multi-tenant.
+      allow write: if isMosqueMember('altayseer');
     }
   }
 }

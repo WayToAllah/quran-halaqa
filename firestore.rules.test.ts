@@ -115,7 +115,7 @@ describe('mosques/{id} and members/{uid} — no client writes ever', () => {
   });
 });
 
-describe('publicStats/{token} — public get, no list, signed-in write (transitional)', () => {
+describe('publicStats/{token} — public get, no list, member-only write (transitional)', () => {
   it('allows an unauthenticated read of a single known token', async () => {
     const db = testEnv.unauthenticatedContext().firestore();
     await assertSucceeds(getDoc(doc(db, 'publicStats', TOKEN)));
@@ -126,7 +126,23 @@ describe('publicStats/{token} — public get, no list, signed-in write (transiti
     await assertFails(setDoc(doc(dbAnon, 'publicStats', TOKEN), { name: 'مزوّر' }));
   });
 
-  it('allows a signed-in admin to write publicStats (transitional — moves to Cloud Function in Phase 5)', async () => {
+  it('denies an ANONYMOUS-provider signed-in user from writing publicStats', async () => {
+    // The real attack vector: Anonymous auth is enabled on this project (the
+    // production parent-form.html uses it), so anyone can signInAnonymously()
+    // and pass a bare `request.auth != null` check. Membership must be what
+    // gates the write, not mere sign-in.
+    const dbAnonAuth = testEnv
+      .authenticatedContext('anon_visitor_1', { firebase: { sign_in_provider: 'anonymous' } })
+      .firestore();
+    await assertFails(setDoc(doc(dbAnonAuth, 'publicStats', TOKEN), { name: 'مزوّر', attendPct: 0 }));
+  });
+
+  it('denies a signed-in NON-member (e.g. self-registered email account) from writing publicStats', async () => {
+    const dbOutsider = testEnv.authenticatedContext(OUTSIDER_UID).firestore();
+    await assertFails(setDoc(doc(dbOutsider, 'publicStats', TOKEN), { name: 'مزوّر' }));
+  });
+
+  it('allows a mosque MEMBER to write publicStats (transitional — moves to Cloud Function in Phase 5)', async () => {
     const dbAdmin = testEnv.authenticatedContext(ADMIN_UID).firestore();
     await assertSucceeds(setDoc(doc(dbAdmin, 'publicStats', TOKEN), { name: 'زيد احمد', attendPct: 80 }));
   });
