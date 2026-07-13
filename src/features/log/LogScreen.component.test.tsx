@@ -81,14 +81,14 @@ describe('LogScreen — rendering', () => {
   it('shows "حضور فقط" for an attendance-only entry, with no edit button', () => {
     renderScreen();
     expect(screen.getByText('✅ حضور فقط')).toBeInTheDocument();
-    const row = screen.getByText('محمد علي').closest('.rounded-xl') as HTMLElement;
+    const row = screen.getByText('محمد علي').closest('.rounded-2xl') as HTMLElement;
     expect(within(row).queryByRole('button', { name: 'تعديل' })).not.toBeInTheDocument();
   });
 
   it('hands the session up to onEditRecord when ✏️ is tapped', async () => {
     const onEditRecord = vi.fn();
     renderScreen({ onEditRecord });
-    const row = screen.getByText('زيد احمد').closest('.rounded-xl') as HTMLElement;
+    const row = screen.getByText('زيد احمد').closest('.rounded-2xl') as HTMLElement;
     await userEvent.click(within(row).getByRole('button', { name: 'تعديل' }));
     expect(onEditRecord).toHaveBeenCalledTimes(1);
     expect(onEditRecord.mock.calls[0][0].id).toBe('r1');
@@ -104,7 +104,7 @@ describe('LogScreen — rendering', () => {
 describe('LogScreen — search', () => {
   it('fetches and shows every matching student (server-side, not loaded-only)', async () => {
     renderScreen();
-    await userEvent.type(screen.getByPlaceholderText('🔍 ابحث باسم الطالب...'), 'احمد');
+    await userEvent.type(screen.getByPlaceholderText('ابحث باسم الطالب…'), 'احمد');
     // resolves after the debounce + fetch
     expect(await screen.findByText('زيد احمد')).toBeInTheDocument();
     expect(screen.queryByText('محمد علي')).not.toBeInTheDocument();
@@ -117,7 +117,7 @@ describe('LogScreen — search', () => {
 
   it('shows a no-results message when no student name matches', async () => {
     renderScreen();
-    await userEvent.type(screen.getByPlaceholderText('🔍 ابحث باسم الطالب...'), 'اسم غير موجود');
+    await userEvent.type(screen.getByPlaceholderText('ابحث باسم الطالب…'), 'اسم غير موجود');
     expect(await screen.findByText(/لا يوجد نتائج/)).toBeInTheDocument();
     // no student matched, so no Firestore fetch is issued
     expect(getAllRecordsForStudentMock).not.toHaveBeenCalled();
@@ -126,7 +126,7 @@ describe('LogScreen — search', () => {
   it('hides the load-more button while a search is active', async () => {
     renderScreen();
     expect(screen.getByRole('button', { name: 'تحميل المزيد' })).toBeInTheDocument();
-    await userEvent.type(screen.getByPlaceholderText('🔍 ابحث باسم الطالب...'), 'زيد');
+    await userEvent.type(screen.getByPlaceholderText('ابحث باسم الطالب…'), 'زيد');
     expect(screen.queryByRole('button', { name: 'تحميل المزيد' })).not.toBeInTheDocument();
   });
 });
@@ -134,7 +134,7 @@ describe('LogScreen — search', () => {
 describe('LogScreen — delete with undo', () => {
   it('hides the entry immediately and does not call deleteRecord until the undo window passes', async () => {
     renderScreen();
-    const row = screen.getByText('محمد علي').closest('.rounded-xl') as HTMLElement;
+    const row = screen.getByText('محمد علي').closest('.rounded-2xl') as HTMLElement;
     await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));
 
     expect(screen.queryByText('محمد علي')).not.toBeInTheDocument();
@@ -145,7 +145,7 @@ describe('LogScreen — delete with undo', () => {
   it('respects a cancelled confirm() and keeps the entry', async () => {
     vi.stubGlobal('confirm', vi.fn(() => false));
     renderScreen();
-    const row = screen.getByText('زيد احمد').closest('.rounded-xl') as HTMLElement;
+    const row = screen.getByText('زيد احمد').closest('.rounded-2xl') as HTMLElement;
     await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));
     expect(screen.getByText('زيد احمد')).toBeInTheDocument();
     expect(deleteRecordMock).not.toHaveBeenCalled();
@@ -160,7 +160,7 @@ describe('LogScreen — edit', () => {
         <LogScreen onEditRecord={onEditRecord} />
       </ToastProvider>,
     );
-    const row = screen.getByText('زيد احمد').closest('.rounded-xl') as HTMLElement;
+    const row = screen.getByText('زيد احمد').closest('.rounded-2xl') as HTMLElement;
     await userEvent.click(within(row).getByRole('button', { name: 'تعديل' }));
     expect(onEditRecord).toHaveBeenCalledTimes(1);
     expect(onEditRecord.mock.calls[0][0].id).toBe('r1');
