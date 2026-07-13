@@ -52,6 +52,11 @@ vi.mock('../../data/records.repo', () => ({
   deleteRecord: (...args: unknown[]) => deleteRecordMock(...args),
   getAllRecordsForStudent: (m: string, h: string, id: string) => getAllRecordsForStudentMock(m, h, id),
 }));
+// See RecordScreen.component.test.tsx: republish is fire-and-forget after a
+// delete and must be mocked so it never reaches unmocked repo exports.
+vi.mock('../../data/publishStats', () => ({
+  republishPublicStatsFor: vi.fn().mockResolvedValue(undefined),
+}));
 
 function renderScreen(props: { onEditRecord?: (r: SessionRecord) => void } = {}) {
   return render(

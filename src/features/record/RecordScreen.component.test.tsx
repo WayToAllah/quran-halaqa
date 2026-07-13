@@ -31,6 +31,14 @@ vi.mock('../../data/records.repo', () => ({
   saveRecord: (...args: unknown[]) => saveRecordMock(...args),
   getRecordsByDate: (...args: unknown[]) => getRecordsByDateMock(...args),
 }));
+// publishStats is fired-and-forgotten after every save — without this mock it
+// reaches records.repo's UNmocked getAllRecords/getAllStudents and throws an
+// async VitestMocker error after the test body finishes (an unhandled error
+// that fails the whole run on CI even though every test passes).
+const republishMock = vi.fn().mockResolvedValue(undefined);
+vi.mock('../../data/publishStats', () => ({
+  republishPublicStatsFor: (...args: unknown[]) => republishMock(...args),
+}));
 
 function renderScreen(props: { editRecord?: SessionRecord | null; onEditConsumed?: () => void } = {}) {
   return render(
