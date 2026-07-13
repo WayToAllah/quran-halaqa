@@ -29,14 +29,14 @@ beforeEach(() => {
 describe('StatsScreen — summary cards', () => {
   it('shows total sessions across all records by default', () => {
     render(<StatsScreen />);
-    expect(screen.getByText('3')).toBeInTheDocument(); // جلسة مسجلة
+    expect(screen.getByText('٣')).toBeInTheDocument(); // جلسة مسجلة
   });
 
   it('shows a genuine zero loh score counted in the average (scoreName(0)/hasScore regression)', () => {
     render(<StatsScreen />);
     // avgLoh = round((0 + 90 + 80) / 3) = 57 — the zero from r1 must be
     // INCLUDED in this average, not treated as "unscored" and skipped.
-    expect(screen.getByText('57%')).toBeInTheDocument();
+    expect(screen.getByText('٥٧٪')).toBeInTheDocument();
   });
 });
 
@@ -53,7 +53,7 @@ describe('StatsScreen — month filter', () => {
     const select = screen.getByDisplayValue('كل الفترة') as HTMLSelectElement;
     await userEvent.selectOptions(select, '2026-06');
     // Only r3 (محمد علي, 2026-06) remains -> 1 session, avgLoh = 80%
-    expect(screen.getByText('80%')).toBeInTheDocument();
+    expect(screen.getByText('٨٠٪')).toBeInTheDocument();
   });
 });
 
@@ -67,7 +67,7 @@ describe('StatsScreen — score distribution', () => {
 describe('StatsScreen — leaderboards', () => {
   it('shows زيد احمد at the top of the ayat leaderboard', () => {
     render(<StatsScreen />);
-    expect(screen.getByText(/20 آية مسمّعة/)).toBeInTheDocument();
+    expect(screen.getByText(/٢٠ آية مسمّعة/)).toBeInTheDocument();
   });
 });
 
@@ -81,10 +81,10 @@ describe('StatsScreen — student table', () => {
 
   it('filters the table by search text', async () => {
     render(<StatsScreen />);
-    await userEvent.type(screen.getByPlaceholderText('🔍 ابحث عن طالب...'), 'محمد');
+    await userEvent.type(screen.getByPlaceholderText('ابحث عن طالب…'), 'محمد');
     // The detail table row for زيد احمد should disappear, but leaderboard
     // mentions may remain — check specifically for the "X جلسة · Y آية" row text
-    expect(screen.getByText(/1 جلسة · 0 آية/)).toBeInTheDocument(); // محمد row
+    expect(screen.getByText(/١ جلسة · ٠ آية/)).toBeInTheDocument(); // محمد row
   });
 
   it('switches sort key when a sort tab is clicked', async () => {
@@ -92,6 +92,6 @@ describe('StatsScreen — student table', () => {
     await userEvent.click(screen.getByRole('button', { name: 'الاسم' }));
     // No assertion error thrown means the click handled cleanly; deeper
     // order assertions are covered at the domain level (sortStudentStatsRows).
-    expect(screen.getByRole('button', { name: 'الاسم' })).toHaveClass('bg-brand-teal');
+    expect(screen.getByRole('button', { name: 'الاسم' })).toHaveClass('bg-forest');
   });
 });
