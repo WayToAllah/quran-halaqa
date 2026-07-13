@@ -10,7 +10,7 @@ import { scoreToStars, scoreName } from '../../domain/scoring';
 import { extractAssignedSuras, validateAyahRange } from '../../domain/record';
 import { buildWhatsAppMessage, normalizeWhatsAppPhone } from '../../domain/whatsapp';
 import { SuraRow } from './SuraRow';
-import { GroupAttendanceModal } from './GroupAttendanceModal';
+import { useGroupAttendance } from '../../hooks/useGroupAttendance';
 import { MistakeCounterModal } from './MistakeCounterModal';
 import { WhatsAppModal } from './WhatsAppModal';
 import { summarizeMistakes, rebuildMistakeHistory, type MistakeKind } from '../../domain/mistakes';
@@ -93,7 +93,9 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
 
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
-  const [showGroupAttendance, setShowGroupAttendance] = useState(false);
+  const [mode, setMode] = useState<'individual' | 'group'>('individual');
+  const groupAttendance = useGroupAttendance(date, students);
+  const [groupSaving, setGroupSaving] = useState(false);
   const [whatsAppPreview, setWhatsAppPreview] = useState<{ message: string; phone: string } | null>(null);
   // Guards the edit-prefill effect so it fires once per distinct record id.
   const consumedEditIdRef = useRef<string | null>(null);
@@ -157,6 +159,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     if (!editRecord) return;
     if (consumedEditIdRef.current === editRecord.id) return;
     consumedEditIdRef.current = editRecord.id;
+    setMode('individual');
     const r = editRecord;
     setEditingId(r.id);
     setEditingRecordData(r);
@@ -327,15 +330,99 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
         </div>
       </div>
 
-      <button
-        type="button"
-        class="w-full py-3 rounded-xl border-[1.5px] border-dashed border-mustard bg-[#FFFCF3] text-[#8A6A15] text-sm font-bold"
-        onClick={() => setShowGroupAttendance(true)}
-      >
-        ✅ تسجيل حضور جماعي
-      </button>
+      <div class="flex bg-[#F1ECDD] rounded-xl p-1">
+        <button
+          type="button"
+          class="flex-1 py-2.5 rounded-[9px] text-[13px] font-bold transition-colors"
+          style={
+            mode === 'individual'
+              ? { background: '#FFFFFF', color: '#0F3D2E', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }
+              : { background: 'transparent', color: '#8A8372' }
+          }
+          onClick={() => setMode('individual')}
+        >
+          تسجيل فردي
+        </button>
+        <button
+          type="button"
+          class="flex-1 py-2.5 rounded-[9px] text-[13px] font-bold transition-colors"
+          style={
+            mode === 'group'
+              ? { background: '#FFFFFF', color: '#0F3D2E', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }
+              : { background: 'transparent', color: '#8A8372' }
+          }
+          onClick={() => setMode('group')}
+        >
+          حضور جماعي
+        </button>
+      </div>
 
-      <div class={cardCls + ' relative'}>
+      {mode === 'group' && (
+        <div class={cardCls}>
+          <div class="flex items-center justify-between mb-3.5">
+            <div class="text-[13px] font-bold text-ink-dark">
+              حضور اليوم — {groupAttendance.sorted.length} طالب
+            </div>
+            <button type="button" class="text-xs font-bold text-forest" onClick={groupAttendance.toggleAll}>
+              تحديد الكل / إلغاء
+            </button>
+          </div>
+          <div class="text-xs text-taupe mb-3">{groupAttendance.checked.size} محدد</div>
+
+          {groupAttendance.dayRecords === null ? (
+            <div class="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} class="h-10 rounded-lg bg-[#F1ECDD] animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <div class="divide-y divide-[#F5F1E5]">
+              {groupAttendance.sorted.map((s) => {
+                const already = !groupAttendance.eligible.some((e) => e.id === s.id);
+                const isChecked = groupAttendance.checked.has(s.id);
+                return (
+                  <label
+                    key={s.id}
+                    class={'flex items-center gap-3 py-2.5 ' + (already ? 'opacity-50' : '')}
+                  >
+                    <div class="w-[34px] h-[34px] rounded-full bg-[#F1ECDD] text-forest font-bold flex items-center justify-center text-xs shrink-0">
+                      {getStudentName(s).trim().split(' ').slice(0, 2).map((w) => w[0]).join('')}
+                    </div>
+                    <span class="flex-1 text-[13.5px] font-semibold text-ink-dark">{getStudentName(s)}</span>
+                    {already ? (
+                      <span class="text-[11px] text-taupe shrink-0">مسجّل بالفعل</span>
+                    ) : (
+                      <button
+                        type="button"
+                        role="checkbox"
+                        aria-checked={isChecked}
+                        aria-label={getStudentName(s)}
+                        class="w-[26px] h-[26px] rounded-lg border-[1.5px] flex items-center justify-center shrink-0"
+                        style={
+                          isChecked
+                            ? { background: '#0F3D2E', borderColor: '#0F3D2E' }
+                            : { background: '#FFFFFF', borderColor: '#D8D2C0' }
+                        }
+                        onClick={() => groupAttendance.toggle(s.id, !isChecked)}
+                      >
+                        {isChecked && (
+                          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="white" stroke-width="3">
+                            <path d="M5 12l5 5 9-10" />
+                          </svg>
+                        )}
+                      </button>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {mode === 'individual' && (
+        <>
+        <div class={cardCls + ' relative'}>
         <label class="text-xs font-semibold text-[#5B5646] block mb-2">الطالب</label>
         <div class="relative">
           <input
@@ -558,15 +645,33 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
           onInput={(e) => setNote((e.target as HTMLTextAreaElement).value)}
         />
       </div>
+        </>
+      )}
 
       <button
         type="button"
         class="w-full py-4 rounded-2xl bg-forest text-parchment font-extrabold text-[15px] shadow-[0_8px_20px_rgba(15,61,46,0.28)] disabled:opacity-60 flex items-center justify-center gap-2"
-        disabled={saving}
-        onClick={handleSave}
+        disabled={mode === 'individual' ? saving : groupSaving}
+        onClick={async () => {
+          if (mode === 'group') {
+            setGroupSaving(true);
+            await groupAttendance.handleSave(showToast);
+            setGroupSaving(false);
+          } else {
+            handleSave();
+          }
+        }}
       >
-        <span>{saving ? '⏳' : '💾'}</span>
-        {saving ? 'جاري الحفظ…' : editingId ? 'تحديث الجلسة' : 'حفظ الجلسة'}
+        <span>{mode === 'group' ? (groupSaving ? '⏳' : '✅') : saving ? '⏳' : '💾'}</span>
+        {mode === 'group'
+          ? groupSaving
+            ? 'جاري الحفظ…'
+            : 'حفظ الحضور'
+          : saving
+            ? 'جاري الحفظ…'
+            : editingId
+              ? 'تحديث الجلسة'
+              : 'حفظ الجلسة'}
       </button>
 
       {editingId && (
@@ -577,14 +682,6 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
         >
           إلغاء التعديل
         </button>
-      )}
-
-      {showGroupAttendance && (
-        <GroupAttendanceModal
-          initialDate={date}
-          students={students}
-          onClose={() => setShowGroupAttendance(false)}
-        />
       )}
 
       {mistakeModal && (
