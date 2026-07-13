@@ -2,20 +2,14 @@
 
 @theme {
   --font-sans: "Tajawal", "Segoe UI", Tahoma, Arial, sans-serif;
-  /* Brand palette — same teal/copper/cream language established in the
-     parent page (ParentPage.tsx) and the نجوم الحضور share card
-     (attendanceCard.ts). Single named colors rather than a full 50-900
-     scale: tints are built with Tailwind's opacity modifier (e.g.
-     bg-brand-teal/10) instead of hand-picked shade steps. */
-  --color-brand-teal: #1B4D5C;
-  --color-brand-teal-deep: #123842;
-  --color-brand-copper: #B8722E;
-  --color-brand-cream: #FAF6ED;
-  --color-brand-gold: #E8B84B;
-
-  /* New design pass (screen-by-screen rollout) — distinct token names so
-     screens not yet redesigned keep using brand-teal/copper/cream untouched.
-     Once every screen is migrated, these can replace brand-* directly. */
+  /* App-wide brand palette (forest/mustard/parchment) — every admin screen
+     (Record, Students, Log, Stats, Login) plus the shared header/nav now
+     uses these. Single named colors rather than a full 50-900 scale: tints
+     are built with Tailwind's opacity modifier (e.g. bg-forest/10) instead
+     of hand-picked shade steps. The parent page (ParentPage.tsx) and the
+     نجوم الحضور share card (attendanceCard.ts) use their own literal hex
+     values instead of these tokens, since both render outside the regular
+     Tailwind-in-the-DOM pipeline (raw SVG / SVG→canvas→PNG). */
   --color-forest: #0F3D2E;
   --color-forest-deep: #0A2E22;
   --color-mustard: #C9A227;
