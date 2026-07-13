@@ -1,7 +1,6 @@
 import type { SessionRecord, Student } from '../types';
 import { buildStudentPublicStats } from '../domain/stats';
 import { getAttendanceRanking, ATTENDANCE_BADGE_THRESHOLD, sortedHalaqaDatesDesc } from '../domain/attendance';
-import { getStudentName } from '../domain/students';
 import { setPublicStats } from './publicStats.repo';
 import { getAllRecords } from './records.repo';
 import { getAllStudents } from './students.repo';
@@ -15,12 +14,14 @@ import { MOSQUE_ID, HALAQA_ID } from '../config';
  */
 export function computeSharedStatsInputs(students: Student[], records: SessionRecord[]) {
   const { totalHalaqaDays, list } = getAttendanceRanking(students, records, ATTENDANCE_BADGE_THRESHOLD);
-  const rankByName: Record<string, number> = {};
+  // Keyed by stable student id, NOT display name — two students with the same
+  // name must never share/steal a rank (same principle as studentMatch()).
+  const rankById: Record<string, number> = {};
   list.forEach((x) => {
-    rankByName[x.name] = x.rank;
+    rankById[x.id] = x.rank;
   });
   const halaqaDatesDesc = sortedHalaqaDatesDesc(records);
-  return { totalHalaqaDays, rankByName, halaqaDatesDesc };
+  return { totalHalaqaDays, rankById, halaqaDatesDesc };
 }
 
 /**
@@ -39,8 +40,8 @@ export async function publishStudentPublicStats(
 ): Promise<void> {
   if (!student.parentToken) return;
   try {
-    const { totalHalaqaDays, rankByName, halaqaDatesDesc } = computeSharedStatsInputs(allStudents, allRecords);
-    const rank = rankByName[getStudentName(student)] ?? null;
+    const { totalHalaqaDays, rankById, halaqaDatesDesc } = computeSharedStatsInputs(allStudents, allRecords);
+    const rank = rankById[student.id] ?? null;
     const stats = buildStudentPublicStats(student, allRecords, totalHalaqaDays, rank, halaqaDatesDesc);
     await setPublicStats(student.parentToken, stats);
   } catch (err) {
@@ -69,7 +70,7 @@ export async function republishPublicStatsFor(studentIds: string[]): Promise<voi
         const student = allStudents.find((s) => s.id === id);
         if (!student?.parentToken) return;
         try {
-          const rank = inputs.rankByName[getStudentName(student)] ?? null;
+          const rank = inputs.rankById[student.id] ?? null;
           const stats = buildStudentPublicStats(student, allRecords, inputs.totalHalaqaDays, rank, inputs.halaqaDatesDesc);
           await setPublicStats(student.parentToken, stats);
         } catch (err) {

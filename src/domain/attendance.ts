@@ -39,6 +39,9 @@ export function computeAttendanceStreak(studentDatesSet: Set<string>, halaqaDate
 }
 
 export interface AttendanceRankEntry {
+  /** Stable student id — the correct key for any rank lookup (names can
+   * collide or change; see studentMatch() in students.ts for the principle). */
+  id: string;
   name: string;
   uniqueDays: number;
   attendPct: number;
@@ -73,9 +76,9 @@ export function getAttendanceRanking(
       if (!recs.length) return null;
       const uniqueDays = new Set(recs.map((r) => r.date)).size;
       const attendPct = totalHalaqaDays > 0 ? Math.min(100, Math.round((uniqueDays / totalHalaqaDays) * 100)) : 0;
-      return { name, uniqueDays, attendPct };
+      return { id: s.id, name, uniqueDays, attendPct };
     })
-    .filter((x): x is { name: string; uniqueDays: number; attendPct: number } => x !== null);
+    .filter((x): x is { id: string; name: string; uniqueDays: number; attendPct: number } => x !== null);
 
   // ترتيب تنازلي؛ الأيام الفريدة والاسم معيار ثانوي للترتيب البصري فقط (مش للمركز)
   per.sort((a, b) => b.attendPct - a.attendPct || b.uniqueDays - a.uniqueDays || a.name.localeCompare(b.name, 'ar'));

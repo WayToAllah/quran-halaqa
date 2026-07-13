@@ -36,7 +36,7 @@ export function StudentsScreen() {
   const topRanks = useMemo(() => {
     const map: Record<string, number> = {};
     getAttendanceRanking(students, records, ATTENDANCE_BADGE_THRESHOLD).list.forEach((x) => {
-      map[x.name] = x.rank;
+      map[x.id] = x.rank;
     });
     return map;
   }, [students, records]);
@@ -140,7 +140,7 @@ export function StudentsScreen() {
           const name = getStudentName(s);
           const metaParts = [s.age ? s.age + ' سنة' : '', s.grade || '', s.school || ''].filter(Boolean);
           const count = recordsForStudent(s, records).length;
-          const rank = topRanks[name];
+          const rank = topRanks[s.id];
           return (
             <div key={s.id} class="bg-white border border-hairline rounded-2xl p-3.5 flex items-start gap-3">
               <div
