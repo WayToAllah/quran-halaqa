@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/preact';
+import { render, screen, waitFor } from '@testing-library/preact';
 import { ParentPage } from './ParentPage';
 import { MOCK_PUBLIC_STATS } from './mockPublicStats';
 
@@ -36,14 +36,16 @@ describe('ParentPage', () => {
     await waitFor(() => expect(screen.getByText(/تعذّر تحميل التقرير/)).toBeInTheDocument());
   });
 
-  it('opens and closes the share sheet, and never exposes a write action', () => {
+  it('exposes no share action and no write action (fully read-only)', () => {
     render(<ParentPage previewStats={MOCK_PUBLIC_STATS} />);
-    fireEvent.click(screen.getAllByText('مشاركة')[0]);
-    expect(screen.getByText('مشاركة تقرير الجلسة')).toBeInTheDocument();
-    // read-only: only WhatsApp + copy-link, no edit/save/delete controls
-    expect(screen.getByText('واتساب')).toBeInTheDocument();
-    expect(screen.getByText('نسخ الرابط')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('إغلاق'));
+    // Share was removed entirely — no button, no sheet, no WhatsApp/copy.
+    expect(screen.queryByText('مشاركة')).not.toBeInTheDocument();
     expect(screen.queryByText('مشاركة تقرير الجلسة')).not.toBeInTheDocument();
+    expect(screen.queryByText('واتساب')).not.toBeInTheDocument();
+    expect(screen.queryByText('نسخ الرابط')).not.toBeInTheDocument();
+    // Still no edit/save/delete controls — the page only ever reads.
+    for (const label of ['حفظ', 'تعديل', 'حذف', 'إرسال']) {
+      expect(screen.queryByText(label)).not.toBeInTheDocument();
+    }
   });
 });

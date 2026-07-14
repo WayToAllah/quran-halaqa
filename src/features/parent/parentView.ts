@@ -258,24 +258,3 @@ export function rankBadgeText(rank: number | null): string | null {
   if (rank == null) return null;
   return '🥇 المركز ' + toArabicDigits(rank) + ' في الحضور';
 }
-
-// ---- Sharing (read-only: builds text the parent copies/sends) -------------
-
-/** Build a short WhatsApp/clipboard summary for one session. The parent page
- * never writes anything — this only produces text the parent chooses to send.
- * The page URL, if given, is appended so the recipient can open the report. */
-export function buildSessionShareText(
-  childName: string,
-  session: SessionView,
-  url?: string,
-): string {
-  const lines = [
-    'تقرير جلسة — ' + childName,
-    session.date,
-    'اللوح: ' + session.lohLabel + (session.newLoh ? ' — ' + session.newLoh : ''),
-    'الماضي: ' + session.madiLabel + (session.newMadi ? ' — ' + session.newMadi : ''),
-  ];
-  if (session.note) lines.push('ملاحظة: ' + session.note);
-  if (url) lines.push(url);
-  return lines.join('\n');
-}

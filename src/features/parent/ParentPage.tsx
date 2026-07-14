@@ -8,13 +8,11 @@ import {
   buildStats,
   buildCurrentTask,
   buildSessions,
-  buildSessionShareText,
   firstInitial,
   rankBadgeText,
   type ParentTheme,
   type ColorRole,
   type TrendTone,
-  type SessionView,
 } from './parentView';
 
 type LoadState =
@@ -82,8 +80,6 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
   const [state, setState] = useState<LoadState>(
     previewStats ? { status: 'ready', stats: previewStats } : { status: 'loading' },
   );
-  const [share, setShare] = useState<SessionView | null>(null);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (previewStats) return;
@@ -156,30 +152,6 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
   const madiLabelY = chart.madiLast ? chart.madiLast.y + (close ? 12 : 18) : 0;
   const pctLeft = (x: number) => (x / 320) * 100 + '%';
   const pctTop = (y: number) => y + '%';
-
-  function openShareFor(s: SessionView) {
-    setCopied(false);
-    setShare(s);
-  }
-  function shareWhatsApp() {
-    if (!share) return;
-    const url = typeof location !== 'undefined' ? location.href : undefined;
-    const text = buildSessionShareText(stats.name, share, url);
-    if (typeof window !== 'undefined') {
-      window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
-    }
-    setShare(null);
-  }
-  async function copyLink() {
-    try {
-      if (typeof navigator !== 'undefined' && navigator.clipboard) {
-        await navigator.clipboard.writeText(location.href);
-        setCopied(true);
-      }
-    } catch {
-      /* clipboard unavailable — leave the sheet open, no false confirmation */
-    }
-  }
 
   const cardStyle =
     'background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:19px;margin-bottom:13px;box-shadow:var(--shadow-sm)';
@@ -389,14 +361,8 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
                 style="padding:16px 20px 16px 4px;border-right:2.5px solid var(--border-strong);margin-top:10px;position:relative"
               >
                 <div style="position:absolute;width:10px;height:10px;right:-6px;top:19px;border-radius:50%;background:var(--ink);border:2px solid var(--surface)"></div>
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
+                <div style="margin-bottom:9px">
                   <div style="font-size:12.5px;color:var(--ink);font-weight:700">{s.date}</div>
-                  <button
-                    onClick={() => openShareFor(s)}
-                    style="display:flex;align-items:center;gap:5px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-muted);font-size:11px;font-weight:600;padding:5px 11px;border-radius:14px;cursor:pointer;font-family:inherit"
-                  >
-                    <span style="font-size:12px">↗</span> مشاركة
-                  </button>
                 </div>
 
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
@@ -447,53 +413,6 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
           آخر تحديث: {formatUpdatedAt(stats.updatedAt)}
         </div>
       </div>
-
-      {/* Share sheet — WhatsApp + copy link only (read-only, no writes) */}
-      {share && (
-        <div
-          onClick={() => setShare(null)}
-          style="position:fixed;inset:0;background:oklch(10% 0.01 250 / 0.45);display:flex;align-items:flex-end;justify-content:center;z-index:50"
-        >
-          <div
-            onClick={(e: Event) => e.stopPropagation()}
-            style="width:100%;max-width:440px;background:var(--surface);border-radius:22px 22px 0 0;padding:22px 20px 30px"
-          >
-            <div style="width:36px;height:4px;border-radius:2px;background:var(--border-strong);margin:0 auto 18px"></div>
-            <div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:4px">
-              مشاركة تقرير الجلسة
-            </div>
-            <div style="font-size:12px;color:var(--text-muted);margin-bottom:18px">
-              {share.date} — {stats.name}
-            </div>
-            <div style="display:flex;gap:14px">
-              <button
-                onClick={shareWhatsApp}
-                style="flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;background:none;border:none;cursor:pointer;font-family:inherit"
-              >
-                <div style="width:52px;height:52px;border-radius:16px;background:oklch(58% 0.15 150 / 0.16);display:flex;align-items:center;justify-content:center;font-size:22px">
-                  💬
-                </div>
-                <span style="font-size:11px;color:var(--text-muted)">واتساب</span>
-              </button>
-              <button
-                onClick={copyLink}
-                style="flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;background:none;border:none;cursor:pointer;font-family:inherit"
-              >
-                <div style="width:52px;height:52px;border-radius:16px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:22px">
-                  🔗
-                </div>
-                <span style="font-size:11px;color:var(--text-muted)">{copied ? 'تم النسخ' : 'نسخ الرابط'}</span>
-              </button>
-            </div>
-            <button
-              onClick={() => setShare(null)}
-              style="width:100%;margin-top:20px;padding:13px;border:none;border-radius:14px;background:var(--surface-2);color:var(--text);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer"
-            >
-              إغلاق
-            </button>
-          </div>
-        </div>
-      )}
     </>,
   );
 }

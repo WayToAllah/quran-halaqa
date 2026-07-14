@@ -9,7 +9,6 @@ import {
   buildStats,
   buildCurrentTask,
   buildSessions,
-  buildSessionShareText,
   firstInitial,
   rankBadgeText,
   CHART_WINDOW,
@@ -223,27 +222,5 @@ describe('header helpers', () => {
   it('rankBadgeText hides when rank is null', () => {
     expect(rankBadgeText(2)).toContain('المركز ٢');
     expect(rankBadgeText(null)).toBeNull();
-  });
-});
-
-describe('buildSessionShareText', () => {
-  const session = buildSessions(baseStats())[0];
-
-  it('includes child name, scores, and assignments', () => {
-    const text = buildSessionShareText('زيد أحمد', session);
-    expect(text).toContain('زيد أحمد');
-    expect(text).toContain('اللوح: ٩٢');
-    expect(text).toContain('آل عمران');
-    expect(text).toContain('ملاحظة: أداء ممتاز');
-  });
-
-  it('appends the url when provided', () => {
-    const text = buildSessionShareText('زيد أحمد', session, 'https://x/v2/child.html?t=abc');
-    expect(text.endsWith('https://x/v2/child.html?t=abc')).toBe(true);
-  });
-
-  it('omits the note line when there is no note', () => {
-    const noNote = { ...session, note: '' };
-    expect(buildSessionShareText('زيد', noNote)).not.toContain('ملاحظة');
   });
 });
