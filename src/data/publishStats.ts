@@ -4,6 +4,7 @@ import { getAttendanceRanking, ATTENDANCE_BADGE_THRESHOLD, sortedHalaqaDatesDesc
 import { setPublicStats } from './publicStats.repo';
 import { getAllRecords } from './records.repo';
 import { getAllStudents } from './students.repo';
+import { getCachedHalaqaSnapshot } from './halaqaCache';
 import { MOSQUE_ID, HALAQA_ID } from '../config';
 
 /**
@@ -50,20 +51,32 @@ export async function publishStudentPublicStats(
 }
 
 /**
- * Fetch the whole halaqa once and republish publicStats for the given student
- * ids. Call this after a save/delete/bulk-attendance write so the parent page
- * reflects the change. Fetching all records+students each time keeps the rank
- * and halaqa-day counts exact (matching the live app); saves are infrequent
- * enough that the extra reads are acceptable. Fire-and-forget: never awaited by
- * the UI in a way that blocks the user, and failures only warn.
+ * Republish publicStats for the given student ids after a save/delete/bulk
+ * write, so the parent page reflects the change.
+ *
+ * Read source, in order of preference:
+ *   1. The shared halaqaCache, when warm (the app UI is mounted, so its live
+ *      onSnapshot already holds the full students+records set — including the
+ *      write that just triggered this call, thanks to Firestore latency
+ *      compensation making a local mutation visible to onSnapshot before the
+ *      setDoc/deleteDoc promise even resolves). This costs ZERO extra reads,
+ *      which is the whole point: an individual save no longer re-reads the
+ *      entire ~3000-doc halaqa.
+ *   2. A one-shot getAllStudents+getAllRecords fallback, only when the cache is
+ *      cold (e.g. a headless/script context with no mounted UI) — preserving the
+ *      exact same behaviour as before this optimisation.
+ *
+ * Fire-and-forget: never awaited by the UI in a way that blocks the user, and
+ * failures only warn (the projection self-heals on the next successful save).
  */
 export async function republishPublicStatsFor(studentIds: string[]): Promise<void> {
   if (!studentIds.length) return;
   try {
-    const [allStudents, allRecords] = await Promise.all([
-      getAllStudents(MOSQUE_ID, HALAQA_ID),
-      getAllRecords(MOSQUE_ID, HALAQA_ID),
-    ]);
+    const cached = getCachedHalaqaSnapshot(MOSQUE_ID, HALAQA_ID);
+    const { students: allStudents, records: allRecords } = cached ?? {
+      students: await getAllStudents(MOSQUE_ID, HALAQA_ID),
+      records: await getAllRecords(MOSQUE_ID, HALAQA_ID),
+    };
     const inputs = computeSharedStatsInputs(allStudents, allRecords);
     await Promise.all(
       studentIds.map(async (id) => {

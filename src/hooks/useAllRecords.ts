@@ -1,14 +1,19 @@
 import { useEffect, useState } from 'preact/hooks';
-import { subscribeAllRecords } from '../data/records.repo';
+import { subscribeAllRecordsCached } from '../data/halaqaCache';
 import type { SessionRecord } from '../types';
 
+/**
+ * Live full records set. Backed by the shared halaqaCache: screens share ONE
+ * onSnapshot, and the same warm snapshot serves republishPublicStatsFor so a
+ * save/delete recomputes the projection without a fresh full re-read.
+ */
 export function useAllRecords(mosqueId: string, halaqaId: string) {
   const [records, setRecords] = useState<SessionRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     setLoaded(false);
-    return subscribeAllRecords(
+    return subscribeAllRecordsCached(
       mosqueId,
       halaqaId,
       (list) => {
