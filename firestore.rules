@@ -12,11 +12,13 @@ rules_version = '2';
 // child.html reads a single doc by a high-entropy token, with no sign-in at
 // all. `get` is allowed, `list` is denied (tokens can never be enumerated).
 //
-// WRITE is currently allowed to any signed-in user (the admin app recomputes
-// and publishes the projection on every save/delete — same trust model as the
-// live RTDB app today). This is a TRANSITIONAL grant: Phase 5 moves the write
-// into a Cloud Function and flips this back to `write: if false` so no client
-// can write it at all. Tracked in PROJECT_CONTEXT.md.
+// WRITE to publicStats requires actual mosque membership — NOT merely being
+// signed in. This project has Anonymous auth enabled and email/password
+// self-signup reachable via the public Auth REST API, so `request.auth != null`
+// would effectively mean "anyone", and a parent knows their own child's token
+// from the WhatsApp link. This is still a TRANSITIONAL grant: Phase 5 moves the
+// write into a Cloud Function and flips it to `write: if false` so no client can
+// write it at all. Tracked in PROJECT_CONTEXT.md.
 //
 // Verify with the Rules Playground in Firebase Console, or (preferred, and
 // what the CI workflow in .github/workflows/ci.yml runs automatically)
