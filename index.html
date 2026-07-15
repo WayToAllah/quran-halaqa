@@ -1418,6 +1418,12 @@ let lohRowCount = 0;
 const suraMap = {};
 SURAS.forEach(([n,c,ps,pe]) => suraMap[n]={count:c, pageStart:ps, pageEnd:pe});
 
+// ترتيب حفظ اللوح: الفاتحة أولاً، ثم من الناس (١١٤) رجوعاً حتى البقرة (٢).
+// يُستخدم في التعبئة التلقائية للمهمة الجديدة لمعرفة "السورة التالية" في اللوح.
+const LOH_ORDER = [SURAS[0][0]].concat(SURAS.slice(1).map(s => s[0]).reverse());
+const lohOrderIndex = {};
+LOH_ORDER.forEach((n, i) => lohOrderIndex[n] = i);
+
 
 
 // السور مرتبة عكسياً (الناس أولاً)
@@ -1748,6 +1754,86 @@ function onStudentSelectManualChange() {
     }
   }
   onStudentChange();
+  autofillNewTask();
+}
+
+/* ---- Auto-fill of the NEW assignment (المهمة الجديدة) ---- */
+// Suggests where to continue from, based on the student's most recent session.
+// Fills the sura + "من آية" only; "إلى آية" is left blank for the teacher.
+// Runs ONLY on a manual student pick (not on sync re-renders or edit-loads),
+// and only when there's a previous session to continue from. Everything it
+// fills is an editable suggestion.
+
+function suraIdx(name) { return SURAS.findIndex(s => s[0] === name); }
+
+// The sura an item ends on, as entered: range → toSura; otherwise → sura.
+function itemEndSura(it) { return (it && it.range && it.toSura) ? it.toSura : (it ? it.sura : null); }
+
+// Partial = an ordinary (non-range) item whose "إلى آية" stops before the
+// sura's last ayah, so the student still has more of that same sura to do.
+function itemIsPartial(it) {
+  if (!it || it.range || !it.sura) return false;
+  const c = suraMap[it.sura] ? suraMap[it.sura].count : null;
+  const t = parseInt(it.to);
+  return !!(it.to && c && t < c);
+}
+
+// Next loh assignment, following the fixed memorization order (الفاتحة → ١١٤ → ٢).
+function computeNextLoh(items) {
+  const valid = (items || []).filter(x => x && x.sura && (suraMap[x.sura] || x.range));
+  if (!valid.length) return null;
+  // frontier = the item furthest along the loh memorization order
+  let frontier = valid[0];
+  valid.forEach(it => {
+    const a = lohOrderIndex[itemEndSura(it)], b = lohOrderIndex[itemEndSura(frontier)];
+    if (a != null && (b == null || a > b)) frontier = it;
+  });
+  if (itemIsPartial(frontier)) return { sura: frontier.sura, from: String(parseInt(frontier.to) + 1), to: '' };
+  const oi = lohOrderIndex[itemEndSura(frontier)];
+  const next = (oi != null && oi + 1 < LOH_ORDER.length) ? LOH_ORDER[oi + 1] : null;
+  return next ? { sura: next, from: '1', to: '' } : null;
+}
+
+// Next madi assignment. A range item sets the direction (inferred from it);
+// otherwise the default is normal ascending mushaf order.
+function computeNextMadi(items) {
+  const valid = (items || []).filter(x => x && x.sura && (suraMap[x.sura] || x.range));
+  if (!valid.length) return null;
+  const rangeItem = [...valid].reverse().find(x => x.range && x.toSura);
+  if (rangeItem) {
+    const si = suraIdx(rangeItem.sura), ei = suraIdx(rangeItem.toSura);
+    const dir = ei >= si ? 1 : -1;          // اتجاه النطاق كما أُدخل
+    const ni = ei + dir;
+    const next = (ni >= 0 && ni < SURAS.length) ? SURAS[ni][0] : null;
+    return next ? { sura: next, from: '1', to: '' } : null;
+  }
+  // default: ascending mushaf order
+  let frontier = valid[0];
+  valid.forEach(it => { if (suraIdx(it.sura) > suraIdx(frontier.sura)) frontier = it; });
+  if (itemIsPartial(frontier)) return { sura: frontier.sura, from: String(parseInt(frontier.to) + 1), to: '' };
+  const idx = suraIdx(frontier.sura);
+  const next = (idx + 1 < SURAS.length) ? SURAS[idx + 1][0] : null;
+  return next ? { sura: next, from: '1', to: '' } : null;
+}
+
+function autofillNewTask() {
+  if (editingRecordId !== null) return;                 // never overwrite an edit-in-progress
+  const name = document.getElementById('student-select').value;
+  if (!name) return;
+  const studentObj = students.find(s => getStudentName(s) === name);
+  const recs = (studentObj ? recordsForStudent(studentObj) : records.filter(r => r.student === name)).filter(r => !r.attendance_only);
+  const last = recs.length ? [...recs].sort(byNewest)[0] : null;
+  if (!last) return;                                    // no previous session → leave fields empty
+  const lastLoh = last.newLoh ? (Array.isArray(last.newLoh) ? last.newLoh : [last.newLoh]) : [];
+  const lastMadi = last.newMadi ? (Array.isArray(last.newMadi) ? last.newMadi : [last.newMadi]) : [];
+  const nextLoh = computeNextLoh(lastLoh);
+  const nextMadi = computeNextMadi(lastMadi);
+  if (!nextLoh && !nextMadi) return;                    // nothing sensible to suggest
+  document.getElementById('loh-rows').innerHTML = ''; lohRows = []; lohRowCount = 0;
+  addLohRow(nextLoh || undefined);
+  document.getElementById('madi-rows').innerHTML = ''; madiRows = []; madiRowCount = 0;
+  addMadiRow(nextMadi || undefined);
+  showToast('📝 تعبئة تلقائية بناءً على آخر جلسة — عدّلها زيّ ما تحب');
 }
 
 function onStudentChange() {
