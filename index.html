@@ -2717,26 +2717,18 @@ function itemAyat(item) {
   return countAyat(item.sura, item.from, item.to);
 }
 
-// Display label for one assignment item: "من الملك إلى الناس" for a range
-// (always in mushaf order, whichever end was picked first), otherwise the
-// sura name plus its optional ayah range.
+// Display label for one assignment item: "من الملك إلى الناس" for a range —
+// shown in the exact order the teacher entered it (start → end) — otherwise
+// the sura name plus its optional ayah range.
 function suraItemLabel(item) {
-  if (item && item.range && item.toSura) {
-    const span = rangeSuras(item.sura, item.toSura);
-    const a = span.length ? span[0] : item.sura;
-    const b = span.length ? span[span.length - 1] : item.toSura;
-    return 'من ' + a + ' إلى ' + b;
-  }
+  if (item && item.range && item.toSura) return 'من ' + item.sura + ' إلى ' + item.toSura;
   return item.sura + ayahRange(item.from, item.to);
 }
 
 // Same as suraItemLabel but with the "سورة" word prefix, for the
-// previous-session cards: "من سورة الملك إلى سورة الناس".
+// previous-session cards: "من سورة الملك إلى سورة الناس" (as entered).
 function rangeCardLabel(item) {
-  const span = rangeSuras(item.sura, item.toSura);
-  const a = span.length ? span[0] : item.sura;
-  const b = span.length ? span[span.length - 1] : item.toSura;
-  return 'من سورة ' + a + ' إلى سورة ' + b;
+  return 'من سورة ' + item.sura + ' إلى سورة ' + item.toSura;
 }
 
 
