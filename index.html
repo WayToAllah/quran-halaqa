@@ -207,6 +207,14 @@
   .madi-row-title { font-size:12px; color:var(--text-muted); font-weight:600; }
   .remove-madi-btn { background:none; border:none; color:var(--text-hint); font-size:18px; cursor:pointer; padding:2px 6px; line-height:1; }
   .remove-madi-btn:active { color:var(--red); }
+  .madi-row-tools { display:flex; align-items:center; gap:12px; }
+  .madi-range-toggle { display:flex; align-items:center; gap:5px; font-size:12px; color:var(--text-muted); font-weight:600; cursor:pointer; user-select:none; }
+  .madi-range-toggle input { width:15px; height:15px; accent-color:var(--green); cursor:pointer; margin:0; }
+  .madi-row.range-on .row3 { grid-template-columns:1fr; }
+  .madi-row .ayah-only { display:block; }
+  .madi-row.range-on .ayah-only { display:none; }
+  .madi-row .range-only { display:none; }
+  .madi-row.range-on .range-only { display:block; }
   .add-madi-btn { width:100%; padding:10px; background:transparent; color:var(--green); border:1.5px dashed var(--green); border-radius:var(--radius-sm); font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; margin-top:10px; transition:background 0.15s; }
   .add-madi-btn:active { background:var(--green-light); }
   .sura-field { position:relative; }
@@ -1015,9 +1023,9 @@ function buildStudentPublicStats(s, totalHalaqaDays, rankByName, halaqaDatesDesc
   let totalAyat = 0;
   realRecs.forEach(r => {
     const lohArr = r.newLoh ? (Array.isArray(r.newLoh) ? r.newLoh : [r.newLoh]) : [];
-    lohArr.forEach(l => { if (l && l.sura) totalAyat += countAyat(l.sura, l.from, l.to); });
+    lohArr.forEach(l => { if (l && l.sura) totalAyat += itemAyat(l); });
     const madiArr = r.newMadi ? (Array.isArray(r.newMadi) ? r.newMadi : [r.newMadi]) : [];
-    madiArr.forEach(m => { if (m && m.sura) totalAyat += countAyat(m.sura, m.from, m.to); });
+    madiArr.forEach(m => { if (m && m.sura) totalAyat += itemAyat(m); });
   });
 
   const uniqueDays = new Set(allRecs.map(r => r.date)).size;
@@ -1075,9 +1083,9 @@ function buildStudentPublicStats(s, totalHalaqaDays, rankByName, halaqaDatesDesc
     let monthAyat = 0;
     monthRealRecs.forEach(r => {
       const lohArr = r.newLoh ? (Array.isArray(r.newLoh) ? r.newLoh : [r.newLoh]) : [];
-      lohArr.forEach(l => { if (l && l.sura) monthAyat += countAyat(l.sura, l.from, l.to); });
+      lohArr.forEach(l => { if (l && l.sura) monthAyat += itemAyat(l); });
       const madiArr = r.newMadi ? (Array.isArray(r.newMadi) ? r.newMadi : [r.newMadi]) : [];
-      madiArr.forEach(m => { if (m && m.sura) monthAyat += countAyat(m.sura, m.from, m.to); });
+      madiArr.forEach(m => { if (m && m.sura) monthAyat += itemAyat(m); });
     });
     monthlyStats[month] = { attendPct: monthAttendPct, sessionsCount: monthAllRecs.length, totalAyat: monthAyat, avgLoh: monthAvgLoh };
   });
@@ -1516,26 +1524,40 @@ function addMadiRow(data) {
   div.innerHTML = `
     <div class="madi-row-header">
       <span class="madi-row-title">${label}</span>
-      ${idx > 0 ? `<button type="button" class="remove-madi-btn" onclick="removeMadiRow('${id}')">✕</button>` : ''}
+      <div class="madi-row-tools">
+        <label class="madi-range-toggle">
+          <input type="checkbox" id="${id}-range-toggle" onchange="toggleRangeRow('${id}')">
+          🔗 نطاق سور
+        </label>
+        ${idx > 0 ? `<button type="button" class="remove-madi-btn" onclick="removeMadiRow('${id}')">✕</button>` : ''}
+      </div>
     </div>
     <div class="row3">
       <div class="field sura-field">
-        <label>السورة</label>
+        <label id="${id}-sura-label">السورة</label>
         <input type="text" id="${id}-sura-input" placeholder="اكتب اسم السورة..." autocomplete="off"
           oninput="filterSuras('${id}')" onfocus="showDropdown('${id}')" onblur="resolveTypedSura('${id}'); hideDropdown('${id}')">
         <input type="hidden" id="${id}-sura" value="${esc(data ? data.sura||'' : '')}">
         <div class="sura-dropdown" id="${id}-sura-dropdown"></div>
       </div>
-      <div class="field">
+      <div class="field ayah-only">
         <label>من آية</label>
         <input type="number" id="${id}-from" placeholder="1" min="1" value="${esc(data ? data.from||'' : '')}" oninput="validateAyah('${id}')">
         <div class="field-error" id="err-${id}-from"></div>
       </div>
-      <div class="field">
+      <div class="field ayah-only">
         <label>إلى آية</label>
         <input type="number" id="${id}-to" placeholder="20" min="1" value="${esc(data ? data.to||'' : '')}" oninput="validateAyah('${id}')">
         <div class="field-error" id="err-${id}-to"></div>
       </div>
+    </div>
+    <div class="field sura-field range-only">
+      <label>إلى سورة</label>
+      <input type="text" id="${id}-e-sura-input" placeholder="اكتب اسم السورة..." autocomplete="off"
+        oninput="filterSuras('${id}-e')" onfocus="showDropdown('${id}-e')" onblur="resolveTypedSura('${id}-e'); hideDropdown('${id}-e')">
+      <input type="hidden" id="${id}-e-sura" value="${esc(data && data.toSura ? data.toSura : '')}">
+      <div class="sura-dropdown" id="${id}-e-sura-dropdown"></div>
+      <div class="ayah-hint" id="hint-${id}-e"></div>
     </div>
     <div class="ayah-hint" id="hint-${id}"></div>
     <div class="field" style="display:none">
@@ -1556,6 +1578,39 @@ function addMadiRow(data) {
   }
   // restore stars
   if (data && data.stars) setStar(id, data.stars);
+  // restore range mode ("من سورة X إلى سورة Y" — whole suras, no ayah numbers)
+  if (data && data.range && data.toSura) {
+    const cb = document.getElementById(id+'-range-toggle');
+    if (cb) { cb.checked = true; toggleRangeRow(id); }
+    const eInput = document.getElementById(id+'-e-sura-input');
+    const eHidden = document.getElementById(id+'-e-sura');
+    if (eInput && eHidden) { eInput.value = data.toSura; eHidden.value = data.toSura; onSuraChange(id+'-e'); }
+  }
+}
+
+// Toggle a loh/madi row between per-sura mode (sura + ayah range) and
+// whole-sura range mode (من سورة X إلى سورة Y). Range mode hides the ayah
+// number fields and reveals the "إلى سورة" picker; the ayah numbers are
+// cleared so a leftover value can't sneak into a saved range item. Works on
+// any row id — the loh and madi rows share the same markup shape.
+function toggleRangeRow(id) {
+  const row = document.getElementById(id);
+  const on = document.getElementById(id+'-range-toggle').checked;
+  row.classList.toggle('range-on', on);
+  const label = document.getElementById(id+'-sura-label');
+  if (label) label.textContent = on ? 'من سورة' : 'السورة';
+  if (on) {
+    ['from','to'].forEach(f => { const el = document.getElementById(id+'-'+f); if (el) el.value = ''; });
+    clearErrors(id);
+  } else {
+    // leaving range mode: drop the end-sura selection so it can't linger
+    const eInput = document.getElementById(id+'-e-sura-input');
+    const eHidden = document.getElementById(id+'-e-sura');
+    if (eInput) { eInput.value = ''; eInput.classList.remove('invalid'); }
+    if (eHidden) eHidden.value = '';
+    const eHint = document.getElementById('hint-'+id+'-e');
+    if (eHint) eHint.textContent = '';
+  }
 }
 
 function removeMadiRow(id) {
@@ -1570,13 +1625,20 @@ function resetMadiRows() {
 }
 
 function getMadiData() {
-  return madiRows.map(({id, stars, score}) => ({
-    sura: document.getElementById(id+'-sura').value,
-    from: document.getElementById(id+'-from').value,
-    to: document.getElementById(id+'-to').value,
-    stars,
-    score: score||0
-  })).filter(m => m.sura);
+  return madiRows.map(({id, stars, score}) => {
+    const sura = document.getElementById(id+'-sura').value;
+    const rangeOn = document.getElementById(id+'-range-toggle') && document.getElementById(id+'-range-toggle').checked;
+    if (rangeOn) {
+      return { sura, toSura: document.getElementById(id+'-e-sura').value, range: true, stars: 0, score: 0 };
+    }
+    return {
+      sura,
+      from: document.getElementById(id+'-from').value,
+      to: document.getElementById(id+'-to').value,
+      stars,
+      score: score||0
+    };
+  }).filter(m => m.range ? (m.sura && m.toSura) : m.sura);
 }
 
 function makeLohRowId() { return 'loh-row-' + (++lohRowCount); }
@@ -1593,32 +1655,54 @@ function addLohRow(data) {
   div.innerHTML = `
     <div class="madi-row-header">
       <span class="madi-row-title">${label}</span>
-      ${idx > 0 ? `<button type="button" class="remove-madi-btn" onclick="removeLohRow('${id}')">✕</button>` : ''}
+      <div class="madi-row-tools">
+        <label class="madi-range-toggle">
+          <input type="checkbox" id="${id}-range-toggle" onchange="toggleRangeRow('${id}')">
+          🔗 نطاق سور
+        </label>
+        ${idx > 0 ? `<button type="button" class="remove-madi-btn" onclick="removeLohRow('${id}')">✕</button>` : ''}
+      </div>
     </div>
     <div class="row3">
       <div class="field sura-field">
-        <label>السورة</label>
+        <label id="${id}-sura-label">السورة</label>
         <input type="text" id="${id}-sura-input" placeholder="اكتب اسم السورة..." autocomplete="off"
           oninput="filterSuras('${id}')" onfocus="showDropdown('${id}')" onblur="resolveTypedSura('${id}'); hideDropdown('${id}')">
         <input type="hidden" id="${id}-sura" value="${esc(data ? data.sura||'' : '')}">
         <div class="sura-dropdown" id="${id}-sura-dropdown"></div>
       </div>
-      <div class="field">
+      <div class="field ayah-only">
         <label>من آية</label>
         <input type="number" id="${id}-from" placeholder="1" min="1" value="${esc(data ? data.from||'' : '')}" oninput="validateAyah('${id}')">
         <div class="field-error" id="err-${id}-from"></div>
       </div>
-      <div class="field">
+      <div class="field ayah-only">
         <label>إلى آية</label>
         <input type="number" id="${id}-to" placeholder="10" min="1" value="${esc(data ? data.to||'' : '')}" oninput="validateAyah('${id}')">
         <div class="field-error" id="err-${id}-to"></div>
       </div>
+    </div>
+    <div class="field sura-field range-only">
+      <label>إلى سورة</label>
+      <input type="text" id="${id}-e-sura-input" placeholder="اكتب اسم السورة..." autocomplete="off"
+        oninput="filterSuras('${id}-e')" onfocus="showDropdown('${id}-e')" onblur="resolveTypedSura('${id}-e'); hideDropdown('${id}-e')">
+      <input type="hidden" id="${id}-e-sura" value="${esc(data && data.toSura ? data.toSura : '')}">
+      <div class="sura-dropdown" id="${id}-e-sura-dropdown"></div>
+      <div class="ayah-hint" id="hint-${id}-e"></div>
     </div>
     <div class="ayah-hint" id="hint-${id}"></div>`;
   container.appendChild(div);
   if (data && data.sura) {
     document.getElementById(id+'-sura-input').value = data.sura;
     onSuraChange(id);
+  }
+  // restore range mode ("من سورة X إلى سورة Y" — whole suras, no ayah numbers)
+  if (data && data.range && data.toSura) {
+    const cb = document.getElementById(id+'-range-toggle');
+    if (cb) { cb.checked = true; toggleRangeRow(id); }
+    const eInput = document.getElementById(id+'-e-sura-input');
+    const eHidden = document.getElementById(id+'-e-sura');
+    if (eInput && eHidden) { eInput.value = data.toSura; eHidden.value = data.toSura; onSuraChange(id+'-e'); }
   }
 }
 
@@ -1634,11 +1718,18 @@ function resetLohRows() {
 }
 
 function getLohData() {
-  return lohRows.map(({id}) => ({
-    sura: document.getElementById(id+'-sura').value,
-    from: document.getElementById(id+'-from').value,
-    to: document.getElementById(id+'-to').value
-  })).filter(l => l.sura);
+  return lohRows.map(({id}) => {
+    const sura = document.getElementById(id+'-sura').value;
+    const rangeOn = document.getElementById(id+'-range-toggle') && document.getElementById(id+'-range-toggle').checked;
+    if (rangeOn) {
+      return { sura, toSura: document.getElementById(id+'-e-sura').value, range: true };
+    }
+    return {
+      sura,
+      from: document.getElementById(id+'-from').value,
+      to: document.getElementById(id+'-to').value
+    };
+  }).filter(l => l.range ? (l.sura && l.toSura) : l.sura);
 }
 
 // M5: the dropdown's onchange goes through here (not straight to onStudentChange)
@@ -1701,14 +1792,14 @@ function onStudentChange() {
   const lohArr = last.newLoh ? (Array.isArray(last.newLoh) ? last.newLoh : [last.newLoh]) : (last.loh && last.loh.sura ? [last.loh] : []);
   const lohFiltered = lohArr.filter(l=>l && l.sura);
   document.getElementById('prev-loh-info').textContent = lohFiltered.length
-    ? lohFiltered.map(l => fmtSura(l.sura, l.from, l.to)).join(' + ')
+    ? lohFiltered.map(l => (l.range && l.toSura) ? rangeCardLabel(l) : fmtSura(l.sura, l.from, l.to)).join(' + ')
     : '—';
 
   // madi info
   const madiArr = last.newMadi || (last.madi ? (Array.isArray(last.madi)?last.madi:[last.madi]) : []);
   const madiFiltered = madiArr.filter(m=>m.sura);
   document.getElementById('prev-madi-info').textContent = madiFiltered.length
-    ? madiFiltered.map(m => fmtSura(m.sura, m.from, m.to)).join(' + ')
+    ? madiFiltered.map(m => (m.range && m.toSura) ? rangeCardLabel(m) : fmtSura(m.sura, m.from, m.to)).join(' + ')
     : '—';
 
   document.getElementById('prev-madi-section').style.display = madiFiltered.length ? 'block' : 'none';
@@ -2216,6 +2307,13 @@ function onSuraChange(prefix) {
   const hint = document.getElementById('hint-'+prefix);
   const fromEl = document.getElementById(prefix+'-from');
   const toEl = document.getElementById(prefix+'-to');
+  // Range-end sura picker (prefix like "madi-row-N-e") has no ayah inputs —
+  // just resolve/echo the sura name and show its length as a hint, then bail
+  // before touching the (nonexistent) from/to fields.
+  if (!fromEl || !toEl) {
+    if (hint) hint.textContent = name && suraMap[name] ? ('عدد آيات السورة: ' + suraMap[name].count) : '';
+    return;
+  }
   if (name) {
     const info = suraMap[name];
     const max = info.count;
@@ -2292,6 +2390,32 @@ function saveRecord() {
     return;
   }
 
+  // Loh/madi range rows: resolve the "إلى سورة" picker and make sure a range
+  // that was started is actually complete (both ends chosen), instead of
+  // letting getLohData()/getMadiData() silently drop it — same failure mode
+  // H11 guards against.
+  function checkRangeRows(rows, label) {
+    for (let i = 0; i < rows.length; i++) {
+      const id = rows[i].id;
+      const cb = document.getElementById(id+'-range-toggle');
+      if (!cb || !cb.checked) continue;
+      resolveTypedSura(id+'-e');
+      const startSura = document.getElementById(id+'-sura').value;
+      const endSura = document.getElementById(id+'-e-sura').value;
+      const eInput = document.getElementById(id+'-e-sura-input');
+      const suffix = rows.length > 1 ? ' رقم ' + (i+1) : '';
+      if (eInput && eInput.value.trim() && !endSura) {
+        return 'سورة النهاية في نطاق ' + label + suffix + ' مش متأكدة — اختارها من القائمة.';
+      }
+      if (startSura && !endSura) {
+        return 'اختر "إلى سورة" لنطاق ' + label + suffix + ' أو ألغِ وضع النطاق.';
+      }
+    }
+    return null;
+  }
+  const rangeWarn = checkRangeRows(lohRows, 'اللوح') || checkRangeRows(madiRows, 'الماضي');
+  if (rangeWarn) { alert(rangeWarn); return; }
+
   const isEditing = editingRecordId !== null;
   const existing = isEditing ? records.find(r => String(r.id) === String(editingRecordId)) : null;
   const sObj = students.find(s => getStudentName(s) === student);
@@ -2311,8 +2435,8 @@ function saveRecord() {
     student,
     loh: { score: lohScore, stars: lohScore == null ? 0 : scoreToStars(lohScore) },
     madi: { score: madiScore, stars: madiScore == null ? 0 : scoreToStars(madiScore) },
-    newLoh: getLohData().map(l=>({sura:l.sura,from:l.from,to:l.to})),
-    newMadi: getMadiData().map(m=>({sura:m.sura,from:m.from,to:m.to})),
+    newLoh: getLohData().map(l=>l.range ? {sura:l.sura, toSura:l.toSura, range:true} : {sura:l.sura,from:l.from,to:l.to}),
+    newMadi: getMadiData().map(m=>m.range ? {sura:m.sura, toSura:m.toSura, range:true} : {sura:m.sura,from:m.from,to:m.to}),
     note: document.getElementById('general-note').value.trim()
   };
   // عداد الأخطاء: نضيف mistakes بس لو المدرّس فعلاً استخدم العدّاد لهذا
@@ -2572,6 +2696,49 @@ function countAyat(sura, from, to) {
   return 0;
 }
 
+// Suras (by name, mushaf order) from `start` to `end` inclusive. Order-agnostic:
+// if the teacher picks the later sura first, they still get the correct span.
+function rangeSuras(start, end) {
+  const i = SURAS.findIndex(s => s[0] === start);
+  const j = SURAS.findIndex(s => s[0] === end);
+  if (i < 0 || j < 0) return [];
+  const [lo, hi] = i <= j ? [i, j] : [j, i];
+  return SURAS.slice(lo, hi + 1).map(s => s[0]);
+}
+
+// Ayah count for a single assignment item, understanding whole-sura ranges
+// ({sura, toSura, range:true}) as the sum of every sura across the span.
+// Falls back to the normal single-sura countAyat for ordinary items.
+function itemAyat(item) {
+  if (!item || !item.sura) return 0;
+  if (item.range && item.toSura) {
+    return rangeSuras(item.sura, item.toSura).reduce((a, n) => a + (suraMap[n] ? suraMap[n].count : 0), 0);
+  }
+  return countAyat(item.sura, item.from, item.to);
+}
+
+// Display label for one assignment item: "من الملك إلى الناس" for a range
+// (always in mushaf order, whichever end was picked first), otherwise the
+// sura name plus its optional ayah range.
+function suraItemLabel(item) {
+  if (item && item.range && item.toSura) {
+    const span = rangeSuras(item.sura, item.toSura);
+    const a = span.length ? span[0] : item.sura;
+    const b = span.length ? span[span.length - 1] : item.toSura;
+    return 'من ' + a + ' إلى ' + b;
+  }
+  return item.sura + ayahRange(item.from, item.to);
+}
+
+// Same as suraItemLabel but with the "سورة" word prefix, for the
+// previous-session cards: "من سورة الملك إلى سورة الناس".
+function rangeCardLabel(item) {
+  const span = rangeSuras(item.sura, item.toSura);
+  const a = span.length ? span[0] : item.sura;
+  const b = span.length ? span[span.length - 1] : item.toSura;
+  return 'من سورة ' + a + ' إلى سورة ' + b;
+}
+
 
 // الشهور المتاحة فعلياً في البيانات، عشان القايمة متعرضش شهور مفيهاش سجلات
 function populateStatsMonthOptions() {
@@ -2615,9 +2782,9 @@ function renderStats() {
   filtered.forEach(r => {
     // ayat live in newLoh/newMadi (the assigned task); fall back to legacy loh/madi if present
     const lohArr = r.newLoh ? (Array.isArray(r.newLoh) ? r.newLoh : [r.newLoh]) : (r.loh && r.loh.sura ? [r.loh] : []);
-    lohArr.forEach(l => { if (l && l.sura) lohAyat += countAyat(l.sura, l.from, l.to); });
+    lohArr.forEach(l => { if (l && l.sura) lohAyat += itemAyat(l); });
     const madiArr = (r.newMadi && r.newMadi.length) ? r.newMadi : (Array.isArray(r.madi) ? r.madi : (r.madi && r.madi.sura ? [r.madi] : []));
-    madiArr.forEach(m=>{ if (m && m.sura) madiAyat += countAyat(m.sura, m.from, m.to); });
+    madiArr.forEach(m=>{ if (m && m.sura) madiAyat += itemAyat(m); });
     if (r.tajweed && r.tajweed.sura) tajweedAyat += countAyat(r.tajweed.sura, r.tajweed.from, r.tajweed.to);
   });
   const totalAyat = lohAyat + madiAyat + tajweedAyat;
@@ -2648,9 +2815,9 @@ function renderStats() {
     const ayat = recs.reduce((a,r)=> {
       let sum = a;
       const lohArr2 = r.newLoh ? (Array.isArray(r.newLoh) ? r.newLoh : [r.newLoh]) : (r.loh && r.loh.sura ? [r.loh] : []);
-      lohArr2.forEach(l => { if (l && l.sura) sum += countAyat(l.sura, l.from, l.to); });
+      lohArr2.forEach(l => { if (l && l.sura) sum += itemAyat(l); });
       const madiArr = (r.newMadi && r.newMadi.length) ? r.newMadi : (Array.isArray(r.madi) ? r.madi : (r.madi && r.madi.sura ? [r.madi] : []));
-      madiArr.forEach(m=>{ if (m && m.sura) sum += countAyat(m.sura, m.from, m.to); });
+      madiArr.forEach(m=>{ if (m && m.sura) sum += itemAyat(m); });
       return sum;
     }, 0);
     // نسبة الحضور: عدد الجلسات الفريدة / إجمالي أيام الحلقة
@@ -2883,7 +3050,7 @@ function ayahRange(from, to) { return (from && to) ? ' (' + from + '–' + to + 
 
 // Joins multiple sura entries Arabic-style: "الناس والفلق" / "الناس، الفلق، والإخلاص"
 function joinSuraNames(list) {
-  const parts = list.map(m => m.sura + ayahRange(m.from, m.to));
+  const parts = list.map(m => suraItemLabel(m));
   if (parts.length === 1) return parts[0];
   return parts.slice(0, -1).join('، ') + ' و' + parts[parts.length - 1];
 }
