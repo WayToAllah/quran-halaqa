@@ -124,7 +124,8 @@
   .log-entry:last-child { border-bottom:none; }
   .log-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:7px; }
   .log-student { font-size:15px; font-weight:600; }
-  .log-date { font-size:12px; color:var(--text-hint); background:var(--green-tint); padding:2px 9px; border-radius:20px; }
+  .log-date { font-size:12.5px; color:var(--green); font-weight:700; background:var(--green-tint); padding:3px 9px; border-radius:20px; text-align:center; line-height:1.3; }
+  .log-date-sub { font-size:10px; opacity:.6; font-weight:400; color:var(--text-hint); }
   .log-actions { display:flex; gap:5px; }
   .log-act-btn { background:var(--surface); border:1px solid var(--border-strong); border-radius:8px; padding:4px 8px; cursor:pointer; font-size:13px; line-height:1; color:var(--text-muted); transition:all 0.15s; }
   .log-act-btn:active { background:var(--green-light); }
@@ -137,6 +138,9 @@
   /* Date strip */
   .date-strip { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; background:linear-gradient(135deg,var(--green-light),var(--green-tint)); border-radius:var(--radius-sm); padding:10px 14px; border:1px solid var(--border); }
   .date-strip label { font-size:13px; color:var(--green); font-weight:600; }
+  .date-input-wrap { display:flex; flex-direction:column; align-items:flex-end; gap:1px; }
+  .date-input-wrap input[type=date] { font-size:11px; color:var(--text-hint); opacity:.85; }
+  .session-hijri { font-size:15px; color:var(--green); font-weight:700; }
   .date-strip input { border:none; background:transparent; font-size:13px; color:var(--green); font-weight:600; font-family:inherit; text-align:left; }
   .date-strip input:focus { outline:none; }
 
@@ -290,7 +294,10 @@
 <div id="screen-record" class="screen active">
   <div class="date-strip">
     <label for="session-date">📅 تاريخ الجلسة</label>
-    <input type="date" id="session-date">
+    <div class="date-input-wrap">
+      <span id="session-date-hijri" class="session-hijri"></span>
+      <input type="date" id="session-date" onchange="updateSessionHijri()">
+    </div>
   </div>
   <button type="button" onclick="openAttendanceModal()" class="add-fab" style="margin-bottom:14px">✅ تسجيل حضور جماعي</button>
   <div class="card">
@@ -820,6 +827,37 @@ function localDateStr(d) {
   d = d || new Date();
   const tzOffsetMs = d.getTimezoneOffset() * 60000;
   return new Date(d.getTime() - tzOffsetMs).toISOString().slice(0, 10);
+}
+
+// التاريخ الهجري (أم القرى) لأي تاريخ ميلادي — يُعرض جنب الميلادي في كل مكان.
+// يقبل إما كائن Date أو نص "YYYY-MM-DD" (يُقرأ عند منتصف اليوم لتفادي فرق يوم
+// بسبب فروق التوقيت). لو التقويم مش مدعوم لأي سبب، بيرجّع نص فاضي بأمان.
+function hijriStr(dateOrStr, opts) {
+  try {
+    const d = (dateOrStr instanceof Date) ? dateOrStr
+      : (typeof dateOrStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateOrStr))
+        ? new Date(dateOrStr + 'T12:00:00') : new Date(dateOrStr);
+    if (isNaN(d)) return '';
+    return new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura',
+      opts || { day: 'numeric', month: 'long', year: 'numeric' }).format(d);
+  } catch (e) { return ''; }
+}
+
+// تاريخ سطر السجل: الميلادي (مختصر) وتحته الهجري بخط أصغر.
+function logDateHtml(r) {
+  if (!r.date) return '';
+  const greg = new Date(r.date).toLocaleDateString('ar-EG', {day:'numeric', month:'short'});
+  const hij = hijriStr(r.date, {day:'numeric', month:'short'});
+  return hij ? (hij + '<br><span class="log-date-sub">' + greg + '</span>') : greg;
+}
+
+// يحدّث السطر الهجري تحت خانة تاريخ الجلسة كل ما التاريخ يتغيّر.
+function updateSessionHijri() {
+  const el = document.getElementById('session-date');
+  const out = document.getElementById('session-date-hijri');
+  if (!el || !out) return;
+  const h = el.value ? hijriStr(el.value, {day:'numeric', month:'long', year:'numeric'}) : '';
+  out.textContent = h || '';
 }
 
 // One-time, idempotent self-heal: any record saved before studentId existed
@@ -1865,8 +1903,9 @@ function onStudentChange() {
   }
 
   document.getElementById('prev-task-card').style.display='block';
-  const dateStr = new Date(last.date).toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'});
-  document.getElementById('prev-task-date').textContent = 'من جلسة ' + dateStr;
+  const dateStr = new Date(last.date).toLocaleDateString('ar-EG',{day:'numeric',month:'long'});
+  const dateHijri = hijriStr(last.date, {weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('prev-task-date').textContent = 'من جلسة ' + (dateHijri ? dateHijri + ' — ' + dateStr : dateStr);
 
   // helper: format sura + optional range
   function fmtSura(sura, from, to) {
@@ -1904,6 +1943,7 @@ function init() {
   addMadiRow();
   addLohRow();
   document.getElementById('session-date').value = localDateStr();
+  updateSessionHijri();
 
   const sub = document.getElementById('header-sub');
   if (sub) { sub.textContent = 'جاري المزامنة…'; sub.dataset.syncing = '1'; }
@@ -1915,8 +1955,11 @@ function init() {
 function updateHeader() {
   const sub = document.getElementById('header-sub');
   if (sub && sub.dataset.syncing === '1') return; // keep "جاري المزامنة…" until first data arrives
-  const today = new Date().toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'});
-  if (sub) sub.textContent = today + ' · ' + students.length + ' طالب';
+  const now = new Date();
+  const today = now.toLocaleDateString('ar-EG',{day:'numeric',month:'long'});
+  const hijri = hijriStr(now, {weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const dateLabel = hijri ? (hijri + ' — ' + today) : today;
+  if (sub) sub.textContent = dateLabel + ' · ' + students.length + ' طالب';
 }
 
 function getStudentName(s) { return typeof s === 'string' ? s : s.name; }
@@ -2654,14 +2697,14 @@ function renderLog() {
       <button class="log-act-btn danger" onclick="deleteRecord('${idAttr}')" aria-label="حذف">🗑</button>
     </div>`;
     if (r.attendance_only) {
-      const dateStr = r.date ? new Date(r.date).toLocaleDateString('ar-EG',{day:'numeric',month:'short'}) : r.date;
+      const dateStr = logDateHtml(r);
       return `<div class="log-entry">
         <div class="log-header"><span class="log-student">${esc(displayStudentName(r))}</span><div style="display:flex;align-items:center;gap:8px"><span class="log-date">${dateStr}</span>${actions}</div></div>
         <div class="log-line" style="color:var(--text-hint)"><span>✅</span> حضور فقط</div>
       </div>`;
     }
     const tj = r.tajweed ? `<div class="log-line"><span>📐</span> تجويد: ${esc(r.tajweed.sura)||'—'}${ayahRange(esc(r.tajweed.from), esc(r.tajweed.to))} ${stars(r.tajweed.stars)}${r.tajweed.note?' · '+esc(r.tajweed.note):''}</div>` : '';
-    const dateStr = r.date ? new Date(r.date).toLocaleDateString('ar-EG',{day:'numeric',month:'short'}) : r.date;
+    const dateStr = logDateHtml(r);
     return `<div class="log-entry">
       <div class="log-header"><span class="log-student">${esc(displayStudentName(r))}</span><div style="display:flex;align-items:center;gap:8px"><span class="log-date">${dateStr}</span>${actions}</div></div>
       ${(() => {
@@ -2719,6 +2762,7 @@ function editRecord(id) {
   document.getElementById('student-search-input').value = displayStudentName(r);
   onStudentChange();
   if (r.date) document.getElementById('session-date').value = r.date;
+  updateSessionHijri();
   // prev-task evaluation scores
   if (hasScore(r.loh)) { document.getElementById('score-prev-loh').value = r.loh.score; onScoreInput('prev-loh'); }
   if (hasScore(r.madi)) { document.getElementById('score-prev-madi').value = r.madi.score; onScoreInput('prev-madi'); }
@@ -3135,7 +3179,9 @@ function joinSuraNames(list) {
 
 function showWhatsAppPrompt(rec, sObj) {
   const stars = n => '★'.repeat(n) + '☆'.repeat(5-n);
-  const dateStr = new Date(rec.date).toLocaleDateString('ar-EG', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  const dateGreg = new Date(rec.date).toLocaleDateString('ar-EG', {day:'numeric', month:'long', year:'numeric'});
+  const dateHijri = hijriStr(rec.date, {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  const dateStr = dateHijri ? (dateHijri + ' — ' + dateGreg) : dateGreg;
   const nl = '\n';
 
   // get the previous session to know what was recited today. M7: byNewest(r, rec) > 0
