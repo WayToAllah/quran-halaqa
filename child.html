@@ -40,6 +40,12 @@
   .session-item:last-child { border-bottom:none; padding-bottom:0; }
   .session-date { font-size:12px; color:var(--text-hint); font-weight:600; margin-bottom:5px; }
   .session-line { font-size:13.5px; color:var(--text-muted); margin-top:4px; line-height:1.6; }
+  .session-group { margin-top:9px; padding-inline-start:9px; border-inline-start:2px solid var(--green-light); }
+  .session-group:first-of-type { margin-top:4px; }
+  .session-group-title { font-size:11.5px; font-weight:700; letter-spacing:0.02em; margin-bottom:1px; }
+  .session-group-title.eval { color:var(--green); }
+  .session-group-title.homework { color:var(--gold); }
+  .session-group.homework-wrap { border-inline-start-color:var(--gold-light); }
   .stars { letter-spacing:1px; color:var(--gold-soft); }
   .empty-state { text-align:center; color:var(--text-hint); font-size:14px; padding:1.5rem 1rem; }
   .status-msg { text-align:center; padding:60px 20px; color:var(--text-muted); font-size:14.5px; line-height:1.8; }
@@ -126,7 +132,9 @@ function esc(s) {
 function ayahRange(from, to) { return (from && to) ? ' (' + from + '–' + to + ')' : from ? ' (من ' + from + ')' : ''; }
 
 function joinSuraNames(list) {
-  const parts = list.map(m => esc(m.sura) + ayahRange(esc(m.from), esc(m.to)));
+  const parts = (list || []).map(m => (m && m.range && m.toSura)
+    ? ('من ' + esc(m.sura) + ' إلى ' + esc(m.toSura))
+    : (esc(m.sura) + ayahRange(esc(m.from), esc(m.to))));
   if (!parts.length) return '';
   if (parts.length === 1) return parts[0];
   return parts.slice(0, -1).join('، ') + ' و' + parts[parts.length - 1];
@@ -336,18 +344,27 @@ function render(data) {
   } else {
     el.innerHTML = list.map(r => {
       const dateStr = r.date ? new Date(r.date + 'T00:00:00').toLocaleDateString('ar-EG', { weekday:'long', day:'numeric', month:'long' }) : '';
-      let lines = '';
-      if (r.newLoh && r.newLoh.length) lines += `<div class="session-line">📝 لوح جديد: ${joinSuraNames(r.newLoh)}</div>`;
+      // فصل واضح بين "تقييم التسميع" (درجة ما سمّعه اليوم = واجب المرة السابقة)
+      // و"الواجب الجديد" (المطلوب حفظه للمرة الجاية) — عشان ولي الأمر ما يخلطش
+      // بين الدرجة والواجب الجديد.
+      let evalLines = '';
       if (r.loh) {
-        lines += `<div class="session-line">⭐ تقييم اللوح: ${r.loh.score}/100 ${renderStarsHTML(r.loh.score)} ${scoreName(r.loh.score)}</div>`;
-        if (r.loh.mistakes) lines += `<div class="session-line" style="font-size:12px;color:var(--text-hint)">↳ ${r.loh.mistakes.full||0} خطأ، ${r.loh.mistakes.tajweed||0} خطأ تجويدي</div>`;
+        evalLines += `<div class="session-line">📖 اللوح: ${r.loh.score}/100 ${renderStarsHTML(r.loh.score)} ${scoreName(r.loh.score)}</div>`;
+        if (r.loh.mistakes) evalLines += `<div class="session-line" style="font-size:12px;color:var(--text-hint)">↳ ${r.loh.mistakes.full||0} خطأ، ${r.loh.mistakes.tajweed||0} خطأ تجويدي</div>`;
       }
-      if (r.newMadi && r.newMadi.length) lines += `<div class="session-line">🔄 ماضي جديد: ${joinSuraNames(r.newMadi)}</div>`;
       if (r.madi) {
-        lines += `<div class="session-line">⭐ تقييم الماضي: ${r.madi.score}/100 ${renderStarsHTML(r.madi.score)} ${scoreName(r.madi.score)}</div>`;
-        if (r.madi.mistakes) lines += `<div class="session-line" style="font-size:12px;color:var(--text-hint)">↳ ${r.madi.mistakes.full||0} خطأ، ${r.madi.mistakes.tajweed||0} خطأ تجويدي</div>`;
+        evalLines += `<div class="session-line">🔄 الماضي: ${r.madi.score}/100 ${renderStarsHTML(r.madi.score)} ${scoreName(r.madi.score)}</div>`;
+        if (r.madi.mistakes) evalLines += `<div class="session-line" style="font-size:12px;color:var(--text-hint)">↳ ${r.madi.mistakes.full||0} خطأ، ${r.madi.mistakes.tajweed||0} خطأ تجويدي</div>`;
       }
-      if (r.tajweed) lines += `<div class="session-line">📐 تجويد: ${esc(r.tajweed.sura)}${ayahRange(esc(r.tajweed.from), esc(r.tajweed.to))}</div>`;
+      if (r.tajweed) evalLines += `<div class="session-line">📐 تجويد: ${esc(r.tajweed.sura)}${ayahRange(esc(r.tajweed.from), esc(r.tajweed.to))}</div>`;
+
+      let newLines = '';
+      if (r.newLoh && r.newLoh.length) newLines += `<div class="session-line">📝 اللوح: ${joinSuraNames(r.newLoh)}</div>`;
+      if (r.newMadi && r.newMadi.length) newLines += `<div class="session-line">🔄 الماضي: ${joinSuraNames(r.newMadi)}</div>`;
+
+      let lines = '';
+      if (evalLines) lines += `<div class="session-group"><div class="session-group-title eval">📊 تقييم التسميع</div>${evalLines}</div>`;
+      if (newLines) lines += `<div class="session-group homework-wrap"><div class="session-group-title homework">✏️ الواجب الجديد للمرة الجاية</div>${newLines}</div>`;
       if (r.note) lines += `<div class="session-line" style="font-style:italic">💬 ${esc(r.note)}</div>`;
       return `<div class="session-item"><div class="session-date">${dateStr}</div>${lines}</div>`;
     }).join('');
