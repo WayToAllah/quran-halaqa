@@ -104,6 +104,11 @@ export interface Halaqa {
   excludedDates: string[];
   /** Minimum attendance % for the "نجم الحضور" badge (was a hardcoded constant). */
   attendanceBadgeThreshold: number;
+  /** Admin-editable rotating intentions (نوايا) shown in the app header. Stored
+   * on the halaqa doc (already member-gated) so the teacher can add/edit/remove
+   * them from inside the app with no redeploy. Empty/absent → the header shows a
+   * default verse instead. */
+  niyyat?: string[];
 }
 
 export interface Badge {

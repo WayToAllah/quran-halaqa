@@ -7,6 +7,10 @@ import { LogScreen } from './features/log/LogScreen';
 import { StatsScreen } from './features/stats/StatsScreen';
 import { RecordScreen } from './features/record/RecordScreen';
 import { RecordIcon, StudentsIcon, LogIcon, StatsIcon } from './ui/NavIcons';
+import { NiyyahBar } from './features/niyyat/NiyyahBar';
+import { NiyyatModal } from './features/niyyat/NiyyatModal';
+import { useNiyyat } from './hooks/useNiyyat';
+import { MOSQUE_ID, HALAQA_ID } from './config';
 import type { SessionRecord } from './types';
 import type { JSX } from 'preact';
 
@@ -24,6 +28,8 @@ function AppShell() {
   const [tab, setTab] = useState<Tab>('record');
   // A session handed off from the log screen's ✏️ button to the record screen.
   const [editingRecord, setEditingRecord] = useState<SessionRecord | null>(null);
+  const { niyyat, save: saveNiyyat } = useNiyyat(MOSQUE_ID, HALAQA_ID, auth.status === 'ready');
+  const [niyyatOpen, setNiyyatOpen] = useState(false);
 
   if (auth.status === 'loading' || auth.status === 'checking-membership') {
     return <LoginScreen auth={auth} />;
@@ -39,47 +45,43 @@ function AppShell() {
 
   return (
     <div class="min-h-screen bg-parchment pb-20" dir="rtl">
-      <header class="bg-white border-b border-hairline px-[18px] py-4 flex items-center justify-between sticky top-0 z-10">
-        <div class="flex items-center gap-2.5">
-          <div class="w-9 h-9 rounded-[10px] bg-forest flex items-center justify-center shrink-0">
-            <svg viewBox="0 0 24 24" width="19" height="19" fill="none">
-              <path
-                d="M6 20.5V11c0-3.3 2.7-6 6-6s6 2.7 6 6v9.5"
-                stroke="#C9A227"
-                stroke-width="1.7"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-              <path d="M4.5 20.5h15" stroke="#C9A227" stroke-width="1.7" stroke-linecap="round" />
-              <path d="M12 5.2v1.1" stroke="#C9A227" stroke-width="1.7" stroke-linecap="round" />
-              <path
-                d="M10.6 3.6l1.4 1.5 1.4-1.5"
-                stroke="#C9A227"
-                stroke-width="1.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-              <circle cx="12" cy="14.5" r="2.1" stroke="#C9A227" stroke-width="1.4" />
-            </svg>
-          </div>
-          <div>
-            <div class="text-[14.5px] font-extrabold text-ink-dark leading-tight">متابعة حفظ القرآن</div>
-            <div class="text-[11px] text-taupe leading-tight">{auth.user?.email}</div>
-          </div>
+      <header class="bg-white border-b border-hairline px-[18px] py-4 flex items-center gap-3 sticky top-0 z-10">
+        <div class="w-9 h-9 rounded-[10px] bg-forest flex items-center justify-center shrink-0">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none">
+            <path
+              d="M6 20.5V11c0-3.3 2.7-6 6-6s6 2.7 6 6v9.5"
+              stroke="#C9A227"
+              stroke-width="1.7"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path d="M4.5 20.5h15" stroke="#C9A227" stroke-width="1.7" stroke-linecap="round" />
+            <path d="M12 5.2v1.1" stroke="#C9A227" stroke-width="1.7" stroke-linecap="round" />
+            <path
+              d="M10.6 3.6l1.4 1.5 1.4-1.5"
+              stroke="#C9A227"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <circle cx="12" cy="14.5" r="2.1" stroke="#C9A227" stroke-width="1.4" />
+          </svg>
         </div>
-        <div class="flex items-center gap-2">
-          <div class="w-[34px] h-[34px] rounded-full bg-[#F1ECDD] border border-hairline flex items-center justify-center text-[12.5px] font-bold text-forest">
-            أد
-          </div>
-          <button
-            class="w-8 h-8 rounded-full border border-hairline bg-white flex items-center justify-center text-sm"
-            aria-label="تسجيل الخروج"
-            onClick={() => auth.signOutUser()}
-          >
-            🚪
-          </button>
-        </div>
+
+        <NiyyahBar niyyat={niyyat} onEdit={() => setNiyyatOpen(true)} />
+
+        <button
+          class="w-8 h-8 shrink-0 rounded-full border border-hairline bg-white flex items-center justify-center text-sm"
+          aria-label="تسجيل الخروج"
+          onClick={() => auth.signOutUser()}
+        >
+          🚪
+        </button>
       </header>
+
+      {niyyatOpen && (
+        <NiyyatModal niyyat={niyyat} onSave={saveNiyyat} onClose={() => setNiyyatOpen(false)} />
+      )}
 
       <main>
         {tab === 'record' && (
