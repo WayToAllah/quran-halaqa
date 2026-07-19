@@ -60,6 +60,8 @@ interface Args {
   mosqueId: string;
   halaqaId: string;
   dryRun: boolean;
+  prune: boolean;
+  confirm: boolean;
 }
 
 function parseArgs(): Args {
@@ -71,7 +73,7 @@ function parseArgs(): Args {
   const adminUid = get('--admin-uid');
   if (!adminUid) {
     console.error(
-      'Usage: tsx scripts/migrate-rtdb-to-firestore.ts --admin-uid <uid> [--export <path>] [--mosque-id altayseer] [--halaqa-id main] [--dry-run]',
+      'Usage: tsx scripts/migrate-rtdb-to-firestore.ts --admin-uid <uid> [--export <path>] [--mosque-id altayseer] [--halaqa-id main] [--dry-run] [--prune [--confirm]]',
     );
     process.exit(1);
   }
@@ -81,6 +83,8 @@ function parseArgs(): Args {
     mosqueId: get('--mosque-id') ?? 'altayseer',
     halaqaId: get('--halaqa-id') ?? 'main',
     dryRun: argv.includes('--dry-run'),
+    prune: argv.includes('--prune'),
+    confirm: argv.includes('--confirm'),
   };
 }
 
@@ -268,6 +272,44 @@ async function main() {
     await batch.commit();
   }
 
+  // Optional prune (guarded): remove records that exist in Firestore but not
+  // in RTDB — stale leftovers from a prior migration, or v2-native/test writes.
+  //   --prune            → preview only, prints what WOULD be deleted
+  //   --prune --confirm  → actually deletes them
+  // Only ever touches the records collection; never students or publicStats.
+  if (args.prune) {
+    const fsRecordsSnap = await halaqaRef.collection('records').get();
+    const fsRecordIds = fsRecordsSnap.docs.map((d) => d.id);
+    const extras = idsOnlyInTarget(recordIds, fsRecordIds);
+    console.log(`\nPrune: ${extras.length} record(s) in Firestore not present in RTDB.`);
+    for (const id of extras) {
+      const doc = fsRecordsSnap.docs.find((d) => d.id === id);
+      const data = (doc?.data() ?? {}) as Record<string, unknown>;
+      const kind = data.attendance_only ? 'attendance' : 'session';
+      console.log(`    ${id} | ${data.date ?? '—'} | ${kind} | ${data.student ?? '—'}`);
+    }
+    if (!args.confirm) {
+      console.log('\n  --prune preview only (no --confirm): nothing deleted.');
+      console.log('  Re-run with BOTH --prune --confirm to actually delete the above.');
+    } else if (extras.length) {
+      console.log('\n  --confirm set: deleting the above from Firestore...');
+      let batch = db.batch();
+      let count = 0;
+      for (const id of extras) {
+        batch.delete(halaqaRef.collection('records').doc(id));
+        count++;
+        if (count % 400 === 0) {
+          await batch.commit();
+          batch = db.batch();
+        }
+      }
+      await batch.commit();
+      console.log(`  Deleted ${extras.length} record(s).`);
+    } else {
+      console.log('  Nothing to prune.');
+    }
+  }
+
   // Verification: read back counts and compare against the source.
   console.log('\nVerifying...');
   const [studentsSnap, recordsSnap] = await Promise.all([
@@ -279,7 +321,15 @@ async function main() {
   console.log(`  students: ${writtenStudents} written / ${studentIds.length} expected`);
   console.log(`  records:  ${writtenRecords} written / ${recordIds.length} expected`);
 
-  if (writtenStudents !== studentIds.length || writtenRecords !== recordIds.length) {
+  const matched = writtenStudents === studentIds.length && writtenRecords === recordIds.length;
+  if (!matched) {
+    // A prune preview (no --confirm) intentionally leaves extras in place, so a
+    // count mismatch there is expected — not a failure.
+    if (args.prune && !args.confirm) {
+      console.log('\n(Count mismatch is expected in --prune preview mode — extras not yet deleted.)');
+      console.log('Re-run with --prune --confirm to delete them and reach an exact match.');
+      return;
+    }
     console.error('\n⚠️  MISMATCH — do not switch the app over to Firestore until this is resolved.');
     process.exit(1);
   }
