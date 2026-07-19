@@ -174,16 +174,37 @@ async function main() {
       if (extras.length) {
         console.log('\n  --- EXTRA records in Firestore (absent from live RTDB) ---');
         console.log('  id | date | kind | student');
+        const extraDates = new Set<string>();
         for (const id of extras) {
           const doc = fsSnap.docs.find((d) => d.id === id);
           const data = (doc?.data() ?? {}) as Record<string, unknown>;
           const date = data.date ?? '—';
           const student = data.student ?? '—';
           const kind = data.attendance_only ? 'attendance' : 'session';
+          if (typeof data.date === 'string') extraDates.add(data.date);
           console.log(`    ${id} | ${date} | ${kind} | ${student}`);
         }
         console.log('\n  A plain migration re-run does NOT remove these (set() only).');
         console.log('  Review the list above and decide before any real run.');
+
+        // For direct ID comparison: dump every LIVE RTDB record that falls on
+        // the same date(s) as the extras. If the live records carry DIFFERENT
+        // ids than the extras above, the extras are duplicate/test writes and
+        // the real data is safe in RTDB. Pure read of already-loaded data.
+        console.log('\n  --- LIVE RTDB records on those same dates (for ID comparison) ---');
+        console.log('  id | date | kind | student');
+        const liveOnDates = Object.entries(records)
+          .map(([id, r]) => ({ id, r: r as Record<string, unknown> }))
+          .filter(({ r }) => typeof r.date === 'string' && extraDates.has(r.date as string))
+          .sort((a, b) => String(a.r.date).localeCompare(String(b.r.date)));
+        if (!liveOnDates.length) {
+          console.log('    (none — live RTDB has NO records at all on those dates)');
+        } else {
+          for (const { id, r } of liveOnDates) {
+            const kind = r.attendance_only ? 'attendance' : 'session';
+            console.log(`    ${id} | ${r.date ?? '—'} | ${kind} | ${r.student ?? '—'}`);
+          }
+        }
       }
     }
 
