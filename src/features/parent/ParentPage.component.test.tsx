@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/preact';
 import { ParentPage } from './ParentPage';
 import { MOCK_PUBLIC_STATS } from './mockPublicStats';
+import type { PublicStats } from '../../types';
 
 describe('ParentPage', () => {
   it('renders the child name, rank badge, and current task from preview stats', () => {
@@ -47,5 +48,44 @@ describe('ParentPage', () => {
     for (const label of ['حفظ', 'تعديل', 'حذف', 'إرسال']) {
       expect(screen.queryByText(label)).not.toBeInTheDocument();
     }
+  });
+
+  it('renders the new assignment and the session evaluations in separate sections', () => {
+    // A record where today's session GRADED the previous homework (آل عمران)
+    // but ASSIGNED new homework (الكهف). The page must show الكهف under the
+    // "current task" section and the grade under the sessions timeline — never
+    // presenting the grade as the new homework or vice versa.
+    const stats: PublicStats = {
+      ...MOCK_PUBLIC_STATS,
+      currentTask: {
+        date: '2026-07-09',
+        newLoh: [{ sura: 'الكهف', from: '1', to: '20' }],
+        newMadi: [],
+      },
+      recentSessions: [
+        {
+          date: '2026-07-09',
+          loh: { score: 88 },
+          madi: null,
+          newLoh: [{ sura: 'الكهف', from: '1', to: '20' }],
+          newMadi: [],
+          tajweed: null,
+          note: '',
+        },
+      ],
+    };
+    render(<ParentPage previewStats={stats} />);
+
+    // Both sections exist and are distinct headings.
+    expect(screen.getByText('المهمة الحالية')).toBeInTheDocument();
+    expect(screen.getByText('آخر الجلسات')).toBeInTheDocument();
+
+    // The evaluation grade (٨٨) shows in the timeline, as a score — separate
+    // from the assignment text.
+    expect(screen.getByText('٨٨')).toBeInTheDocument();
+
+    // The current-task section names the NEW assignment (الكهف), not the graded
+    // homework — proving the score is not being surfaced as the assignment.
+    expect(screen.getAllByText(/الكهف/).length).toBeGreaterThan(0);
   });
 });

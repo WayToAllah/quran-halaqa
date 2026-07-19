@@ -9,6 +9,7 @@ import { esc, toArabicDigits } from '../../domain/text';
 import { displayStudentName } from '../../domain/students';
 import { hasScore, scoreName } from '../../domain/scoring';
 import { ayahRange, joinSuraNames } from '../../domain/suras';
+import { hijriShort } from '../../domain/hijri';
 import { PlainStars } from '../../ui/StarRating';
 import { useToast } from '../../ui/ToastProvider';
 import { MOSQUE_ID, HALAQA_ID } from '../../config';
@@ -76,7 +77,14 @@ function LogEntry({
       <div class="flex items-center justify-between">
         <div class="min-w-0">
           <div class="text-sm font-extrabold text-ink-dark truncate">{studentName}</div>
-          <div class="text-[11.5px] text-taupe mt-0.5">{formatDate(r.date)}</div>
+          {hijriShort(r.date) ? (
+            <div class="mt-0.5 leading-tight">
+              <div class="text-[11.5px] text-[#0F3D2E] font-semibold">{hijriShort(r.date)}</div>
+              <div class="text-[10px] text-taupe">{formatDate(r.date)}</div>
+            </div>
+          ) : (
+            <div class="text-[11.5px] text-taupe mt-0.5">{formatDate(r.date)}</div>
+          )}
         </div>
         <div class="flex items-center gap-1.5 shrink-0">
           {!r.attendance_only && (

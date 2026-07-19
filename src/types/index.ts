@@ -21,11 +21,20 @@ export interface Student {
   parentToken?: string;
 }
 
-/** A single sura assignment: sura name + optional ayah range. */
+/** A single sura assignment. Two mutually-exclusive shapes:
+ *  - per-sura mode: `sura` + optional ayah range (`from`/`to`).
+ *  - whole-sura range mode: `range: true` + `sura` (start) + `toSura` (end),
+ *    meaning "from sura X through sura Y" with no ayah numbers. Matches the
+ *    production {sura, toSura, range:true} shape so records written by the live
+ *    index.html app read back identically here. */
 export interface SuraAssignment {
   sura: string;
   from?: string;
   to?: string;
+  /** End sura for a whole-sura range (only meaningful when `range` is true). */
+  toSura?: string;
+  /** True when this is a whole-sura range (`sura`..`toSura`), not an ayah range. */
+  range?: boolean;
 }
 
 /** Evaluation of a *previous* session's assignment. `score` is null/undefined

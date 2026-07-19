@@ -5,9 +5,9 @@ import { saveRecord } from '../../data/records.repo';
 import { republishPublicStatsFor } from '../../data/publishStats';
 import { normAr } from '../../domain/text';
 import { getStudentName } from '../../domain/students';
-import { localDateStr, genId } from '../../domain';
+import { localDateStr, genId, hijriLong } from '../../domain';
 import { scoreToStars, scoreName } from '../../domain/scoring';
-import { extractAssignedSuras, validateAyahRange } from '../../domain/record';
+import { extractAssignedSuras, validateAyahRange, isRowComplete, cleanAssignmentRow } from '../../domain/record';
 import { buildWhatsAppMessage, normalizeWhatsAppPhone } from '../../domain/whatsapp';
 import { SuraRow } from './SuraRow';
 import { useGroupAttendance } from '../../hooks/useGroupAttendance';
@@ -234,9 +234,12 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
       return;
     }
 
-    const activeLohRows = lohRows.filter((r) => r.sura);
-    const activeMadiRows = madiRows.filter((r) => r.sura);
+    const activeLohRows = lohRows.filter(isRowComplete).map(cleanAssignmentRow);
+    const activeMadiRows = madiRows.filter(isRowComplete).map(cleanAssignmentRow);
+    // Ayah-range validation applies only to per-sura rows; whole-sura range
+    // rows carry no ayah numbers, so skip them here.
     const rowErrors = [...activeLohRows, ...activeMadiRows, ...(tajweedEnabled ? [tajweed] : [])].some((r) => {
+      if (r.range) return false;
       const e = validateAyahRange(r.sura || '', r.from || '', r.to || '');
       return e.fromError || e.toError;
     });
@@ -321,12 +324,17 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
             <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
             <path d="M3.5 9.5h17M8 3v3.5M16 3v3.5" />
           </svg>
-          <input
-            type="date"
-            class="flex-1 min-w-0 text-sm font-semibold text-ink-dark bg-transparent border-none outline-none"
-            value={date}
-            onInput={(e) => setDate((e.target as HTMLInputElement).value)}
-          />
+          <div class="flex-1 min-w-0">
+            <input
+              type="date"
+              class="w-full text-sm font-semibold text-ink-dark bg-transparent border-none outline-none"
+              value={date}
+              onInput={(e) => setDate((e.target as HTMLInputElement).value)}
+            />
+            {date && hijriLong(date) && (
+              <div class="text-[12px] text-[#0F3D2E] font-bold mt-0.5">{hijriLong(date)}</div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -474,7 +482,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
             <div class="text-[11px] text-taupe mt-0.5">
               {editingId
                 ? 'تقييم هذه الجلسة'
-                : `من جلسة ${new Date(evalSource.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}`}
+                : `من جلسة ${hijriLong(evalSource.date) ? hijriLong(evalSource.date) + ' — ' : ''}${new Date(evalSource.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}`}
             </div>
           </div>
 

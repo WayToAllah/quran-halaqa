@@ -224,3 +224,85 @@ describe('header helpers', () => {
     expect(rankBadgeText(null)).toBeNull();
   });
 });
+
+describe('evaluation ↔ assignment separation (parent page)', () => {
+  // The parent page must keep "today's evaluation" (the score for what was
+  // memorized before) distinct from "the new assignment" (what to memorize
+  // next). These are different fields on the record: loh/madi carry the
+  // evaluation, newLoh/newMadi carry the assignment. A session commonly
+  // evaluates the *previous* homework while handing out *new* homework, so the
+  // two must never be conflated. buildCurrentTask reads assignments only;
+  // buildSessions surfaces both, but as separate properties.
+
+  it('current task exposes the assignment and carries no score', () => {
+    const task = buildCurrentTask(baseStats())!;
+    // Assignment text is present…
+    expect(task.loh).toContain('آل عمران');
+    expect(task.madi).toContain('البقرة');
+    // …and the task object has no score/evaluation field at all.
+    expect(task).not.toHaveProperty('lohScore');
+    expect(task).not.toHaveProperty('score');
+    expect(Object.keys(task).sort()).toEqual(['date', 'loh', 'madi'].sort());
+  });
+
+  it('a session keeps its evaluation score separate from its assignment text', () => {
+    // Build a session whose evaluation (the grade) and assignment (the suras)
+    // are deliberately different values, then assert they land on different
+    // properties — the score never leaks into the assignment string, and vice
+    // versa.
+    const stats = baseStats({
+      recentSessions: [
+        {
+          date: '2026-07-09',
+          loh: { score: 92 }, // evaluation of PREVIOUS homework
+          madi: { score: 90 },
+          newLoh: [{ sura: 'الكهف', from: '1', to: '10' }], // NEW homework
+          newMadi: [{ sura: 'مريم', from: '1', to: '5' }],
+          tajweed: null,
+          note: '',
+        },
+      ],
+    });
+    const s = buildSessions(stats)[0];
+    // Evaluation lives on numeric score fields.
+    expect(s.loh).toBe(92);
+    expect(s.madi).toBe(90);
+    // Assignment lives on separate text fields — and is the NEW suras, not the
+    // thing that was graded.
+    expect(s.newLoh).toContain('الكهف');
+    expect(s.newMadi).toContain('مريم');
+    // The score must not appear inside the assignment text, nor the assignment
+    // sura inside the score.
+    expect(s.newLoh).not.toContain('92');
+    expect(s.newLoh).not.toContain('٩٢');
+  });
+
+  it('current task and a session can disagree — the new assignment is not the graded one', () => {
+    // Realistic case: the latest session GRADED آل عمران (previous homework)
+    // and ASSIGNED الكهف (new homework). The current task must reflect the new
+    // assignment (الكهف), independent of what score any session shows.
+    const stats = baseStats({
+      currentTask: {
+        date: '2026-07-09',
+        newLoh: [{ sura: 'الكهف', from: '1', to: '20' }],
+        newMadi: [],
+      },
+      recentSessions: [
+        {
+          date: '2026-07-09',
+          loh: { score: 88 }, // grade for the PREVIOUS assignment (آل عمران)
+          madi: null,
+          newLoh: [{ sura: 'الكهف', from: '1', to: '20' }],
+          newMadi: [],
+          tajweed: null,
+          note: '',
+        },
+      ],
+    });
+    const task = buildCurrentTask(stats)!;
+    expect(task.loh).toContain('الكهف'); // the NEW assignment
+    expect(task.loh).not.toContain('آل عمران'); // not the thing that was graded
+    // And the session still reports the grade separately.
+    expect(buildSessions(stats)[0].loh).toBe(88);
+  });
+});

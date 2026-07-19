@@ -1,5 +1,6 @@
 export * from './ids';
 export * from './dates';
+export * from './hijri';
 export * from './scoring';
 export * from './suras';
 export * from './students';

@@ -5,6 +5,7 @@ import {
   countAyat,
   findSuraByName,
   joinSuraNames,
+  suraLabel,
   suraNumber,
   suraPageLabel,
 } from './suras';
@@ -92,6 +93,38 @@ describe('joinSuraNames', () => {
   });
   it('includes ayah ranges in the joined output', () => {
     expect(joinSuraNames([{ sura: 'البقرة', from: '1', to: '10' }])).toBe('البقرة (1–10)');
+  });
+  it('renders a whole-sura range as "من X إلى Y"', () => {
+    expect(joinSuraNames([{ sura: 'الملك', toSura: 'الناس', range: true }])).toBe(
+      'من الملك إلى الناس',
+    );
+  });
+  it('mixes a range item with ordinary items', () => {
+    expect(
+      joinSuraNames([
+        { sura: 'البقرة', from: '1', to: '5' },
+        { sura: 'الملك', toSura: 'الناس', range: true },
+      ]),
+    ).toBe('البقرة (1–5) ومن الملك إلى الناس');
+  });
+  it('preserves entry order (never sorts by mushaf order)', () => {
+    // الناس (114) entered before البقرة (2): output must keep entry order.
+    expect(joinSuraNames([{ sura: 'الناس' }, { sura: 'البقرة' }])).toBe('الناس والبقرة');
+  });
+});
+
+describe('suraLabel', () => {
+  it('labels a plain sura with no range', () => {
+    expect(suraLabel({ sura: 'الإخلاص' })).toBe('الإخلاص');
+  });
+  it('labels an ayah range', () => {
+    expect(suraLabel({ sura: 'البقرة', from: '1', to: '10' })).toBe('البقرة (1–10)');
+  });
+  it('labels a whole-sura range as "من X إلى Y"', () => {
+    expect(suraLabel({ sura: 'الملك', toSura: 'الناس', range: true })).toBe('من الملك إلى الناس');
+  });
+  it('falls back to the plain sura name when a range is missing its toSura', () => {
+    expect(suraLabel({ sura: 'الملك', range: true })).toBe('الملك');
   });
 });
 

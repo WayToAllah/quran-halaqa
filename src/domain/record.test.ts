@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { findPreviousSession, extractAssignedSuras, validateAyahRange } from './record';
+import { findPreviousSession, extractAssignedSuras, validateAyahRange, isRowComplete, cleanAssignmentRow } from './record';
 import type { SessionRecord, Student } from '../types';
 
 const zaid: Student = { id: 's_1', name: 'زيد احمد' };
@@ -85,5 +85,53 @@ describe('validateAyahRange', () => {
 
   it('accepts a valid in-range, in-order pair', () => {
     expect(validateAyahRange('البقرة', '1', '10')).toEqual({});
+  });
+});
+
+describe('isRowComplete', () => {
+  it('accepts a per-sura row with just a sura', () => {
+    expect(isRowComplete({ sura: 'الفاتحة' })).toBe(true);
+  });
+  it('rejects an empty row', () => {
+    expect(isRowComplete({ sura: '' })).toBe(false);
+  });
+  it('accepts a whole-sura range with both ends', () => {
+    expect(isRowComplete({ sura: 'الملك', toSura: 'الناس', range: true })).toBe(true);
+  });
+  it('rejects a range missing its end sura', () => {
+    expect(isRowComplete({ sura: 'الملك', range: true })).toBe(false);
+  });
+  it('rejects a range missing its start sura', () => {
+    expect(isRowComplete({ sura: '', toSura: 'الناس', range: true })).toBe(false);
+  });
+});
+
+describe('cleanAssignmentRow', () => {
+  it('keeps a per-sura row with its ayah range and no range fields', () => {
+    expect(cleanAssignmentRow({ sura: 'البقرة', from: '1', to: '10' })).toEqual({
+      sura: 'البقرة',
+      from: '1',
+      to: '10',
+    });
+  });
+  it('omits empty from/to on a per-sura row', () => {
+    expect(cleanAssignmentRow({ sura: 'الفاتحة', from: '', to: '' })).toEqual({ sura: 'الفاتحة' });
+  });
+  it('saves a whole-sura range as {sura, toSura, range}', () => {
+    expect(cleanAssignmentRow({ sura: 'الملك', toSura: 'الناس', range: true })).toEqual({
+      sura: 'الملك',
+      toSura: 'الناس',
+      range: true,
+    });
+  });
+  it('strips leftover ayah numbers from a range row (toggle residue)', () => {
+    // A row toggled from per-sura → range could still carry stale from/to.
+    expect(
+      cleanAssignmentRow({ sura: 'الملك', toSura: 'الناس', range: true, from: '3', to: '9' }),
+    ).toEqual({ sura: 'الملك', toSura: 'الناس', range: true });
+  });
+  it('strips range/toSura when the row is not a valid range', () => {
+    // range:true but no toSura → treated as an ordinary per-sura row.
+    expect(cleanAssignmentRow({ sura: 'الملك', range: true })).toEqual({ sura: 'الملك' });
   });
 });

@@ -161,9 +161,19 @@ export function ayahRange(from?: string | number, to?: string | number): string 
   return '';
 }
 
+/** Display label for one assignment item. A whole-sura range renders as
+ * "من X إلى Y" (matching production's compact form); an ordinary item renders
+ * as its sura name plus any ayah range, e.g. "البقرة (1–10)". A range item
+ * missing its `toSura` falls back to the plain sura name so a half-entered
+ * range never shows a dangling "من … إلى". */
+export function suraLabel(item: SuraAssignment): string {
+  if (item.range && item.toSura) return 'من ' + item.sura + ' إلى ' + item.toSura;
+  return item.sura + ayahRange(item.from, item.to);
+}
+
 /** Joins multiple sura entries Arabic-style: "الناس والفلق" / "الناس، الفلق، والإخلاص". */
 export function joinSuraNames(list: SuraAssignment[]): string {
-  const parts = list.map((m) => m.sura + ayahRange(m.from, m.to));
+  const parts = list.map(suraLabel);
   if (parts.length === 1) return parts[0];
   return parts.slice(0, -1).join('، ') + ' و' + parts[parts.length - 1];
 }

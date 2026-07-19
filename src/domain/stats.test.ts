@@ -184,6 +184,28 @@ describe('buildStudentPublicStats', () => {
     });
   });
 
+  it('carries a whole-sura range assignment through to currentTask and recentSessions', () => {
+    const withRange: SessionRecord[] = [
+      {
+        id: 'r1',
+        studentId: 's_1',
+        date: '2026-07-01',
+        loh: { score: 88 },
+        newLoh: [{ sura: 'الملك', toSura: 'الناس', range: true }],
+      },
+    ];
+    const result = buildStudentPublicStats(zaid, withRange, 1, 1, ['2026-07-01']);
+    // The range fields must reach publicStats unmodified so the parent page
+    // can render "من الملك إلى الناس".
+    expect(result.currentTask?.newLoh).toEqual([{ sura: 'الملك', toSura: 'الناس', range: true }]);
+    expect(result.recentSessions[0].newLoh).toEqual([
+      { sura: 'الملك', toSura: 'الناس', range: true },
+    ]);
+    // A whole-sura range has no ayah numbers, so it contributes 0 to totalAyat
+    // (matching production).
+    expect(result.totalAyat).toBe(0);
+  });
+
   it('carries the mistake tally into recentSessions when present', () => {
     const withMistakes: SessionRecord[] = [
       {

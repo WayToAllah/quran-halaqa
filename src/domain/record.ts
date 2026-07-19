@@ -48,6 +48,31 @@ export interface AyahRangeErrors {
   toError?: string;
 }
 
+/** A row counts as filled-in and worth saving when it has a sura, and — if it
+ * is in whole-sura range mode — also an end sura. A range row missing its
+ * `toSura` is treated as incomplete and dropped on save (mirrors the live
+ * app's `.filter(x => x.range ? (x.sura && x.toSura) : x.sura)`). */
+export function isRowComplete(row: SuraAssignment): boolean {
+  if (!row.sura) return false;
+  if (row.range) return !!row.toSura;
+  return true;
+}
+
+/** Normalizes an entry row into the exact shape persisted to the DB. A range
+ * row saves as `{sura, toSura, range:true}` with no ayah numbers; an ordinary
+ * row saves as `{sura, from, to}` with no range fields. This prevents a stale
+ * `toSura`/`range` (or a leftover `from`/`to`) from a toggled row leaking into
+ * the saved record — matching the live index.html save mapping. */
+export function cleanAssignmentRow(row: SuraAssignment): SuraAssignment {
+  if (row.range && row.toSura) {
+    return { sura: row.sura, toSura: row.toSura, range: true };
+  }
+  const out: SuraAssignment = { sura: row.sura };
+  if (row.from) out.from = row.from;
+  if (row.to) out.to = row.to;
+  return out;
+}
+
 /**
  * Validates a from/to ayah range against the real ayah count of the named
  * sura. Returns an empty object (no errors) when the sura isn't recognized

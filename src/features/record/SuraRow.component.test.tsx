@@ -56,3 +56,46 @@ describe('SuraRow — searchable sura picker', () => {
     expect(fromInput.max).toBe('7');
   });
 });
+
+describe('SuraRow — whole-sura range mode', () => {
+  it('reveals the "إلى سورة" picker and hides the ayah fields when toggled on', async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderRow({ sura: 'الملك', from: '', to: '' });
+    // ayah fields present before toggling
+    expect(screen.getByPlaceholderText('من آية')).toBeInTheDocument();
+    await user.click(screen.getByRole('checkbox'));
+    // onChange fires with range:true, and from/to are dropped
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ sura: 'الملك', range: true }));
+    const call = onChange.mock.calls[0][0] as Record<string, unknown>;
+    expect(call).not.toHaveProperty('from');
+    expect(call).not.toHaveProperty('to');
+  });
+
+  it('when already a range, shows both pickers and no ayah inputs', () => {
+    renderRow({ sura: 'الملك', toSura: 'الناس', range: true });
+    expect(screen.getByText('إلى سورة')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('اكتب سورة النهاية…')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('من آية')).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('إلى آية')).not.toBeInTheDocument();
+  });
+
+  it('commits the end sura via onChange as toSura', async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderRow({ sura: 'الملك', toSura: '', range: true });
+    const endInput = screen.getByPlaceholderText('اكتب سورة النهاية…');
+    await user.click(endInput);
+    await user.type(endInput, 'الناس');
+    await user.click(await screen.findByRole('button', { name: /114\. الناس/ }));
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ toSura: 'الناس' }));
+  });
+
+  it('toggling back off drops toSura and range', async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderRow({ sura: 'الملك', toSura: 'الناس', range: true });
+    await user.click(screen.getByRole('checkbox'));
+    const call = onChange.mock.calls[0][0] as Record<string, unknown>;
+    expect(call).not.toHaveProperty('toSura');
+    expect(call).not.toHaveProperty('range');
+    expect(call).toMatchObject({ sura: 'الملك' });
+  });
+});
