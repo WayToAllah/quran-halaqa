@@ -1,45 +1,5 @@
 name: Migrate RTDB to Firestore
 
-# ⚠️ MANUAL, DATA-WRITE WORKFLOW — only runs when you explicitly trigger it
-# from the Actions tab. Never runs automatically on push.
-#
-# ---------------------------------------------------------------------------
-# ONE-TIME SETUP (before the first run):
-#
-# 1. Enable Firestore: Firebase Console → Firestore Database → Create database
-#    (Native mode, any region — e.g. eur3 / europe-west).
-#
-# 2. Get a service account key: Firebase Console → Project Settings (gear
-#    icon) → Service Accounts tab → "Generate new private key" → a JSON
-#    file downloads.
-#
-# 3. Add it as a GitHub secret: this repo → Settings → Secrets and
-#    variables → Actions → "New repository secret" →
-#      Name:  FIREBASE_SERVICE_ACCOUNT
-#      Value: paste the ENTIRE content of the downloaded JSON file
-#    → Save. (This is a one-time setup — never needed again after this.)
-#
-# 4. Find your admin UID: Firebase Console → Authentication → Users →
-#    copy the value in the "User UID" column for your admin account.
-#
-# ---------------------------------------------------------------------------
-# TO RUN:
-#
-# Actions tab (top of the repo) → "Migrate RTDB to Firestore" (left sidebar)
-# → "Run workflow" button → fill in:
-#   - admin_uid: the UID from step 4
-#   - dry_run: "true" for the first run (prints what WOULD happen, writes
-#     nothing — safe to run as many times as you like) → "false" once the
-#     dry-run output looks correct, to actually migrate
-#   - deploy_rules: "true" to also publish firestore.rules/indexes (safe —
-#     rules deploys don't touch any data)
-# → "Run workflow"
-#
-# Then click into the run to watch its log — the "Run migration" step
-# prints exactly what it found/wrote, and a final verification comparing
-# written counts to source counts.
-# ---------------------------------------------------------------------------
-
 on:
   workflow_dispatch:
     inputs:
@@ -50,10 +10,14 @@ on:
         description: 'Dry run (no writes)? true or false'
         required: true
         default: 'true'
+      prune:
+        description: 'Delete Firestore records NOT in RTDB (cleanup)? true or false'
+        required: true
+        default: 'false'
       deploy_rules:
         description: 'Also deploy firestore.rules/indexes? true or false'
         required: true
-        default: 'true'
+        default: 'false'
 
 jobs:
   migrate:
@@ -82,12 +46,17 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/service-account.json
           ADMIN_UID: ${{ github.event.inputs.admin_uid }}
           DRY_RUN: ${{ github.event.inputs.dry_run }}
+          PRUNE: ${{ github.event.inputs.prune }}
         run: |
+          ARGS="--admin-uid $ADMIN_UID"
           if [ "$DRY_RUN" = "true" ]; then
-            npx tsx scripts/migrate-rtdb-to-firestore.ts --admin-uid "$ADMIN_UID" --dry-run
-          else
-            npx tsx scripts/migrate-rtdb-to-firestore.ts --admin-uid "$ADMIN_UID"
+            ARGS="$ARGS --dry-run"
           fi
+          if [ "$PRUNE" = "true" ]; then
+            ARGS="$ARGS --prune --confirm"
+          fi
+          echo "Running: tsx scripts/migrate-rtdb-to-firestore.ts $ARGS"
+          npx tsx scripts/migrate-rtdb-to-firestore.ts $ARGS
 
       - name: Clean up credentials file
         if: always()
