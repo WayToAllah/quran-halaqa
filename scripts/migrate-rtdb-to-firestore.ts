@@ -50,6 +50,7 @@ import { readFileSync } from 'node:fs';
 import { initializeApp, applicationDefault } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getDatabase } from 'firebase-admin/database';
+import { idsOnlyInSource, idsOnlyInTarget } from '../src/domain/migrationDiff';
 
 const RTDB_URL = 'https://quran-app-abe52-default-rtdb.firebaseio.com';
 
@@ -150,6 +151,42 @@ async function main() {
     if (tokenIds[0]) {
       console.log(`  publicStats/${tokenIds[0]}`, JSON.stringify(publicStats[tokenIds[0]]).slice(0, 150));
     }
+
+    // Reconciliation (read-only): when reading live data (Firebase already
+    // initialized above), compare the CURRENT Firestore records against the
+    // live RTDB records. This surfaces drift a plain re-run would silently
+    // leave behind — most importantly records that exist in Firestore but no
+    // longer in RTDB (deleted from the production app after a prior migration,
+    // or created directly in the v2 app). NOTHING is written or deleted here.
+    if (!args.exportPath) {
+      const fsDb = getFirestore();
+      const halaqaRef = fsDb.doc(`mosques/${args.mosqueId}/halaqat/${args.halaqaId}`);
+      const fsSnap = await halaqaRef.collection('records').get();
+      const fsRecordIds = fsSnap.docs.map((d) => d.id);
+      const extras = idsOnlyInTarget(recordIds, fsRecordIds);
+      const missing = idsOnlyInSource(recordIds, fsRecordIds);
+
+      console.log(`\nReconciliation against current Firestore:`);
+      console.log(`  Firestore currently holds ${fsRecordIds.length} records.`);
+      console.log(`  In Firestore but NOT in live RTDB (extras):  ${extras.length}`);
+      console.log(`  In live RTDB but NOT yet in Firestore (new): ${missing.length}`);
+
+      if (extras.length) {
+        console.log('\n  --- EXTRA records in Firestore (absent from live RTDB) ---');
+        console.log('  id | date | kind | student');
+        for (const id of extras) {
+          const doc = fsSnap.docs.find((d) => d.id === id);
+          const data = (doc?.data() ?? {}) as Record<string, unknown>;
+          const date = data.date ?? '—';
+          const student = data.student ?? '—';
+          const kind = data.attendance_only ? 'attendance' : 'session';
+          console.log(`    ${id} | ${date} | ${kind} | ${student}`);
+        }
+        console.log('\n  A plain migration re-run does NOT remove these (set() only).');
+        console.log('  Review the list above and decide before any real run.');
+      }
+    }
+
     console.log('\nRe-run without --dry-run to actually write.');
     return;
   }
