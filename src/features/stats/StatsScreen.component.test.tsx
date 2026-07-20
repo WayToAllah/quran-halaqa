@@ -38,6 +38,25 @@ describe('StatsScreen — summary cards', () => {
     // INCLUDED in this average, not treated as "unscored" and skipped.
     expect(screen.getByText('٥٧٪')).toBeInTheDocument();
   });
+
+  it('shows total registered students and recently-active students as distinct cards', () => {
+    // Fix "today" so recency is deterministic: with today=2026-07-20, زيد's
+    // last session (2026-07-02) is within 30 days -> active; محمد's last
+    // session (2026-06-01) is ~50 days old -> not active. Total students = 2
+    // regardless (both are registered), so the two numbers must differ.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-20T12:00:00'));
+    render(<StatsScreen />);
+    expect(screen.getByText('إجمالي الطلاب')).toBeInTheDocument();
+    expect(screen.getByText('طالب نشط (آخر شهر)')).toBeInTheDocument();
+    // total = 2 (both registered students)
+    const totalCard = screen.getByText('إجمالي الطلاب').previousSibling;
+    expect(totalCard?.textContent).toBe('٢');
+    // recently active = 1 (only زيد، محمد's last session is too old)
+    const activeCard = screen.getByText('طالب نشط (آخر شهر)').previousSibling;
+    expect(activeCard?.textContent).toBe('١');
+    vi.useRealTimers();
+  });
 });
 
 describe('StatsScreen — month filter', () => {

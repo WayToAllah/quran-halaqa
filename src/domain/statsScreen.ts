@@ -24,6 +24,8 @@ function ayatInRecord(r: SessionRecord): number {
 
 export interface SummaryStats {
   totalSessions: number;
+  /** Students with at least one session in the records passed in (legacy
+   * "ever recorded" reading — kept for callers that still want it). */
   activeStudents: number;
   totalAyat: number;
   lohAyat: number;
@@ -70,6 +72,39 @@ export function computeSummaryStats(records: SessionRecord[]): SummaryStats {
   ).size;
 
   return { totalSessions, activeStudents, totalAyat, lohAyat, madiAyat, avgLoh, totalHalaqaDays };
+}
+
+/**
+ * Counts students whose most recent session (across ALL records — not the
+ * screen's month filter, since "active" is about real-world recency, not the
+ * viewed month) falls within `withinDays` of `today`. This is deliberately a
+ * different, stricter notion of "active" than `SummaryStats.activeStudents`
+ * (which just means "has ever had a session"): a student who memorized last
+ * year but hasn't attended since isn't "active" today even though they have
+ * historical records.
+ */
+export function countRecentlyActiveStudents(
+  students: Student[],
+  allRecords: SessionRecord[],
+  withinDays = 30,
+  today: string = localDateStr(),
+): number {
+  const cutoff = new Date(today + 'T12:00:00');
+  cutoff.setDate(cutoff.getDate() - withinDays);
+  const cutoffStr = localDateStr(cutoff);
+
+  const lastDateByStudent = new Map<string, string>();
+  allRecords.forEach((r) => {
+    const key = r.studentId || r.student;
+    if (!key || !r.date) return;
+    const prev = lastDateByStudent.get(key);
+    if (!prev || r.date > prev) lastDateByStudent.set(key, r.date);
+  });
+
+  return students.filter((s) => {
+    const last = lastDateByStudent.get(s.id);
+    return !!last && last >= cutoffStr;
+  }).length;
 }
 
 /** The halaqa's week runs Saturday→Friday (not the ISO Monday start) — this

@@ -7,6 +7,7 @@ import {
   computeStudentStatsRows,
   sortStudentStatsRows,
   getWeekStart,
+  countRecentlyActiveStudents,
 } from './statsScreen';
 import type { SessionRecord, Student } from '../types';
 
@@ -80,6 +81,54 @@ describe('computeSummaryStats', () => {
       { id: 'r2', studentId: 's_1', date: '2026-07-01' },
     ];
     expect(computeSummaryStats(records).totalHalaqaDays).toBe(1);
+  });
+});
+
+describe('countRecentlyActiveStudents', () => {
+  const today = '2026-07-20';
+
+  it('counts a student whose last session is within the window', () => {
+    const records: SessionRecord[] = [{ id: 'r1', studentId: 's_1', date: '2026-07-10' }]; // 10 days ago
+    expect(countRecentlyActiveStudents(students, records, 30, today)).toBe(1);
+  });
+
+  it('excludes a student whose last session is older than the window', () => {
+    const records: SessionRecord[] = [{ id: 'r1', studentId: 's_1', date: '2026-05-01' }]; // ~80 days ago
+    expect(countRecentlyActiveStudents(students, records, 30, today)).toBe(0);
+  });
+
+  it('uses each student\'s MOST RECENT session, not their first', () => {
+    const records: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-01-01' }, // old
+      { id: 'r2', studentId: 's_1', date: '2026-07-15' }, // recent — this one counts
+    ];
+    expect(countRecentlyActiveStudents(students, records, 30, today)).toBe(1);
+  });
+
+  it('counts a registered student with zero records as not active', () => {
+    expect(countRecentlyActiveStudents(students, [], 30, today)).toBe(0);
+  });
+
+  it('a date exactly at the cutoff boundary counts as active (inclusive)', () => {
+    // 30 days before 2026-07-20 is 2026-06-20.
+    const records: SessionRecord[] = [{ id: 'r1', studentId: 's_1', date: '2026-06-20' }];
+    expect(countRecentlyActiveStudents(students, records, 30, today)).toBe(1);
+  });
+
+  it('counts multiple recently-active students independently', () => {
+    const records: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-18' },
+      { id: 'r2', studentId: 's_2', date: '2026-07-19' },
+    ];
+    expect(countRecentlyActiveStudents(students, records, 30, today)).toBe(2);
+  });
+
+  it('never exceeds the number of registered students, even with extra record studentIds', () => {
+    const records: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-18' },
+      { id: 'r2', studentId: 's_ghost_deleted', date: '2026-07-18' }, // not in `students`
+    ];
+    expect(countRecentlyActiveStudents(students, records, 30, today)).toBe(1);
   });
 });
 

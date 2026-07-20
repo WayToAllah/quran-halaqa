@@ -10,6 +10,7 @@ import {
   computeTopAyat,
   computeStudentStatsRows,
   sortStudentStatsRows,
+  countRecentlyActiveStudents,
   type StatsSortKey,
 } from '../../domain/statsScreen';
 import { MOSQUE_ID, HALAQA_ID } from '../../config';
@@ -75,6 +76,12 @@ export function StatsScreen() {
   }, [records, monthFilter]);
 
   const summary = useMemo(() => computeSummaryStats(filteredRecords), [filteredRecords]);
+  // Recency is about real-world activity, not the selected month view, so this
+  // always reads from the full (unfiltered) records regardless of monthFilter.
+  const recentlyActive = useMemo(
+    () => countRecentlyActiveStudents(students, records, 30),
+    [students, records],
+  );
   const weeklyBuckets = useMemo(() => computeWeeklyBuckets(filteredRecords), [filteredRecords]);
   const scoreDist = useMemo(() => computeScoreDistribution(filteredRecords), [filteredRecords]);
   const topAyat = useMemo(() => computeTopAyat(students, filteredRecords, 3), [students, filteredRecords]);
@@ -147,11 +154,16 @@ export function StatsScreen() {
       <div class="grid grid-cols-2 gap-2.5">
         {[
           { num: toArabicDigits(summary.totalSessions), lbl: 'جلسة مسجلة', color: '#0F3D2E' },
-          { num: toArabicDigits(summary.activeStudents), lbl: 'طالب نشط', color: '#C9A227' },
-          { num: toArabicDigits(summary.totalAyat), lbl: 'إجمالي الآيات', color: '#0F3D2E' },
-          { num: toArabicDigits(summary.avgLoh) + '٪', lbl: 'متوسط اللوح', color: '#C9A227' },
-          { num: toArabicDigits(summary.lohAyat), lbl: 'آيات لوح', color: '#0F3D2E' },
-          { num: toArabicDigits(summary.madiAyat), lbl: 'آيات ماضي', color: '#C9A227' },
+          { num: toArabicDigits(students.length), lbl: 'إجمالي الطلاب', color: '#C9A227' },
+          {
+            num: toArabicDigits(recentlyActive),
+            lbl: 'طالب نشط (آخر شهر)',
+            color: '#0F3D2E',
+          },
+          { num: toArabicDigits(summary.totalAyat), lbl: 'إجمالي الآيات', color: '#C9A227' },
+          { num: toArabicDigits(summary.avgLoh) + '٪', lbl: 'متوسط اللوح', color: '#0F3D2E' },
+          { num: toArabicDigits(summary.lohAyat), lbl: 'آيات لوح', color: '#C9A227' },
+          { num: toArabicDigits(summary.madiAyat), lbl: 'آيات ماضي', color: '#0F3D2E' },
         ].map((c) => (
           <div key={c.lbl} class="bg-white border border-hairline rounded-2xl py-4 px-3 text-center">
             <div class="text-[24px] font-black leading-none" style={{ color: c.color }}>
