@@ -27,6 +27,10 @@ export default defineConfig({
         dir: 'rtl',
         // Scope/start_url are resolved relative to `base`, so they land under
         // /quran-halaqa/v2/ — the app opens to the admin index, not the site root.
+        // An explicit `id` pins v2's app identity to its own path so browsers
+        // never confuse it with the production PWA at the root (whose id is
+        // /quran-halaqa/) — the two install as two separate apps.
+        id: '/quran-halaqa/v2/',
         scope: '/quran-halaqa/v2/',
         start_url: '/quran-halaqa/v2/',
         display: 'standalone',
