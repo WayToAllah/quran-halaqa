@@ -51,7 +51,7 @@ export default defineConfig({
         // SPA-style navigation fallback to the admin index, but ONLY within the
         // v2 scope — never intercept the production root.
         navigateFallback: '/quran-halaqa/v2/index.html',
-        navigateFallbackDenylist: [/child\.html$/],
+        navigateFallbackDenylist: [/\/child\.html(\?.*)?$/],
         runtimeCaching: [
           {
             urlPattern: ({ url }) =>
