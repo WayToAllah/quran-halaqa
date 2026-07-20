@@ -56,20 +56,9 @@ describe('SuraRow — searchable sura picker', () => {
     expect(fromInput.max).toBe('7');
   });
 
-  it('shows an incomplete-range error when "من" is filled but "إلى" is empty', () => {
+  it('does not show an error when "من" is filled but "إلى" is empty (auto-fill case)', () => {
     renderRow({ sura: 'البقرة', from: '5', to: '' });
-    expect(screen.getByText('أكمل نهاية النطاق')).toBeInTheDocument();
-  });
-
-  it('shows an incomplete-range error when "إلى" is filled but "من" is empty', () => {
-    renderRow({ sura: 'البقرة', from: '', to: '5' });
-    expect(screen.getByText('أكمل بداية النطاق')).toBeInTheDocument();
-  });
-
-  it('shows no incomplete-range error when both ayah fields are empty', () => {
-    renderRow({ sura: 'البقرة', from: '', to: '' });
     expect(screen.queryByText('أكمل نهاية النطاق')).not.toBeInTheDocument();
-    expect(screen.queryByText('أكمل بداية النطاق')).not.toBeInTheDocument();
   });
 });
 

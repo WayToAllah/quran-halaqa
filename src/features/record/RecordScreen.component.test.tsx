@@ -73,6 +73,19 @@ beforeEach(() => {
   studentsForHook = students;
 });
 
+/** The save flow is now two-step: tap the floating "حفظ الجلسة" to open the
+ * review modal, then confirm. This helper does both. `via` picks which confirm
+ * button to press. */
+async function saveAndConfirm(via: 'send' | 'saveOnly' = 'saveOnly') {
+  await userEvent.click(screen.getByRole('button', { name: /حفظ الجلسة|تحديث الجلسة/ }));
+  // The review modal is now open; find its commit button.
+  const name =
+    via === 'send'
+      ? /احفظ وأرسل واتساب|حدّث وأرسل واتساب/
+      : /احفظ بدون إرسال|حدّث بدون إرسال|احفظ الجلسة|حدّث الجلسة/;
+  await userEvent.click(await screen.findByRole('button', { name }));
+}
+
 describe('RecordScreen — student picker', () => {
   it('defaults the date to today', () => {
     renderScreen();
@@ -154,7 +167,7 @@ describe('RecordScreen — save validation', () => {
     renderScreen();
     await selectStudent('زيد احمد');
     await userEvent.type(screen.getByPlaceholderText('أي ملاحظة عن أداء الطالب اليوم…'), 'ملاحظة تجريبية');
-    await userEvent.click(screen.getByRole('button', { name: /حفظ الجلسة/ }));
+    await saveAndConfirm();
     await waitFor(() => expect(saveRecordMock).toHaveBeenCalledTimes(1));
   });
 });
@@ -171,7 +184,7 @@ describe('RecordScreen — save flow', () => {
     await userEvent.type(fromInputs[0], '1');
     await userEvent.type(toInputs[0], '10');
 
-    await userEvent.click(screen.getByRole('button', { name: /حفظ الجلسة/ }));
+    await saveAndConfirm();
 
     await waitFor(() => expect(saveRecordMock).toHaveBeenCalledTimes(1));
     const savedRecord = saveRecordMock.mock.calls[0][2];
@@ -204,7 +217,7 @@ describe('RecordScreen — save flow', () => {
     // score field now shows 97
     expect(screen.getByDisplayValue('97')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: /حفظ الجلسة/ }));
+    await saveAndConfirm();
     await waitFor(() => expect(saveRecordMock).toHaveBeenCalledTimes(1));
     const savedRecord = saveRecordMock.mock.calls[0][2];
     expect(savedRecord.loh.score).toBe(97);
@@ -218,7 +231,7 @@ describe('RecordScreen — save flow', () => {
     renderScreen();
     await selectStudent('زيد احمد');
     await userEvent.type(screen.getByPlaceholderText('أي ملاحظة عن أداء الطالب اليوم…'), 'ملاحظة');
-    await userEvent.click(screen.getByRole('button', { name: /حفظ الجلسة/ }));
+    await saveAndConfirm();
 
     await waitFor(() => expect(screen.getByText(/فشل الحفظ/)).toBeInTheDocument());
     // student selection preserved after failure
@@ -317,6 +330,8 @@ describe('RecordScreen — edit mode', () => {
     expect(onEditConsumed).toHaveBeenCalledTimes(1);
 
     await userEvent.click(screen.getByRole('button', { name: /تحديث الجلسة/ }));
+    // review modal opens; confirm the update
+    await userEvent.click(await screen.findByRole('button', { name: /حدّث/ }));
     await waitFor(() => expect(saveRecordMock).toHaveBeenCalledTimes(1));
     const saved = saveRecordMock.mock.calls[0][2];
     expect(saved.id).toBe('r_edit_1'); // same id — overwrite, not new
@@ -325,13 +340,16 @@ describe('RecordScreen — edit mode', () => {
     expect(saved.loh.mistakes).toEqual({ full: 2, tajweed: 1 });
   });
 
-  it('opens the WhatsApp preview after an edit save (same as a new session)', async () => {
+  it('shows the review modal before an edit save, then saves on confirm', async () => {
     renderScreen({ editRecord: editRec });
     await screen.findByText(/تعديل جلسة محفوظة/);
     await userEvent.click(screen.getByRole('button', { name: /تحديث الجلسة/ }));
+    // review modal appears BEFORE anything is saved
+    expect(await screen.findByText('مراجعة قبل الحفظ')).toBeInTheDocument();
+    expect(saveRecordMock).not.toHaveBeenCalled();
+    // confirm → save happens
+    await userEvent.click(screen.getByRole('button', { name: /حدّث/ }));
     await waitFor(() => expect(saveRecordMock).toHaveBeenCalledTimes(1));
-    // WhatsApp modal appears so the teacher can resend the updated summary
-    expect(await screen.findByText('إرسال ملخص الجلسة')).toBeInTheDocument();
     expect(screen.getByText(/تم تحديث الجلسة/)).toBeInTheDocument();
   });
 

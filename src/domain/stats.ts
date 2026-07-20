@@ -1,7 +1,7 @@
 import type { Badge, PublicStats, SessionRecord, Student } from '../types';
 import { byNewest } from './dates';
 import { hasScore } from './scoring';
-import { countAyat } from './suras';
+import { itemAyat } from './suras';
 import { getStudentName, recordsForStudent } from './students';
 import { computeAttendanceStreak } from './attendance';
 
@@ -106,11 +106,12 @@ export function buildStudentPublicStats(
   let totalAyat = 0;
   realRecs.forEach((r) => {
     (r.newLoh ?? []).forEach((l) => {
-      if (l?.sura) totalAyat += countAyat(l.from, l.to);
+      if (l?.sura) totalAyat += itemAyat(l);
     });
     (r.newMadi ?? []).forEach((m) => {
-      if (m?.sura) totalAyat += countAyat(m.from, m.to);
+      if (m?.sura) totalAyat += itemAyat(m);
     });
+    if (r.tajweed?.sura) totalAyat += itemAyat(r.tajweed);
   });
 
   const uniqueDays = new Set(allRecs.map((r) => r.date)).size;
@@ -168,11 +169,12 @@ export function buildStudentPublicStats(
     let monthAyat = 0;
     monthRealRecs.forEach((r) => {
       (r.newLoh ?? []).forEach((l) => {
-        if (l?.sura) monthAyat += countAyat(l.from, l.to);
+        if (l?.sura) monthAyat += itemAyat(l);
       });
       (r.newMadi ?? []).forEach((m) => {
-        if (m?.sura) monthAyat += countAyat(m.from, m.to);
+        if (m?.sura) monthAyat += itemAyat(m);
       });
+      if (r.tajweed?.sura) monthAyat += itemAyat(r.tajweed);
     });
     monthlyStats[month] = {
       attendPct: monthAttendPct,

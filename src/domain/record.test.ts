@@ -70,19 +70,14 @@ describe('validateAyahRange', () => {
   });
 
   it('flags a from-ayah below 1', () => {
-    // Use a valid `to` so this isolates the range check, not the paired rule.
     expect(validateAyahRange('الفاتحة', '0', '3')).toHaveProperty('fromError');
   });
 
-  it('flags "من" filled without "إلى" as an incomplete range', () => {
-    expect(validateAyahRange('البقرة', '5', '')).toEqual({ toError: 'أكمل نهاية النطاق' });
+  it('does not flag "من" filled without "إلى" (auto-fill leaves it blank on purpose)', () => {
+    expect(validateAyahRange('البقرة', '5', '')).toEqual({});
   });
 
-  it('flags "إلى" filled without "من" as an incomplete range', () => {
-    expect(validateAyahRange('البقرة', '', '5')).toEqual({ fromError: 'أكمل بداية النطاق' });
-  });
-
-  it('does not flag an incomplete range when both ends are empty (whole sura)', () => {
+  it('does not flag an empty range (both ends blank = whole sura)', () => {
     expect(validateAyahRange('البقرة', '', '')).toEqual({});
   });
 

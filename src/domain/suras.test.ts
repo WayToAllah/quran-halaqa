@@ -6,6 +6,8 @@ import {
   findSuraByName,
   joinSuraNames,
   suraLabel,
+  itemAyat,
+  rangeSuras,
   suraNumber,
   suraPageLabel,
 } from './suras';
@@ -141,5 +143,40 @@ describe('countAyat', () => {
   });
   it('returns 0 for a zero "from" (falsy)', () => {
     expect(countAyat('0', '5')).toBe(0);
+  });
+});
+
+describe('rangeSuras', () => {
+  it('returns the inclusive span in mushaf order', () => {
+    expect(rangeSuras('الفلق', 'الناس')).toEqual(['الفلق', 'الناس']);
+  });
+  it('is order-agnostic (later sura first still works)', () => {
+    expect(rangeSuras('الناس', 'الفلق')).toEqual(['الفلق', 'الناس']);
+  });
+  it('returns a single sura when start === end', () => {
+    expect(rangeSuras('الإخلاص', 'الإخلاص')).toEqual(['الإخلاص']);
+  });
+  it('returns [] for an unknown sura', () => {
+    expect(rangeSuras('غير موجودة', 'الناس')).toEqual([]);
+  });
+});
+
+describe('itemAyat', () => {
+  it('counts an ordinary ayah range inclusively', () => {
+    expect(itemAyat({ sura: 'البقرة', from: '1', to: '10' })).toBe(10);
+  });
+  it('counts a bare sura (no ayah numbers) as its full length', () => {
+    expect(itemAyat({ sura: 'الفاتحة' })).toBe(7); // الفاتحة has 7 ayat
+  });
+  it('sums every sura across a whole-sura range', () => {
+    // الفلق (5) + الناس (6) = 11
+    expect(itemAyat({ sura: 'الفلق', toSura: 'الناس', range: true })).toBe(11);
+  });
+  it('returns 0 for an item with no sura', () => {
+    expect(itemAyat({ sura: '' })).toBe(0);
+  });
+  it('falls back to full sura length when only "from" is set (no valid range)', () => {
+    // من without a valid to → not a countable range → whole sura length
+    expect(itemAyat({ sura: 'الفاتحة', from: '3' })).toBe(7);
   });
 });

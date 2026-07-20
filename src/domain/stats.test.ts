@@ -201,9 +201,9 @@ describe('buildStudentPublicStats', () => {
     expect(result.recentSessions[0].newLoh).toEqual([
       { sura: 'الملك', toSura: 'الناس', range: true },
     ]);
-    // A whole-sura range has no ayah numbers, so it contributes 0 to totalAyat
-    // (matching production).
-    expect(result.totalAyat).toBe(0);
+    // A whole-sura range counts the sum of every sura's ayat across the span
+    // (الملك→الناس = 48 suras = 995 ayat), matching production's itemAyat.
+    expect(result.totalAyat).toBe(995);
   });
 
   it('carries the mistake tally into recentSessions when present', () => {

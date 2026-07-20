@@ -8,6 +8,7 @@ import { getStudentName } from '../../domain/students';
 import { localDateStr, genId, hijriLong } from '../../domain';
 import { scoreToStars, scoreName } from '../../domain/scoring';
 import { extractAssignedSuras, validateAyahRange, isRowComplete, cleanAssignmentRow } from '../../domain/record';
+import { computeNextLoh, computeNextMadi } from '../../domain/nextTask';
 import { buildWhatsAppMessage, normalizeWhatsAppPhone } from '../../domain/whatsapp';
 import { SuraRow } from './SuraRow';
 import { FloatingSaveButton } from './FloatingSaveButton';
@@ -97,7 +98,15 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   const [mode, setMode] = useState<'individual' | 'group'>('individual');
   const groupAttendance = useGroupAttendance(date, students);
   const [groupSaving, setGroupSaving] = useState(false);
-  const [whatsAppPreview, setWhatsAppPreview] = useState<{ message: string; phone: string } | null>(null);
+  // A session that's been reviewed-but-not-yet-saved: the WhatsApp confirm modal
+  // is showing its summary, and the save fires only on explicit confirm.
+  const [pendingSave, setPendingSave] = useState<{
+    rec: SessionRecord;
+    message: string;
+    phone: string;
+    isEditing: boolean;
+    studentId: string;
+  } | null>(null);
   // Guards the edit-prefill effect so it fires once per distinct record id.
   const consumedEditIdRef = useRef<string | null>(null);
 
@@ -223,6 +232,35 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [students, editingId, selectedStudent, editingRecordData]);
 
+  // Auto-fill the NEW assignment from the student's last session — suggests
+  // where to continue (same sura from the next ayah, or the next sura from ayah
+  // 1), matching the live app. Runs once per student, only on a fresh pick (not
+  // in edit mode), and only when there's a previous session. Everything it
+  // fills is an editable suggestion. Guarded by a ref so a background sync of
+  // prevSession never re-clobbers rows the teacher has started editing.
+  const autofilledForRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (editingId) return; // never overwrite an edit-in-progress
+    if (!selectedStudent || !prevSession) return;
+    if (autofilledForRef.current === selectedStudent.id) return;
+    autofilledForRef.current = selectedStudent.id;
+
+    const nextLoh = computeNextLoh(prevSession.newLoh);
+    const nextMadi = computeNextMadi(prevSession.newMadi);
+    if (!nextLoh && !nextMadi) return; // nothing sensible to suggest
+
+    if (nextLoh) setLohRows([{ ...nextLoh }]);
+    if (nextMadi) setMadiRows([{ ...nextMadi }]);
+    showToast('📝 تعبئة تلقائية بناءً على آخر جلسة — عدّلها زيّ ما تحب');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStudent?.id, prevSession, editingId]);
+
+  // Reset the autofill guard when the student is cleared, so re-picking the
+  // same student later re-suggests.
+  useEffect(() => {
+    if (!selectedStudent) autofilledForRef.current = null;
+  }, [selectedStudent]);
+
   function cancelEdit() {
     resetForm();
     showToast('تم إلغاء التعديل');
@@ -283,19 +321,33 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
       return;
     }
 
+    // Preview-before-save: show the WhatsApp summary as the confirmation step so
+    // the teacher reviews exactly what the parent will see BEFORE anything is
+    // written. Nothing is saved here — the actual save happens only when they
+    // confirm in the modal (or they go back and keep editing). This is why the
+    // summary doubles as the teacher's own review of the session.
+    const message = buildWhatsAppMessage(rec, prevSession, selectedStudent.parentToken);
+    const phone = normalizeWhatsAppPhone(selectedStudent.phonePrimary);
+    setPendingSave({ rec, message, phone, isEditing, studentId: selectedStudent.id });
+  }
+
+  // Commits the reviewed session. Called from the confirm modal; `send` decides
+  // whether to open WhatsApp afterward. Only here does anything hit Firestore.
+  async function commitPendingSave(send: boolean) {
+    if (!pendingSave || saving) return;
+    const { rec, message, phone, isEditing, studentId } = pendingSave;
     setSaving(true);
     try {
       await saveRecord(MOSQUE_ID, HALAQA_ID, rec);
       showToast(isEditing ? '✓ تم تحديث الجلسة' : '✓ تم الحفظ بنجاح');
       // Refresh the parent-facing projection immediately (fire-and-forget; a
       // failure here must not block the save that already succeeded).
-      void republishPublicStatsFor([selectedStudent.id]);
-      // In both new-session and edit mode, offer the WhatsApp message so the
-      // teacher can (re)send the parent the updated homework/evaluation.
-      const message = buildWhatsAppMessage(rec, prevSession, selectedStudent.parentToken);
-      const phone = normalizeWhatsAppPhone(selectedStudent.phonePrimary);
+      void republishPublicStatsFor([studentId]);
+      setPendingSave(null);
       resetForm();
-      setWhatsAppPreview({ message, phone });
+      if (send && phone) {
+        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+      }
     } catch (err) {
       console.error('saveRecord failed:', err);
       showToast('⚠️ فشل الحفظ — تأكد من الإنترنت وحاول تاني', true);
@@ -706,11 +758,15 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
         />
       )}
 
-      {whatsAppPreview && (
+      {pendingSave && (
         <WhatsAppModal
-          message={whatsAppPreview.message}
-          phone={whatsAppPreview.phone}
-          onClose={() => setWhatsAppPreview(null)}
+          message={pendingSave.message}
+          phone={pendingSave.phone}
+          busy={saving}
+          isEditing={pendingSave.isEditing}
+          onBack={() => setPendingSave(null)}
+          onSaveOnly={() => commitPendingSave(false)}
+          onSaveAndSend={() => commitPendingSave(true)}
         />
       )}
     </div>

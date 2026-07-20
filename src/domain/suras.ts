@@ -185,3 +185,43 @@ export function countAyat(from?: string | number, to?: string | number): number 
   if (!f || !t || t < f) return 0;
   return t - f + 1;
 }
+
+/** Every sura name from `start` through `end` inclusive, in mushaf order.
+ * Order-agnostic: picking the later sura first still yields the correct span. */
+export function rangeSuras(start: string, end: string): string[] {
+  const i = SURAS.findIndex((s) => s.name === start);
+  const j = SURAS.findIndex((s) => s.name === end);
+  if (i < 0 || j < 0) return [];
+  const [lo, hi] = i <= j ? [i, j] : [j, i];
+  return SURAS.slice(lo, hi + 1).map((s) => s.name);
+}
+
+/**
+ * Ayah count for a single assignment item, matching the live index.html:
+ *  - whole-sura range ({sura, toSura, range:true}) → sum of every sura's ayat
+ *    across the span;
+ *  - ordinary item with a from/to → that inclusive ayah range;
+ *  - a bare sura with no ayah numbers → the sura's full length (an approximation
+ *    the production app deliberately prefers over counting it as zero).
+ * Returns 0 for an item with no/unknown sura.
+ */
+export function itemAyat(item: {
+  sura?: string;
+  from?: string;
+  to?: string;
+  toSura?: string;
+  range?: boolean;
+}): number {
+  if (!item?.sura) return 0;
+  if (item.range && item.toSura) {
+    return rangeSuras(item.sura, item.toSura).reduce((sum, name) => {
+      const info = SURA_BY_NAME.get(name);
+      return sum + (info ? info.count : 0);
+    }, 0);
+  }
+  const ranged = countAyat(item.from, item.to);
+  if (ranged) return ranged;
+  // Bare sura (no valid ayah range) → full sura length, like production.
+  const info = SURA_BY_NAME.get(item.sura);
+  return info ? info.count : 0;
+}

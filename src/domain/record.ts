@@ -87,15 +87,9 @@ export function validateAyahRange(suraName: string, from: string, to: string): A
   const toNum = parseInt(to);
   const errors: AyahRangeErrors = {};
 
-  // Paired-field rule: an ayah range needs both ends. One filled without the
-  // other is an incomplete range (e.g. "من ٥" with no end). Leaving BOTH empty
-  // is allowed — that means "the whole sura", no ayah numbers.
-  if (from && !to) {
-    errors.toError = 'أكمل نهاية النطاق';
-  } else if (to && !from) {
-    errors.fromError = 'أكمل بداية النطاق';
-  }
-
+  // Note: a filled "من" with an empty "إلى" is intentionally NOT an error — the
+  // auto-fill leaves "إلى" blank for the teacher on purpose, and the
+  // review-before-save WhatsApp preview is where an unintended gap gets caught.
   if (from && (fromNum < 1 || fromNum > max)) {
     errors.fromError = `الآية بين ١ و${max}`;
   }

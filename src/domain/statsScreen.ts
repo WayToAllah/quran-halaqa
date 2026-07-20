@@ -1,6 +1,6 @@
 import type { SessionRecord, Student } from '../types';
 import { hasScore, scoreName } from './scoring';
-import { countAyat } from './suras';
+import { itemAyat } from './suras';
 import { getStudentName, recordsForStudent } from './students';
 import { EXCLUDED_HALAQA_DATES } from './attendance';
 import { localDateStr } from './dates';
@@ -12,13 +12,13 @@ function ayatInRecord(r: SessionRecord): number {
   let sum = 0;
   const lohArr = r.newLoh?.length ? r.newLoh : r.loh && (r.loh as unknown as { sura?: string }).sura ? [r.loh as never] : [];
   lohArr.forEach((l) => {
-    if (l?.sura) sum += countAyat(l.from, l.to);
+    if (l?.sura) sum += itemAyat(l);
   });
   const madiArr = r.newMadi?.length ? r.newMadi : r.madi && (r.madi as unknown as { sura?: string }).sura ? [r.madi as never] : [];
   madiArr.forEach((m) => {
-    if (m?.sura) sum += countAyat(m.from, m.to);
+    if (m?.sura) sum += itemAyat(m);
   });
-  if (r.tajweed?.sura) sum += countAyat(r.tajweed.from, r.tajweed.to);
+  if (r.tajweed?.sura) sum += itemAyat(r.tajweed);
   return sum;
 }
 
@@ -55,14 +55,14 @@ export function computeSummaryStats(records: SessionRecord[]): SummaryStats {
   records.forEach((r) => {
     const lohArr = r.newLoh?.length ? r.newLoh : r.loh && (r.loh as unknown as { sura?: string }).sura ? [r.loh as never] : [];
     lohArr.forEach((l) => {
-      if (l?.sura) lohAyat += countAyat(l.from, l.to);
+      if (l?.sura) lohAyat += itemAyat(l);
     });
     const madiArr = r.newMadi?.length ? r.newMadi : r.madi && (r.madi as unknown as { sura?: string }).sura ? [r.madi as never] : [];
     madiArr.forEach((m) => {
-      if (m?.sura) madiAyat += countAyat(m.from, m.to);
+      if (m?.sura) madiAyat += itemAyat(m);
     });
   });
-  const tajweedAyat = records.reduce((a, r) => a + (r.tajweed?.sura ? countAyat(r.tajweed.from, r.tajweed.to) : 0), 0);
+  const tajweedAyat = records.reduce((a, r) => a + (r.tajweed?.sura ? itemAyat(r.tajweed) : 0), 0);
   const totalAyat = lohAyat + madiAyat + tajweedAyat;
 
   const totalHalaqaDays = new Set(
