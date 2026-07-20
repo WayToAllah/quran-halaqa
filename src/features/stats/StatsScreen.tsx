@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'preact/hooks';
 import { useStudents } from '../../hooks/useStudents';
 import { useAllRecords } from '../../hooks/useAllRecords';
-import { esc, toArabicDigits } from '../../domain/text';
+import { esc, toArabicDigits, toArabicOrdinal } from '../../domain/text';
 import { ATTENDANCE_BADGE_THRESHOLD, getAttendanceRanking } from '../../domain/attendance';
 import {
   computeSummaryStats,
@@ -266,14 +266,14 @@ export function StatsScreen() {
                   <div
                     class="w-[26px] h-[26px] rounded-full flex items-center justify-center text-xs font-extrabold shrink-0"
                     style={{ background: rc.bg, color: rc.color }}
-                    title={`المركز ${x.rank}`}
+                    title={`المركز ${toArabicOrdinal(x.rank)}`}
                   >
                     {toArabicDigits(x.rank)}
                   </div>
                   <div class="flex-1 min-w-0">
                     <div class="text-sm font-bold text-ink-dark truncate">{x.name}</div>
                     <div class="text-xs text-taupe">
-                      المركز {toArabicDigits(x.rank)} · {toArabicDigits(x.uniqueDays)} يوم حضور من{' '}
+                      المركز {toArabicOrdinal(x.rank)} · {toArabicDigits(x.uniqueDays)} يوم حضور من{' '}
                       {toArabicDigits(summary.totalHalaqaDays)}
                     </div>
                   </div>

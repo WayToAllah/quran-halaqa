@@ -49,3 +49,60 @@ export function formatArabicNumber(n: number): string {
     .replace(/\B(?=(\d{3})+(?!\d))/g, '٬');
   return toArabicDigits(grouped);
 }
+
+// Standalone ordinals 1–10, e.g. "الأول", "الخامس".
+const AR_ORDINAL_UNITS = [
+  '',
+  'الأول',
+  'الثاني',
+  'الثالث',
+  'الرابع',
+  'الخامس',
+  'السادس',
+  'السابع',
+  'الثامن',
+  'التاسع',
+  'العاشر',
+];
+// Compound form of 1–9 used inside "الحادي عشر" / "الحادي والعشرون" — note
+// 1 becomes "الحادي" here instead of "الأول".
+const AR_ORDINAL_COMPOUND_UNITS = [
+  '',
+  'الحادي',
+  'الثاني',
+  'الثالث',
+  'الرابع',
+  'الخامس',
+  'السادس',
+  'السابع',
+  'الثامن',
+  'التاسع',
+];
+const AR_ORDINAL_TENS = [
+  '',
+  '',
+  'العشرون',
+  'الثلاثون',
+  'الأربعون',
+  'الخمسون',
+  'الستون',
+  'السبعون',
+  'الثمانون',
+  'التسعون',
+];
+
+/**
+ * Convert a rank (1-based) to its Arabic ordinal word — "الأول", "الثاني",
+ * "الحادي عشر", "الثاني والعشرون", etc. Covers 1–99 (comfortably more than
+ * any realistic student-ranking list); falls back to Arabic-Indic digits
+ * for 0, negatives, or 100+ rather than guessing at an unsupported form.
+ */
+export function toArabicOrdinal(rank: number): string {
+  if (!Number.isInteger(rank) || rank <= 0 || rank >= 100) return toArabicDigits(rank);
+  if (rank <= 10) return AR_ORDINAL_UNITS[rank];
+  if (rank < 20) return `${AR_ORDINAL_COMPOUND_UNITS[rank - 10]} عشر`;
+  if (rank % 10 === 0) return AR_ORDINAL_TENS[Math.floor(rank / 10)];
+  const tens = Math.floor(rank / 10);
+  const units = rank % 10;
+  return `${AR_ORDINAL_COMPOUND_UNITS[units]} و${AR_ORDINAL_TENS[tens]}`;
+}
