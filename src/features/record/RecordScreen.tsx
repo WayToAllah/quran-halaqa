@@ -10,6 +10,7 @@ import { scoreToStars, scoreName } from '../../domain/scoring';
 import { extractAssignedSuras, validateAyahRange, isRowComplete, cleanAssignmentRow } from '../../domain/record';
 import { buildWhatsAppMessage, normalizeWhatsAppPhone } from '../../domain/whatsapp';
 import { SuraRow } from './SuraRow';
+import { FloatingSaveButton } from './FloatingSaveButton';
 import { useGroupAttendance } from '../../hooks/useGroupAttendance';
 import { MistakeCounterModal } from './MistakeCounterModal';
 import { WhatsAppModal } from './WhatsAppModal';
@@ -306,7 +307,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   const cardCls = 'bg-white border border-hairline rounded-2xl p-[18px]';
 
   return (
-    <div class="p-[18px] pb-[100px] space-y-3" dir="rtl">
+    <div class="p-[18px] pb-[150px] space-y-3" dir="rtl">
       <div class="text-[19px] font-extrabold text-ink-dark mb-1">تسجيل جلسة</div>
 
       {editingId && (
@@ -656,10 +657,16 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
         </>
       )}
 
-      <button
-        type="button"
-        class="w-full py-4 rounded-2xl bg-forest text-parchment font-extrabold text-[15px] shadow-[0_8px_20px_rgba(15,61,46,0.28)] disabled:opacity-60 flex items-center justify-center gap-2"
-        disabled={mode === 'individual' ? saving : groupSaving}
+      <FloatingSaveButton
+        icon={mode === 'group' ? '✅' : '💾'}
+        label={
+          mode === 'group'
+            ? 'حفظ الحضور'
+            : editingId
+              ? 'تحديث الجلسة'
+              : 'حفظ الجلسة'
+        }
+        busy={mode === 'individual' ? saving : groupSaving}
         onClick={async () => {
           if (mode === 'group') {
             setGroupSaving(true);
@@ -669,18 +676,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
             handleSave();
           }
         }}
-      >
-        <span>{mode === 'group' ? (groupSaving ? '⏳' : '✅') : saving ? '⏳' : '💾'}</span>
-        {mode === 'group'
-          ? groupSaving
-            ? 'جاري الحفظ…'
-            : 'حفظ الحضور'
-          : saving
-            ? 'جاري الحفظ…'
-            : editingId
-              ? 'تحديث الجلسة'
-              : 'حفظ الجلسة'}
-      </button>
+      />
 
       {editingId && (
         <button
