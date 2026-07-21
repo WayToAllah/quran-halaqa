@@ -76,7 +76,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   // its loh/madi even when there's no live "previous session" to evaluate).
   const [editingRecordData, setEditingRecordData] = useState<SessionRecord | null>(null);
 
-  const { prev: prevSession } = usePreviousSession(MOSQUE_ID, HALAQA_ID, selectedStudent);
+  const { prev: prevSession } = usePreviousSession(MOSQUE_ID, HALAQA_ID, selectedStudent, editingId ?? undefined);
   const [prevLohScore, setPrevLohScore] = useState('');
   const [prevMadiScore, setPrevMadiScore] = useState('');
   // Mistake-counter history per evaluation. Preserved so reopening the counter
@@ -118,10 +118,13 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     return list.slice(0, 30);
   }, [students, studentQuery]);
 
-  // The session whose loh/madi assignment is being evaluated. Normally the
-  // student's previous session; in edit mode it's the record itself, so the
-  // evaluation fields (and their existing scores) still render.
-  const evalSource = editingId ? editingRecordData : prevSession;
+  // The session whose loh/madi assignment is being evaluated. In new-session
+  // mode that's the student's previous session. In edit mode it's the session
+  // BEFORE the one being edited (usePreviousSession excludes editingId) — this
+  // is what today's scores actually grade. Only when editing a student's very
+  // first session (no prior session exists) do we fall back to the record
+  // itself, so the evaluation fields still render.
+  const evalSource = editingId ? (prevSession ?? editingRecordData) : prevSession;
   const prevLohInfo = evalSource ? fmtSuraInfo(extractAssignedSuras(evalSource.newLoh, evalSource.loh)) : '—';
   const prevMadiList = evalSource ? extractAssignedSuras(evalSource.newMadi, evalSource.madi) : [];
   const prevMadiInfo = fmtSuraInfo(prevMadiList);
