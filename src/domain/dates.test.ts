@@ -1,5 +1,48 @@
 import { describe, it, expect } from 'vitest';
-import { byNewest, localDateStr } from './dates';
+import { byNewest, localDateStr, gregorianStr, gregorianLong } from './dates';
+
+const ARABIC_INDIC = /[\u0660-\u0669]/; // ٠..٩
+// Arabic month names never contain a digit — this is what distinguishes a
+// spelled-out month from the numeric browser rendering of a native
+// `<input type="date">`.
+const HAS_DIGIT = /[0-9\u0660-\u0669]/;
+
+describe('gregorianStr', () => {
+  it('spells out the month instead of showing it as a number', () => {
+    const out = gregorianStr('2026-07-23');
+    expect(ARABIC_INDIC.test(out)).toBe(true); // day is still Arabic-Indic digits
+    // strip the day's digits, then the remainder (the month) must have none
+    const monthPart = out.replace(/[\u0660-\u0669]/g, '').trim();
+    expect(HAS_DIGIT.test(monthPart)).toBe(false);
+  });
+
+  it('returns empty string for an unparseable input', () => {
+    expect(gregorianStr('not-a-date')).toBe('');
+    expect(gregorianStr('')).toBe('');
+  });
+
+  it('anchors a bare date at local noon so it never rolls to the previous day', () => {
+    const ds = '2026-07-23';
+    const noonLocal = gregorianStr(new Date(ds + 'T12:00:00'));
+    expect(gregorianStr(ds)).toBe(noonLocal);
+  });
+
+  it('honors custom options', () => {
+    const short = gregorianStr('2026-07-23', { day: 'numeric', month: 'long' });
+    const withYear = gregorianStr('2026-07-23', { day: 'numeric', month: 'long', year: 'numeric' });
+    expect(short).not.toBe(withYear);
+  });
+});
+
+describe('gregorianLong', () => {
+  const ds = '2026-07-23';
+  it('matches day+month long formatting', () => {
+    expect(gregorianLong(ds)).toBe(gregorianStr(ds, { day: 'numeric', month: 'long' }));
+  });
+  it('returns empty string on bad input', () => {
+    expect(gregorianLong('xxx')).toBe('');
+  });
+});
 
 describe('localDateStr', () => {
   it('formats as YYYY-MM-DD', () => {

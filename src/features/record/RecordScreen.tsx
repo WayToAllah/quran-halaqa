@@ -5,7 +5,7 @@ import { saveRecord } from '../../data/records.repo';
 import { republishPublicStatsFor } from '../../data/publishStats';
 import { normAr } from '../../domain/text';
 import { getStudentName } from '../../domain/students';
-import { localDateStr, genId, hijriLong } from '../../domain';
+import { localDateStr, genId, hijriLong, hijriShort, gregorianLong } from '../../domain';
 import { scoreToStars, scoreName } from '../../domain/scoring';
 import { extractAssignedSuras, validateAyahRange, isRowComplete, cleanAssignmentRow } from '../../domain/record';
 import { computeNextLoh, computeNextMadi } from '../../domain/nextTask';
@@ -360,6 +360,10 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   }
 
   const cardCls = 'bg-white border border-hairline rounded-2xl p-[18px]';
+  // Compact, matched-format pair — both month-named, neither shows the year,
+  // so the two stay visually aligned instead of one running longer than the
+  // other: "٢٤ محرم — ٢٣ يوليو".
+  const dateDisplay = [hijriShort(date), gregorianLong(date)].filter(Boolean).join(' — ');
 
   return (
     <div class="p-[18px] pb-[150px] space-y-3" dir="rtl">
@@ -374,22 +378,24 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
         </div>
       )}
 
-      <div class={cardCls + ' flex items-center justify-between gap-2.5'}>
-        <div class="flex items-center gap-2.5 min-w-0 flex-1">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#0F3D2E" stroke-width="1.8" class="shrink-0">
-            <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
-            <path d="M3.5 9.5h17M8 3v3.5M16 3v3.5" />
-          </svg>
-          <div class="flex-1 min-w-0">
-            <input
-              type="date"
-              class="w-full text-sm font-semibold text-ink-dark bg-transparent border-none outline-none"
-              value={date}
-              onInput={(e) => setDate((e.target as HTMLInputElement).value)}
-            />
-            {date && hijriLong(date) && (
-              <div class="text-[12px] text-[#0F3D2E] font-bold mt-0.5">{hijriLong(date)}</div>
-            )}
+      <div class="bg-white border border-hairline rounded-2xl p-2.5 flex items-center gap-2.5">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#0F3D2E" stroke-width="1.8" class="shrink-0">
+          <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
+          <path d="M3.5 9.5h17M8 3v3.5M16 3v3.5" />
+        </svg>
+        <div class="relative flex-1 min-w-0 h-5">
+          {/* Native picker as an invisible full-area overlay — tapping anywhere
+              opens the date sheet — so the visible text is always our own
+              Hijri/Gregorian formatting, never the browser's numeric rendering. */}
+          <input
+            type="date"
+            aria-label="تاريخ الجلسة"
+            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            value={date}
+            onInput={(e) => setDate((e.target as HTMLInputElement).value)}
+          />
+          <div class="pointer-events-none text-[13px] font-bold text-[#0F3D2E] leading-5 truncate">
+            {dateDisplay || 'اختر التاريخ'}
           </div>
         </div>
       </div>
