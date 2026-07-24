@@ -63,13 +63,26 @@ export function SuraRow({ value, onChange, onRemove, label }: Props) {
         </div>
       </div>
 
-      <div class="flex items-center gap-2 mb-3">
-        {/* Start sura (in range mode this is the "من سورة") */}
-        <SuraCombobox
-          value={value.sura || ''}
-          placeholder="اكتب اسم السورة…"
-          onCommit={(name) => onChange({ ...value, sura: name })}
-        />
+      <div class="flex items-start gap-2 mb-3">
+        {/* Start sura ("من سورة" in range mode) */}
+        <div class={isRange ? 'flex-1 min-w-0' : 'contents'}>
+          {isRange && <label class="block text-[11px] text-taupe mb-1.5">من سورة</label>}
+          <SuraCombobox
+            value={value.sura || ''}
+            placeholder="اكتب اسم السورة…"
+            onCommit={(name) => onChange({ ...value, sura: name })}
+          />
+        </div>
+        {isRange && (
+          <div class="flex-1 min-w-0">
+            <label class="block text-[11px] text-taupe mb-1.5">إلى سورة</label>
+            <SuraCombobox
+              value={value.toSura || ''}
+              placeholder="اكتب سورة النهاية…"
+              onCommit={(name) => onChange({ ...value, toSura: name })}
+            />
+          </div>
+        )}
         {!isRange && (
           <>
             <div class="w-[62px] shrink-0">
@@ -107,24 +120,11 @@ export function SuraRow({ value, onChange, onRemove, label }: Props) {
         <div class="text-[10px] text-red-500 -mt-2 mb-3">{errors.fromError || errors.toError}</div>
       )}
 
-      {isRange ? (
-        <div>
-          <label class="block text-[11px] text-taupe mb-1.5">إلى سورة</label>
-          <SuraCombobox
-            value={value.toSura || ''}
-            placeholder="اكتب سورة النهاية…"
-            onCommit={(name) => onChange({ ...value, toSura: name })}
-          />
+      {!isRange && selectedInfoOf(value.sura) && (
+        <div class="text-[11px] text-taupe mt-2">
+          عدد آيات السورة: {selectedInfoOf(value.sura)!.count} ·{' '}
+          {suraPageLabel(selectedInfoOf(value.sura)!)} (مصحف المدينة)
         </div>
-      ) : (
-        <>
-          {selectedInfoOf(value.sura) && (
-            <div class="text-[11px] text-taupe mt-2">
-              عدد آيات السورة: {selectedInfoOf(value.sura)!.count} ·{' '}
-              {suraPageLabel(selectedInfoOf(value.sura)!)} (مصحف المدينة)
-            </div>
-          )}
-        </>
       )}
     </div>
   );
