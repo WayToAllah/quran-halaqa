@@ -67,3 +67,14 @@ export function parseScoreField(raw: string): ScoreFieldState {
   const clampedValue = Math.min(100, Math.max(0, Math.round(n)));
   return { value: clampedValue, invalid: false, clamped: clampedValue !== n };
 }
+
+/** A typed score (0–100) is unambiguously finished once another digit can't
+ * change it: two digits that aren't "10" (e.g. "95" — a third digit would
+ * exceed 100), or three digits (only "100" is valid). Left open after a
+ * single digit ("9" might still become "90") and after exactly "10" (might
+ * still become "100"). Used to auto-dismiss the mobile keyboard once typing
+ * more would be pointless, without cutting the teacher off from "100". */
+export function isScoreEntryComplete(raw: string): boolean {
+  const trimmed = raw.trim();
+  return trimmed.length >= 3 || (trimmed.length === 2 && trimmed !== '10');
+}

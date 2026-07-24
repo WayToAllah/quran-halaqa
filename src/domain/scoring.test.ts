@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hasScore, parseScoreField, scoreName, scoreToHalfStars, scoreToStars } from './scoring';
+import { hasScore, isScoreEntryComplete, parseScoreField, scoreName, scoreToHalfStars, scoreToStars } from './scoring';
 
 describe('scoreName', () => {
   it('returns إعادة for a genuine zero score (regression: was returning "")', () => {
@@ -87,5 +87,22 @@ describe('parseScoreField', () => {
   it('flags non-numeric text as invalid instead of silently saving a real zero (false "إعادة")', () => {
     expect(parseScoreField('abc')).toEqual({ value: null, invalid: true, clamped: false });
     expect(parseScoreField('٩٠عايز')).toEqual({ value: null, invalid: true, clamped: false });
+  });
+});
+
+describe('isScoreEntryComplete', () => {
+  it('is not complete after a single digit — a second digit could still come', () => {
+    expect(isScoreEntryComplete('9')).toBe(false);
+    expect(isScoreEntryComplete('0')).toBe(false);
+  });
+  it('is complete after two digits that cannot become a valid 3-digit score', () => {
+    expect(isScoreEntryComplete('95')).toBe(true);
+    expect(isScoreEntryComplete('50')).toBe(true);
+  });
+  it('is NOT complete after exactly "10" — it could still become "100"', () => {
+    expect(isScoreEntryComplete('10')).toBe(false);
+  });
+  it('is complete after three digits ("100" — the only valid one)', () => {
+    expect(isScoreEntryComplete('100')).toBe(true);
   });
 });

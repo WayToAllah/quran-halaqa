@@ -178,6 +178,41 @@ describe('RecordScreen — previous session card', () => {
     await selectStudent('زيد احمد');
     expect(screen.queryByText('الماضي')).not.toBeInTheDocument();
   });
+
+  it('auto-blurs the score field once two digits can\'t become "100" (keyboard dismisses itself)', async () => {
+    previousSessionForS1 = {
+      id: 'r_prev',
+      studentId: 's_1',
+      date: '2026-07-01',
+      newLoh: [{ sura: 'البقرة', from: '1', to: '10' }],
+    };
+    renderScreen();
+    await selectStudent('زيد احمد');
+    const scoreInput = screen.getByPlaceholderText('مثلاً 90') as HTMLInputElement;
+    scoreInput.focus();
+    expect(document.activeElement).toBe(scoreInput);
+    await userEvent.type(scoreInput, '95');
+    expect(document.activeElement).not.toBe(scoreInput);
+    expect(scoreInput.value).toBe('95');
+  });
+
+  it('does NOT auto-blur after exactly "10" — the teacher might still type "100"', async () => {
+    previousSessionForS1 = {
+      id: 'r_prev',
+      studentId: 's_1',
+      date: '2026-07-01',
+      newLoh: [{ sura: 'البقرة', from: '1', to: '10' }],
+    };
+    renderScreen();
+    await selectStudent('زيد احمد');
+    const scoreInput = screen.getByPlaceholderText('مثلاً 90') as HTMLInputElement;
+    scoreInput.focus();
+    await userEvent.type(scoreInput, '10');
+    expect(document.activeElement).toBe(scoreInput);
+    await userEvent.type(scoreInput, '0');
+    expect(scoreInput.value).toBe('100');
+    expect(document.activeElement).not.toBe(scoreInput);
+  });
 });
 
 describe('RecordScreen — multi-sura rows', () => {

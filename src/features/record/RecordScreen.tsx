@@ -6,7 +6,7 @@ import { republishPublicStatsFor } from '../../data/publishStats';
 import { normAr } from '../../domain/text';
 import { getStudentName, findStudentRecordOnDate } from '../../domain/students';
 import { localDateStr, genId, hijriLong, hijriShort, gregorianLong } from '../../domain';
-import { scoreToStars, scoreName, parseScoreField, type ScoreFieldState } from '../../domain/scoring';
+import { scoreToStars, scoreName, parseScoreField, isScoreEntryComplete, type ScoreFieldState } from '../../domain/scoring';
 import { extractAssignedSuras, validateAyahRange, isRowComplete, cleanAssignmentRow } from '../../domain/record';
 import { computeNextLoh, computeNextMadi } from '../../domain/nextTask';
 import { buildWhatsAppMessage, normalizeWhatsAppPhone } from '../../domain/whatsapp';
@@ -38,6 +38,17 @@ const TIER_COLORS: Record<string, { bg: string; color: string }> = {
   'مقبول': { bg: '#FBEEE3', color: '#9A5A24' },
   'إعادة': { bg: '#FBEAE7', color: '#B24A3A' },
 };
+/** Blurs a score input once its value is unambiguously complete, so the
+ * on-screen keyboard dismisses itself instead of the teacher having to tap
+ * away — skipped while backspacing so deleting digits doesn't fight back. */
+function autoCloseScoreKeyboard(e: Event, value: string) {
+  const inputType = (e as InputEvent).inputType;
+  if (inputType?.startsWith('delete')) return;
+  if (isScoreEntryComplete(value)) {
+    (e.target as HTMLInputElement).blur();
+  }
+}
+
 function tierBadge(state: ScoreFieldState): { label: string; bg: string; color: string } | null {
   if (state.value == null) return null; // empty, or invalid text — nothing to badge yet
   const label = scoreName(state.value);
@@ -665,7 +676,11 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
                     : 'border-mustard/50 bg-[#FFFCF3] text-forest')
                 }
                 value={prevLohScore}
-                onInput={(e) => setPrevLohScore((e.target as HTMLInputElement).value)}
+                onInput={(e) => {
+                  const val = (e.target as HTMLInputElement).value;
+                  setPrevLohScore(val);
+                  autoCloseScoreKeyboard(e, val);
+                }}
               />
               {lohTier && (
                 <span
@@ -712,7 +727,11 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
                       : 'border-mustard/50 bg-[#FFFCF3] text-forest')
                   }
                   value={prevMadiScore}
-                  onInput={(e) => setPrevMadiScore((e.target as HTMLInputElement).value)}
+                  onInput={(e) => {
+                    const val = (e.target as HTMLInputElement).value;
+                    setPrevMadiScore(val);
+                    autoCloseScoreKeyboard(e, val);
+                  }}
                 />
                 {madiTier && (
                   <span
