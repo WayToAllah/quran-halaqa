@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { SURAS, suraNumber, suraPageLabel, findSuraByName, type SuraInfo } from '../../domain/suras';
+import { SURAS_IN_LOH_ORDER, suraNumber, suraPageLabel, findSuraByName, type SuraInfo } from '../../domain/suras';
 import { validateAyahRange } from '../../domain/record';
 import { normAr } from '../../domain/text';
 import type { SuraAssignment } from '../../types';
@@ -165,8 +165,8 @@ function SuraCombobox({ value, placeholder, onCommit }: ComboProps) {
 
   const matches = useMemo(() => {
     const q = normAr(query.trim());
-    if (!q) return SURAS;
-    return SURAS.filter((s) => normAr(s.name).includes(q));
+    if (!q) return SURAS_IN_LOH_ORDER;
+    return SURAS_IN_LOH_ORDER.filter((s) => normAr(s.name).includes(q));
   }, [query]);
 
   function commitSura(name: string) {

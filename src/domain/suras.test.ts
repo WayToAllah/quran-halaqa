@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   SURAS,
+  SURAS_IN_LOH_ORDER,
   ayahRange,
   countAyat,
   findSuraByName,
@@ -178,5 +179,17 @@ describe('itemAyat', () => {
   it('falls back to full sura length when only "from" is set (no valid range)', () => {
     // من without a valid to → not a countable range → whole sura length
     expect(itemAyat({ sura: 'الفاتحة', from: '3' })).toBe(7);
+  });
+});
+
+describe('SURAS_IN_LOH_ORDER', () => {
+  it('starts with الفاتحة, then descends from الناس to البقرة', () => {
+    expect(SURAS_IN_LOH_ORDER[0].name).toBe('الفاتحة');
+    expect(SURAS_IN_LOH_ORDER[1].name).toBe('الناس');
+    expect(SURAS_IN_LOH_ORDER[SURAS_IN_LOH_ORDER.length - 1].name).toBe('البقرة');
+  });
+  it('contains every sura exactly once, same set as SURAS', () => {
+    expect(SURAS_IN_LOH_ORDER.length).toBe(SURAS.length);
+    expect(new Set(SURAS_IN_LOH_ORDER.map((s) => s.name))).toEqual(new Set(SURAS.map((s) => s.name)));
   });
 });

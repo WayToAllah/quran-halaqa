@@ -35,6 +35,17 @@ describe('SuraRow — searchable sura picker', () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ sura: 'الفاتحة' }));
   });
 
+  it('lists suras in loh order (الفاتحة, then الناس descending to البقرة) rather than raw mushaf order', async () => {
+    const user = userEvent.setup();
+    renderRow();
+    const input = screen.getByPlaceholderText('اكتب اسم السورة…');
+    await user.click(input);
+    const options = await screen.findAllByRole('button');
+    expect(options[0]).toHaveTextContent('1. الفاتحة');
+    expect(options[1]).toHaveTextContent('114. الناس');
+    expect(options[options.length - 1]).toHaveTextContent('2. البقرة');
+  });
+
   it('shows the ayah-count + Madinah page hint once a sura is selected', () => {
     renderRow({ sura: 'الكهف', from: '', to: '' });
     expect(screen.getByText(/عدد آيات السورة: 110/)).toBeInTheDocument();

@@ -154,6 +154,13 @@ export function findSuraByName(typed: string): SuraInfo | undefined {
   return SURAS.find((s) => s.name.replace(/\s+/g, ' ') === normalized);
 }
 
+/** Suras in loh (memorization) order: الفاتحة first, then descending from
+ * الناس (114) down to البقرة (2) — matches nextTask.ts's LOH_ORDER and the
+ * order the halaqa actually memorizes in. Used so the sura picker lists
+ * browse in the order teachers actually work through, instead of raw
+ * ascending mushaf order. */
+export const SURAS_IN_LOH_ORDER: ReadonlyArray<SuraInfo> = [SURAS[0], ...SURAS.slice(1).reverse()];
+
 /** '(3–10)' / '(من 3)' / '' — ayah-range suffix for display. */
 export function ayahRange(from?: string | number, to?: string | number): string {
   if (from && to) return ' (' + from + '–' + to + ')';
