@@ -18,8 +18,8 @@ type Tab = 'record' | 'students' | 'log' | 'stats';
 
 const TABS: { id: Tab; label: string; Icon: (p: { class?: string }) => JSX.Element }[] = [
   { id: 'record', label: 'تسجيل', Icon: RecordIcon },
-  { id: 'students', label: 'الطلاب', Icon: StudentsIcon },
   { id: 'log', label: 'السجل', Icon: LogIcon },
+  { id: 'students', label: 'الطلاب', Icon: StudentsIcon },
   { id: 'stats', label: 'إحصائيات', Icon: StatsIcon },
 ];
 
