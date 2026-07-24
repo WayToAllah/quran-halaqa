@@ -70,7 +70,42 @@ export function SuraRow({ value, onChange, onRemove, label }: Props) {
           placeholder="اكتب اسم السورة…"
           onCommit={(name) => onChange({ ...value, sura: name })}
         />
+        {!isRange && (
+          <>
+            <div class="w-[62px] shrink-0">
+              <input
+                type="number"
+                min={1}
+                max={selectedInfoOf(value.sura)?.count}
+                placeholder="من آية"
+                class={
+                  'w-full border rounded-[11px] px-2 py-3 text-sm text-center text-ink-dark ' +
+                  (errors.fromError ? 'border-red-400' : 'border-hairline')
+                }
+                value={value.from || ''}
+                onInput={(e) => onChange({ ...value, from: (e.target as HTMLInputElement).value })}
+              />
+            </div>
+            <div class="w-[62px] shrink-0">
+              <input
+                type="number"
+                min={1}
+                max={selectedInfoOf(value.sura)?.count}
+                placeholder="إلى آية"
+                class={
+                  'w-full border rounded-[11px] px-2 py-3 text-sm text-center text-ink-dark ' +
+                  (errors.toError ? 'border-red-400' : 'border-hairline')
+                }
+                value={value.to || ''}
+                onInput={(e) => onChange({ ...value, to: (e.target as HTMLInputElement).value })}
+              />
+            </div>
+          </>
+        )}
       </div>
+      {(errors.fromError || errors.toError) && (
+        <div class="text-[10px] text-red-500 -mt-2 mb-3">{errors.fromError || errors.toError}</div>
+      )}
 
       {isRange ? (
         <div>
@@ -83,39 +118,6 @@ export function SuraRow({ value, onChange, onRemove, label }: Props) {
         </div>
       ) : (
         <>
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <input
-                type="number"
-                min={1}
-                max={selectedInfoOf(value.sura)?.count}
-                placeholder="من آية"
-                class={
-                  'w-full border rounded-[11px] px-2.5 py-2.5 text-sm text-ink-dark ' +
-                  (errors.fromError ? 'border-red-400' : 'border-hairline')
-                }
-                value={value.from || ''}
-                onInput={(e) => onChange({ ...value, from: (e.target as HTMLInputElement).value })}
-              />
-              {errors.fromError && <div class="text-[10px] text-red-500 mt-0.5">{errors.fromError}</div>}
-            </div>
-            <div>
-              <input
-                type="number"
-                min={1}
-                max={selectedInfoOf(value.sura)?.count}
-                placeholder="إلى آية"
-                class={
-                  'w-full border rounded-[11px] px-2.5 py-2.5 text-sm text-ink-dark ' +
-                  (errors.toError ? 'border-red-400' : 'border-hairline')
-                }
-                value={value.to || ''}
-                onInput={(e) => onChange({ ...value, to: (e.target as HTMLInputElement).value })}
-              />
-              {errors.toError && <div class="text-[10px] text-red-500 mt-0.5">{errors.toError}</div>}
-            </div>
-          </div>
-
           {selectedInfoOf(value.sura) && (
             <div class="text-[11px] text-taupe mt-2">
               عدد آيات السورة: {selectedInfoOf(value.sura)!.count} ·{' '}
