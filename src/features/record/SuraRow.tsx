@@ -207,7 +207,7 @@ function SuraCombobox({ value, placeholder, onCommit }: ComboProps) {
               <button
                 type="button"
                 key={s.name}
-                class="w-full text-right px-3 py-2 text-sm hover:bg-parchment flex items-center justify-between gap-2"
+                class="w-full text-right px-3 py-2 text-sm hover:bg-parchment flex flex-col items-start gap-0.5"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   if (blurTimer.current) clearTimeout(blurTimer.current);
@@ -217,7 +217,7 @@ function SuraCombobox({ value, placeholder, onCommit }: ComboProps) {
                 <span>
                   {suraNumber(s.name)}. {s.name}
                 </span>
-                <span class="text-[11px] text-taupe whitespace-nowrap">
+                <span class="text-[11px] text-taupe">
                   {s.count} آية · {suraPageLabel(s)}
                 </span>
               </button>
