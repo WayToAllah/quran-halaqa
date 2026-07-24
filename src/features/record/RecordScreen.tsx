@@ -4,9 +4,9 @@ import { usePreviousSession } from '../../hooks/usePreviousSession';
 import { saveRecord } from '../../data/records.repo';
 import { republishPublicStatsFor } from '../../data/publishStats';
 import { normAr } from '../../domain/text';
-import { getStudentName } from '../../domain/students';
+import { getStudentName, findStudentRecordOnDate } from '../../domain/students';
 import { localDateStr, genId, hijriLong, hijriShort, gregorianLong } from '../../domain';
-import { scoreToStars, scoreName } from '../../domain/scoring';
+import { scoreToStars, scoreName, parseScoreField, type ScoreFieldState } from '../../domain/scoring';
 import { extractAssignedSuras, validateAyahRange, isRowComplete, cleanAssignmentRow } from '../../domain/record';
 import { computeNextLoh, computeNextMadi } from '../../domain/nextTask';
 import { buildWhatsAppMessage, normalizeWhatsAppPhone } from '../../domain/whatsapp';
@@ -17,6 +17,7 @@ import { MistakeCounterModal } from './MistakeCounterModal';
 import { WhatsAppModal } from './WhatsAppModal';
 import { summarizeMistakes, rebuildMistakeHistory, type MistakeKind } from '../../domain/mistakes';
 import { StarPicker } from '../../ui/StarPicker';
+import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useToast } from '../../ui/ToastProvider';
 import { MOSQUE_ID, HALAQA_ID } from '../../config';
 import type { SuraAssignment, SessionRecord, Student } from '../../types';
@@ -28,13 +29,6 @@ function fmtSuraInfo(list: SuraAssignment[]): string {
     .join(' + ');
 }
 
-/** Empty-string-preserving numeric field: distinguishes "nothing entered"
- * (null score, matching hasScore()'s contract) from a genuine zero. */
-function readScoreField(raw: string): number | null {
-  if (raw === '') return null;
-  return Math.min(100, Math.max(0, parseInt(raw) || 0));
-}
-
 /** Tier badge colors ported from the approved design, keyed by the real
  * scoreName() bands (85/75/65/50 — see domain/scoring.ts), not re-derived. */
 const TIER_COLORS: Record<string, { bg: string; color: string }> = {
@@ -44,9 +38,9 @@ const TIER_COLORS: Record<string, { bg: string; color: string }> = {
   'مقبول': { bg: '#FBEEE3', color: '#9A5A24' },
   'إعادة': { bg: '#FBEAE7', color: '#B24A3A' },
 };
-function tierBadge(score: string): { label: string; bg: string; color: string } | null {
-  if (score === '') return null;
-  const label = scoreName(readScoreField(score));
+function tierBadge(state: ScoreFieldState): { label: string; bg: string; color: string } | null {
+  if (state.value == null) return null; // empty, or invalid text — nothing to badge yet
+  const label = scoreName(state.value);
   const c = TIER_COLORS[label] ?? { bg: '#F1ECDD', color: '#5B5646' };
   return { label, ...c };
 }
@@ -69,6 +63,15 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   const [date, setDate] = useState(localDateStr());
   const [studentQuery, setStudentQuery] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  // Delays closing the student dropdown on blur just long enough for a tap on
+  // one of the suggestion buttons (onMouseDown) to register first — same
+  // pattern as the sura combobox in SuraRow.tsx.
+  const studentBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (studentBlurTimer.current) clearTimeout(studentBlurTimer.current);
+    };
+  }, []);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   // When set, handleSave overwrites this record id instead of minting a new one.
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -107,6 +110,17 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     isEditing: boolean;
     studentId: string;
   } | null>(null);
+  // Replaces the browser's native confirm() for the two yes/no checks in the
+  // save flow (duplicate session, empty session) with a modal matching the
+  // app's own style. `onConfirm` carries whatever the save flow should do
+  // next if the teacher proceeds.
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    confirmLabel: string;
+    destructive?: boolean;
+    onConfirm: () => void;
+  } | null>(null);
   // Guards the edit-prefill effect so it fires once per distinct record id.
   const consumedEditIdRef = useRef<string | null>(null);
 
@@ -117,6 +131,18 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
       : [...students].sort((a, b) => getStudentName(a).localeCompare(getStudentName(b), 'ar'));
     return list.slice(0, 30);
   }, [students, studentQuery]);
+
+  // Detects an existing session for the picked student on the picked date —
+  // reuses the same day-coverage data the group-attendance tab already
+  // fetches for this date, so this costs no extra read. Excludes the record
+  // currently being edited (that's not a duplicate, it's the same session).
+  // Individual mode had no such check at all before; group mode already
+  // prevents this by graying out students who are "مسجّل بالفعل".
+  const duplicateRecord = useMemo(() => {
+    if (!selectedStudent || !groupAttendance.dayRecords) return null;
+    const found = findStudentRecordOnDate(selectedStudent, date, groupAttendance.dayRecords);
+    return found && found.id !== editingId ? found : null;
+  }, [selectedStudent, groupAttendance.dayRecords, date, editingId]);
 
   // The session whose loh/madi assignment is being evaluated. In new-session
   // mode that's the student's previous session. In edit mode it's the session
@@ -129,8 +155,10 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   const prevMadiList = evalSource ? extractAssignedSuras(evalSource.newMadi, evalSource.madi) : [];
   const prevMadiInfo = fmtSuraInfo(prevMadiList);
 
-  const lohTier = tierBadge(prevLohScore);
-  const madiTier = tierBadge(prevMadiScore);
+  const lohScoreState = parseScoreField(prevLohScore);
+  const madiScoreState = parseScoreField(prevMadiScore);
+  const lohTier = tierBadge(lohScoreState);
+  const madiTier = tierBadge(madiScoreState);
 
   function selectStudent(s: Student) {
     setSelectedStudent(s);
@@ -165,15 +193,13 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     // usually records several students in a row for the same session date.
   }
 
-  // Populate the form when the log screen hands us a record to edit. Guarded by
-  // a ref so it runs exactly once per distinct record id — NOT re-run when the
-  // students list arrives or changes (which would clobber the user's edits).
-  useEffect(() => {
-    if (!editRecord) return;
-    if (consumedEditIdRef.current === editRecord.id) return;
-    consumedEditIdRef.current = editRecord.id;
+  /** Loads a saved record into the form for editing — resolves the current
+   * student, fills every field, and switches into edit mode. Shared by the
+   * log screen's ✏️ hand-off (via the effect below) and the duplicate-session
+   * banner's "فتح الجلسة الموجودة" action, so both paths edit in place
+   * instead of ever risking a second record for the same student/day. */
+  function enterEditMode(r: SessionRecord) {
     setMode('individual');
-    const r = editRecord;
     setEditingId(r.id);
     setEditingRecordData(r);
     // Resolve the student via studentId so this stays correct even if the
@@ -214,6 +240,16 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     setNote(r.note ?? '');
 
     showToast('✏️ وضع التعديل');
+  }
+
+  // Populate the form when the log screen hands us a record to edit. Guarded by
+  // a ref so it runs exactly once per distinct record id — NOT re-run when the
+  // students list arrives or changes (which would clobber the user's edits).
+  useEffect(() => {
+    if (!editRecord) return;
+    if (consumedEditIdRef.current === editRecord.id) return;
+    consumedEditIdRef.current = editRecord.id;
+    enterEditMode(editRecord);
     onEditConsumed?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editRecord?.id]);
@@ -275,6 +311,28 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
       showToast('اختر طالباً أولاً', true);
       return;
     }
+    // Last-resort safety net for the duplicate-session banner above the
+    // picker — if the teacher saves anyway without tapping "فتح الجلسة
+    // الموجودة", confirm they really mean to create a second record for the
+    // same student/day rather than silently doing it.
+    if (duplicateRecord) {
+      setConfirmDialog({
+        title: 'جلسة مسجلة بالفعل',
+        message: `${getStudentName(selectedStudent)} مسجّل بالفعل بتاريخ ${date}. تريد إنشاء جلسة تانية برضه؟`,
+        confirmLabel: 'إنشاء جلسة تانية',
+        destructive: true,
+        onConfirm: () => {
+          setConfirmDialog(null);
+          continueSaveAfterDuplicateCheck();
+        },
+      });
+      return;
+    }
+    continueSaveAfterDuplicateCheck();
+  }
+
+  function continueSaveAfterDuplicateCheck() {
+    if (!selectedStudent) return; // narrows for TS; handleSave already checked this
 
     const activeLohRows = lohRows.filter(isRowComplete).map(cleanAssignmentRow);
     const activeMadiRows = madiRows.filter(isRowComplete).map(cleanAssignmentRow);
@@ -289,9 +347,16 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
       showToast('يوجد خطأ في أرقام الآيات — راجع الحقول الحمراء', true);
       return;
     }
+    // A non-numeric score used to silently save as a real 0 ("إعادة") — a
+    // false failing grade from a typo. Block the save instead and point at
+    // the red field so the teacher notices and retypes it.
+    if (lohScoreState.invalid || madiScoreState.invalid) {
+      showToast('الدرجة لازم تكون رقم — راجع الحقل الأحمر', true);
+      return;
+    }
 
-    const lohScore = readScoreField(prevLohScore);
-    const madiScore = readScoreField(prevMadiScore);
+    const lohScore = lohScoreState.value;
+    const madiScore = madiScoreState.value;
 
     const isEditing = editingId !== null;
     const rec: SessionRecord = {
@@ -320,15 +385,29 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
 
     const hasContent =
       rec.newLoh!.length > 0 || rec.newMadi!.length > 0 || !!rec.tajweed || lohScore != null || madiScore != null || !!rec.note;
-    if (!hasContent && !confirm('الجلسة فارغة تماماً (بدون لوح أو ماضي أو تقييم أو ملاحظة). تريد الحفظ برضه؟')) {
+    if (!hasContent) {
+      setConfirmDialog({
+        title: 'جلسة فارغة',
+        message: 'الجلسة فارغة تماماً (بدون لوح أو ماضي أو تقييم أو ملاحظة). تريد الحفظ برضه؟',
+        confirmLabel: 'حفظ برضه',
+        destructive: true,
+        onConfirm: () => {
+          setConfirmDialog(null);
+          previewSave(rec, isEditing);
+        },
+      });
       return;
     }
+    previewSave(rec, isEditing);
+  }
 
-    // Preview-before-save: show the WhatsApp summary as the confirmation step so
-    // the teacher reviews exactly what the parent will see BEFORE anything is
-    // written. Nothing is saved here — the actual save happens only when they
-    // confirm in the modal (or they go back and keep editing). This is why the
-    // summary doubles as the teacher's own review of the session.
+  // Preview-before-save: show the WhatsApp summary as the confirmation step so
+  // the teacher reviews exactly what the parent will see BEFORE anything is
+  // written. Nothing is saved here — the actual save happens only when they
+  // confirm in the modal (or they go back and keep editing). This is why the
+  // summary doubles as the teacher's own review of the session.
+  function previewSave(rec: SessionRecord, isEditing: boolean) {
+    if (!selectedStudent) return;
     const message = buildWhatsAppMessage(rec, prevSession, selectedStudent.parentToken);
     const phone = normalizeWhatsAppPhone(selectedStudent.phonePrimary);
     setPendingSave({ rec, message, phone, isEditing, studentId: selectedStudent.id });
@@ -506,6 +585,9 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
               if (selectedStudent) setSelectedStudent(null);
             }}
             onFocus={() => setDropdownOpen(true)}
+            onBlur={() => {
+              studentBlurTimer.current = setTimeout(() => setDropdownOpen(false), 120);
+            }}
           />
           <svg
             viewBox="0 0 24 24"
@@ -537,6 +619,24 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
         )}
       </div>
 
+      {duplicateRecord && (
+        <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between gap-2.5">
+          <span class="text-xs font-semibold text-amber-800">
+            ⚠️ {getStudentName(selectedStudent!)} مسجّل بالفعل بتاريخ {dateDisplay || date}
+          </span>
+          <button
+            type="button"
+            class="shrink-0 text-xs font-bold text-amber-800 underline"
+            onClick={() => {
+              consumedEditIdRef.current = duplicateRecord.id;
+              enterEditMode(duplicateRecord);
+            }}
+          >
+            فتح الجلسة الموجودة
+          </button>
+        </div>
+      )}
+
       {selectedStudent && evalSource && (
         <div class={cardCls + ' space-y-3.5'}>
           <div>
@@ -558,7 +658,12 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
                 min={0}
                 max={100}
                 placeholder="مثلاً 90"
-                class="w-20 text-center font-extrabold text-lg border border-mustard/50 bg-[#FFFCF3] text-forest rounded-xl py-2"
+                class={
+                  'w-20 text-center font-extrabold text-lg rounded-xl py-2 border ' +
+                  (lohScoreState.invalid
+                    ? 'border-red-400 bg-red-50 text-red-700'
+                    : 'border-mustard/50 bg-[#FFFCF3] text-forest')
+                }
                 value={prevLohScore}
                 onInput={(e) => setPrevLohScore((e.target as HTMLInputElement).value)}
               />
@@ -579,6 +684,14 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
                 {lohMistakes.length > 0 ? ` (${lohMistakes.length})` : ''}
               </button>
             </div>
+            {lohScoreState.invalid && (
+              <div class="text-[11px] text-red-600 font-semibold mt-1">الدرجة لازم تكون رقم</div>
+            )}
+            {lohScoreState.clamped && (
+              <div class="text-[11px] text-amber-700 font-semibold mt-1">
+                هيتحفظ {lohScoreState.value} (الدرجة من 0 إلى 100)
+              </div>
+            )}
           </div>
 
           {prevMadiList.length > 0 && (
@@ -592,7 +705,12 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
                   min={0}
                   max={100}
                   placeholder="مثلاً 85"
-                  class="w-20 text-center font-extrabold text-lg border border-mustard/50 bg-[#FFFCF3] text-forest rounded-xl py-2"
+                  class={
+                    'w-20 text-center font-extrabold text-lg rounded-xl py-2 border ' +
+                    (madiScoreState.invalid
+                      ? 'border-red-400 bg-red-50 text-red-700'
+                      : 'border-mustard/50 bg-[#FFFCF3] text-forest')
+                  }
                   value={prevMadiScore}
                   onInput={(e) => setPrevMadiScore((e.target as HTMLInputElement).value)}
                 />
@@ -613,6 +731,14 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
                   {madiMistakes.length > 0 ? ` (${madiMistakes.length})` : ''}
                 </button>
               </div>
+              {madiScoreState.invalid && (
+                <div class="text-[11px] text-red-600 font-semibold mt-1">الدرجة لازم تكون رقم</div>
+              )}
+              {madiScoreState.clamped && (
+                <div class="text-[11px] text-amber-700 font-semibold mt-1">
+                  هيتحفظ {madiScoreState.value} (الدرجة من 0 إلى 100)
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -776,6 +902,17 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
           onBack={() => setPendingSave(null)}
           onSaveOnly={() => commitPendingSave(false)}
           onSaveAndSend={() => commitPendingSave(true)}
+        />
+      )}
+
+      {confirmDialog && (
+        <ConfirmDialog
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          destructive={confirmDialog.destructive}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
         />
       )}
     </div>

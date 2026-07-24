@@ -30,6 +30,17 @@ export function studentHasRecordOnDate(student: Student, dateStr: string, allRec
   return allRecords.some((r) => studentMatch(r, student) && r.date === dateStr);
 }
 
+/** The student's existing record on a given date, if any — used by the
+ * individual-mode picker to detect and offer to resolve an accidental
+ * duplicate entry before a second session gets saved for the same day. */
+export function findStudentRecordOnDate(
+  student: Student,
+  dateStr: string,
+  allRecords: SessionRecord[],
+): SessionRecord | null {
+  return allRecords.find((r) => studentMatch(r, student) && r.date === dateStr) ?? null;
+}
+
 /**
  * Display name for a record: prefer the *current* name of the linked student
  * (so renames show up everywhere instantly), fall back to the name stored on

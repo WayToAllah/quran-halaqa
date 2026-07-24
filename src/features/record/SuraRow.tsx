@@ -152,6 +152,15 @@ function SuraCombobox({ value, placeholder, onCommit }: ComboProps) {
     setQuery(value || '');
   }, [value]);
 
+  // Cancels the pending blur-close timeout if the row is removed (e.g. "❌
+  // إزالة") while the field still has focus — otherwise the timeout fires
+  // after unmount and calls setOpen on a component that's already gone.
+  useEffect(() => {
+    return () => {
+      if (blurTimer.current) clearTimeout(blurTimer.current);
+    };
+  }, []);
+
   const matches = useMemo(() => {
     const q = normAr(query.trim());
     if (!q) return SURAS;

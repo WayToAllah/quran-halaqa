@@ -68,7 +68,6 @@ async function pickSura(name: string, index = 0) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubGlobal('confirm', vi.fn(() => true));
   previousSessionForS1 = null;
   studentsForHook = students;
 });
@@ -100,6 +99,51 @@ describe('RecordScreen — student picker', () => {
     await userEvent.type(input, 'احمد'); // no hamza, must still match "زيد احمد"
     await userEvent.click(screen.getByRole('button', { name: 'زيد احمد' }));
     expect((input as HTMLInputElement).value).toBe('زيد احمد');
+  });
+
+  it('closes the dropdown when tapping outside, same as the sura pickers', async () => {
+    renderScreen();
+    const input = screen.getByPlaceholderText('ابحث أو اختر اسم الطالب…');
+    await userEvent.click(input);
+    await userEvent.type(input, 'محمد');
+    expect(screen.getByRole('button', { name: 'محمد علي' })).toBeInTheDocument();
+    fireEvent.blur(input);
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'محمد علي' })).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe('RecordScreen — duplicate session detection', () => {
+  it('warns when the picked student already has a session on the picked date', async () => {
+    getRecordsByDateMock.mockResolvedValueOnce([
+      { id: 'r1', studentId: 's_1', date: localDateStr(), note: 'جلسة سابقة' },
+    ]);
+    renderScreen();
+    await selectStudent('زيد احمد');
+    await waitFor(() => expect(screen.getByText(/مسجّل بالفعل/)).toBeInTheDocument());
+  });
+
+  it('does not warn for a student with no session that day', async () => {
+    getRecordsByDateMock.mockResolvedValueOnce([]);
+    renderScreen();
+    await selectStudent('زيد احمد');
+    await waitFor(() => expect(getRecordsByDateMock).toHaveBeenCalled());
+    expect(screen.queryByText(/مسجّل بالفعل/)).not.toBeInTheDocument();
+  });
+
+  it('"فتح الجلسة الموجودة" loads the existing record into edit mode instead of leaving a new blank one', async () => {
+    getRecordsByDateMock.mockResolvedValueOnce([
+      { id: 'r1', studentId: 's_1', date: localDateStr(), note: 'جلسة سابقة' },
+    ]);
+    renderScreen();
+    await selectStudent('زيد احمد');
+    await waitFor(() => expect(screen.getByText(/مسجّل بالفعل/)).toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: 'فتح الجلسة الموجودة' }));
+    expect(screen.getByText('✏️ تعديل جلسة محفوظة')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('جلسة سابقة')).toBeInTheDocument();
+    // now editing the existing record, so the warning is gone
+    expect(screen.queryByText(/مسجّل بالفعل/)).not.toBeInTheDocument();
   });
 });
 
@@ -156,11 +200,22 @@ describe('RecordScreen — save validation', () => {
   });
 
   it('asks for confirmation before saving a completely empty session, and respects "cancel"', async () => {
-    vi.stubGlobal('confirm', vi.fn(() => false));
     renderScreen();
     await selectStudent('زيد احمد');
     await userEvent.click(screen.getByRole('button', { name: /حفظ الجلسة/ }));
+    expect(screen.getByText('جلسة فارغة')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'إلغاء' }));
+    expect(screen.queryByText('جلسة فارغة')).not.toBeInTheDocument();
     expect(saveRecordMock).not.toHaveBeenCalled();
+  });
+
+  it('proceeds to the review modal when the teacher confirms an empty session anyway', async () => {
+    renderScreen();
+    await selectStudent('زيد احمد');
+    await userEvent.click(screen.getByRole('button', { name: /حفظ الجلسة/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'حفظ برضه' }));
+    // the WhatsApp review modal is now the one open
+    await waitFor(() => expect(screen.getByRole('button', { name: /احفظ بدون إرسال|احفظ الجلسة/ })).toBeInTheDocument());
   });
 
   it('saves without confirmation when a note is present (non-empty session)', async () => {

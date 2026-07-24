@@ -68,4 +68,29 @@ describe('NiyyahBar', () => {
     await user.click(screen.getByRole('button', { name: 'تعديل النوايا' }));
     expect(onEdit).toHaveBeenCalledOnce();
   });
+
+  it('tapping a clipped niyyah expands it to full text (no ellipsis-only view)', async () => {
+    const long = 'نية طويلة جداً '.repeat(10).trim();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<NiyyahBar niyyat={[long]} onEdit={vi.fn()} />);
+    const text = screen.getByText(long);
+    expect(text).toHaveAttribute('aria-expanded', 'false');
+    await user.click(text);
+    expect(text).toHaveAttribute('aria-expanded', 'true');
+    // tapping again collapses it back
+    await user.click(text);
+    expect(text).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('pauses rotation while a niyyah is expanded', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<NiyyahBar niyyat={['نية ١', 'نية ٢']} onEdit={vi.fn()} intervalSec={4} />);
+    await user.click(screen.getByText('نية ١'));
+    act(() => {
+      vi.advanceTimersByTime(10000); // would normally rotate multiple times
+    });
+    // still showing the expanded first niyyah, rotation is paused
+    expect(screen.getByText('نية ١')).toBeInTheDocument();
+    expect(screen.queryByText('نية ٢')).not.toBeInTheDocument();
+  });
 });

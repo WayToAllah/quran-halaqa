@@ -84,12 +84,23 @@ function AppShell() {
       )}
 
       <main>
-        {tab === 'record' && (
+        {/* All four screens stay mounted at all times; only the active one is
+            shown (display:none on the rest). Switching tabs used to unmount
+            RecordScreen entirely, silently wiping any unsaved session the
+            teacher was mid-way through typing — this keeps that state alive
+            across tab switches, matching what a teacher actually expects. */}
+        <div class={tab === 'record' ? '' : 'hidden'}>
           <RecordScreen editRecord={editingRecord} onEditConsumed={() => setEditingRecord(null)} />
-        )}
-        {tab === 'students' && <StudentsScreen />}
-        {tab === 'log' && <LogScreen onEditRecord={handleEditRecord} />}
-        {tab === 'stats' && <StatsScreen />}
+        </div>
+        <div class={tab === 'students' ? '' : 'hidden'}>
+          <StudentsScreen />
+        </div>
+        <div class={tab === 'log' ? '' : 'hidden'}>
+          <LogScreen onEditRecord={handleEditRecord} />
+        </div>
+        <div class={tab === 'stats' ? '' : 'hidden'}>
+          <StatsScreen />
+        </div>
       </main>
 
       <nav class="fixed bottom-0 inset-x-0 bg-white border-t border-hairline flex px-1.5 pb-[env(safe-area-inset-bottom)]">

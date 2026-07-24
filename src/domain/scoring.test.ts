@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hasScore, scoreName, scoreToHalfStars, scoreToStars } from './scoring';
+import { hasScore, parseScoreField, scoreName, scoreToHalfStars, scoreToStars } from './scoring';
 
 describe('scoreName', () => {
   it('returns إعادة for a genuine zero score (regression: was returning "")', () => {
@@ -68,5 +68,24 @@ describe('hasScore', () => {
   });
   it('is true for any real numeric score', () => {
     expect(hasScore({ score: 85 })).toBe(true);
+  });
+});
+
+describe('parseScoreField', () => {
+  it('treats an empty field as legitimately not-evaluated, not an error', () => {
+    expect(parseScoreField('')).toEqual({ value: null, invalid: false, clamped: false });
+    expect(parseScoreField('   ')).toEqual({ value: null, invalid: false, clamped: false });
+  });
+  it('parses a normal in-range score', () => {
+    expect(parseScoreField('90')).toEqual({ value: 90, invalid: false, clamped: false });
+    expect(parseScoreField('0')).toEqual({ value: 0, invalid: false, clamped: false });
+  });
+  it('clamps and flags an out-of-range number instead of silently substituting it', () => {
+    expect(parseScoreField('150')).toEqual({ value: 100, invalid: false, clamped: true });
+    expect(parseScoreField('-5')).toEqual({ value: 0, invalid: false, clamped: true });
+  });
+  it('flags non-numeric text as invalid instead of silently saving a real zero (false "إعادة")', () => {
+    expect(parseScoreField('abc')).toEqual({ value: null, invalid: true, clamped: false });
+    expect(parseScoreField('٩٠عايز')).toEqual({ value: null, invalid: true, clamped: false });
   });
 });

@@ -23,6 +23,10 @@ export function NiyyahBar({ niyyat, onEdit, intervalSec = 4 }: Props) {
   const list = useMemo(() => displayNiyyat(niyyat), [niyyat]);
   const [index, setIndex] = useState(0);
   const [visible, setVisible] = useState(true);
+  // Tapping a niyyah that got clipped expands it to full, multi-line text.
+  // Rotation pauses while expanded so a long niyyah doesn't fade away
+  // mid-read; collapsing (tap again) resumes the normal cycle.
+  const [expanded, setExpanded] = useState(false);
   const reduceMotion = useRef(false);
 
   useEffect(() => {
@@ -37,10 +41,16 @@ export function NiyyahBar({ niyyat, onEdit, intervalSec = 4 }: Props) {
   useEffect(() => {
     setIndex(0);
     setVisible(true);
+    setExpanded(false);
   }, [list]);
 
+  // Collapse back to clipped view whenever the rotation moves to a new niyyah.
   useEffect(() => {
-    if (list.length <= 1) return; // nothing to rotate
+    setExpanded(false);
+  }, [index]);
+
+  useEffect(() => {
+    if (list.length <= 1 || expanded) return; // nothing to rotate, or paused while reading
     const holdMs = Math.max(1000, intervalSec * 1000);
     const tick = setInterval(() => {
       if (reduceMotion.current) {
@@ -55,7 +65,7 @@ export function NiyyahBar({ niyyat, onEdit, intervalSec = 4 }: Props) {
       }, FADE_MS);
     }, holdMs);
     return () => clearInterval(tick);
-  }, [list, intervalSec]);
+  }, [list, intervalSec, expanded]);
 
   const current = list[Math.min(index, list.length - 1)];
 
@@ -63,10 +73,22 @@ export function NiyyahBar({ niyyat, onEdit, intervalSec = 4 }: Props) {
     <div class="flex items-center gap-2 min-w-0 flex-1">
       <div class="min-w-0 flex-1 overflow-hidden">
         <div
-          class="text-[14px] font-extrabold text-ink-dark leading-snug truncate transition-opacity duration-300"
+          role="button"
+          tabIndex={0}
+          class={
+            'text-[14px] font-extrabold text-ink-dark leading-snug transition-opacity duration-300 cursor-pointer ' +
+            (expanded ? 'whitespace-normal' : 'line-clamp-2')
+          }
           style={{ opacity: visible ? 1 : 0 }}
-          title={current}
           aria-live="polite"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((e) => !e)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setExpanded((v) => !v);
+            }
+          }}
         >
           {current}
         </div>

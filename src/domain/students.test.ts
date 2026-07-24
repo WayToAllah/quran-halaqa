@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { displayStudentName, getStudentName, recordsForStudent, studentHasRecordOnDate, studentMatch } from './students';
+import { displayStudentName, findStudentRecordOnDate, getStudentName, recordsForStudent, studentHasRecordOnDate, studentMatch } from './students';
 import type { SessionRecord, Student } from '../types';
 
 const zaid: Student = { id: 's_1', name: 'زيد احمد' };
@@ -69,6 +69,22 @@ describe('studentHasRecordOnDate', () => {
   });
   it('is false for a date with no record at all', () => {
     expect(studentHasRecordOnDate(zaid, '2026-07-05', records)).toBe(false);
+  });
+});
+
+describe('findStudentRecordOnDate', () => {
+  const records: SessionRecord[] = [
+    { id: 'r1', studentId: 's_1', date: '2026-07-01' },
+    { id: 'r2', studentId: 's_2', date: '2026-07-01' },
+  ];
+  it('returns the matching record for that student and date', () => {
+    expect(findStudentRecordOnDate(zaid, '2026-07-01', records)?.id).toBe('r1');
+  });
+  it('returns null when the student has no record that day', () => {
+    expect(findStudentRecordOnDate(zaid, '2026-07-05', records)).toBeNull();
+  });
+  it('does not cross-match another student on the same date', () => {
+    expect(findStudentRecordOnDate(zaid, '2026-07-01', records)?.studentId).toBe('s_1');
   });
 });
 

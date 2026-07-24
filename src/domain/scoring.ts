@@ -40,3 +40,30 @@ export function scoreName(score: number | string | null | undefined): string {
   if (s >= 50) return 'مقبول';
   return 'إعادة';
 }
+
+export interface ScoreFieldState {
+  /** The value that will actually be saved — null means "not evaluated". */
+  value: number | null;
+  /** The raw text couldn't be parsed as a number at all (e.g. stray
+   * letters). Previously this silently saved as a real zero — a false
+   * "إعادة" grade from a typo. Now it's treated as not-evaluated, and the
+   * caller can surface `invalid` so the teacher notices and retypes it. */
+  invalid: boolean;
+  /** A valid number was typed but outside 0–100, so it was clamped. Lets the
+   * caller show the teacher what actually got saved instead of silently
+   * substituting it behind their back. */
+  clamped: boolean;
+}
+
+/** Parses a free-typed score field into what will actually be saved, without
+ * ever silently turning a typo into a misleading real grade. Empty is a
+ * legitimate "not evaluated yet" (score: null); everything else must parse
+ * as a finite number or it's flagged `invalid` rather than defaulting to 0. */
+export function parseScoreField(raw: string): ScoreFieldState {
+  const trimmed = raw.trim();
+  if (trimmed === '') return { value: null, invalid: false, clamped: false };
+  const n = Number(trimmed);
+  if (!Number.isFinite(n)) return { value: null, invalid: true, clamped: false };
+  const clampedValue = Math.min(100, Math.max(0, Math.round(n)));
+  return { value: clampedValue, invalid: false, clamped: clampedValue !== n };
+}
