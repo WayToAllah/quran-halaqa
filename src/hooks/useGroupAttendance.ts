@@ -3,7 +3,7 @@ import { getRecordsByDate, saveRecord } from '../data/records.repo';
 import { republishPublicStatsFor } from '../data/publishStats';
 import { getStudentName, studentHasRecordOnDate } from '../domain/students';
 import { genId } from '../domain/ids';
-import { MOSQUE_ID, HALAQA_ID } from '../config';
+import { useMosque } from '../features/mosque/MosqueContext';
 import type { SessionRecord, Student } from '../types';
 
 /**
@@ -14,6 +14,7 @@ import type { SessionRecord, Student } from '../types';
  * of the screen, not a per-mode one).
  */
 export function useGroupAttendance(date: string, students: Student[]) {
+  const { mosqueId, halaqaId } = useMosque();
   const [dayRecords, setDayRecords] = useState<SessionRecord[] | null>(null);
   const [checked, setChecked] = useState<Set<string>>(new Set());
 
@@ -21,7 +22,7 @@ export function useGroupAttendance(date: string, students: Student[]) {
     let cancelled = false;
     setDayRecords(null);
     setChecked(new Set());
-    getRecordsByDate(MOSQUE_ID, HALAQA_ID, date)
+    getRecordsByDate(mosqueId, halaqaId, date)
       .then((recs) => {
         if (!cancelled) setDayRecords(recs);
       })
@@ -29,7 +30,7 @@ export function useGroupAttendance(date: string, students: Student[]) {
     return () => {
       cancelled = true;
     };
-  }, [date]);
+  }, [date, mosqueId, halaqaId]);
 
   const sorted = useMemo(
     () => [...students].sort((a, b) => getStudentName(a).localeCompare(getStudentName(b), 'ar')),
@@ -71,7 +72,7 @@ export function useGroupAttendance(date: string, students: Student[]) {
     try {
       await Promise.all(
         toSave.map((s) =>
-          saveRecord(MOSQUE_ID, HALAQA_ID, {
+          saveRecord(mosqueId, halaqaId, {
             id: genId('att'),
             studentId: s.id,
             student: getStudentName(s),
@@ -82,10 +83,10 @@ export function useGroupAttendance(date: string, students: Student[]) {
         ),
       );
       showToast(`✓ تم تسجيل حضور ${toSave.length} طالب`);
-      void republishPublicStatsFor(toSave.map((s) => s.id));
+      void republishPublicStatsFor(toSave.map((s) => s.id), mosqueId, halaqaId);
       // Refresh day coverage so the just-saved students immediately show as
       // "مسجّل بالفعل" instead of staying checkable until the next date change.
-      const fresh = await getRecordsByDate(MOSQUE_ID, HALAQA_ID, date);
+      const fresh = await getRecordsByDate(mosqueId, halaqaId, date);
       setDayRecords(fresh);
       setChecked(new Set());
       return true;

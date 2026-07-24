@@ -8,11 +8,11 @@ import { getStudentName, recordsForStudent } from '../../domain/students';
 import { getAttendanceRanking, ATTENDANCE_BADGE_THRESHOLD, rankBadgeEmoji } from '../../domain/attendance';
 import { genParentToken } from '../../domain/ids';
 import { useToast } from '../../ui/ToastProvider';
-import { MOSQUE_ID, HALAQA_ID } from '../../config';
 import { StudentModal } from './StudentModal';
 import type { Student } from '../../types';
 
 import { CHILD_STATS_BASE_URL } from '../../config';
+import { useMosque } from '../mosque/MosqueContext';
 
 // A generic person-silhouette icon for the student avatar circle (Heroicons
 // "user" solid, inlined so we don't need an icon-library dependency for one glyph).
@@ -29,8 +29,9 @@ function PersonAvatarIcon() {
 }
 
 export function StudentsScreen() {
-  const { students, loaded: studentsLoaded } = useStudents(MOSQUE_ID, HALAQA_ID);
-  const { records } = useAllRecords(MOSQUE_ID, HALAQA_ID);
+  const { mosqueId, halaqaId } = useMosque();
+  const { students, loaded: studentsLoaded } = useStudents(mosqueId, halaqaId);
+  const { records } = useAllRecords(mosqueId, halaqaId);
   const { showToast } = useToast();
 
   const [query, setQuery] = useState('');
@@ -70,7 +71,7 @@ export function StudentsScreen() {
     if (!token) {
       token = genParentToken();
       try {
-        await updateStudent(MOSQUE_ID, HALAQA_ID, s.id, { parentToken: token });
+        await updateStudent(mosqueId, halaqaId, s.id, { parentToken: token });
       } catch (err) {
         console.error('failed to mint parentToken:', err);
         showToast('⚠️ تعذّر إنشاء رابط المتابعة', true);
@@ -92,7 +93,7 @@ export function StudentsScreen() {
       ? `حذف \"${getStudentName(s)}\"؟\n\nله ${linkedCount} جلسة مسجلة — هتفضل موجودة في السجل والإحصائيات باسمه الحالي لكن بدون إمكانية ربطها بملفه بعد الحذف.`
       : `حذف \"${getStudentName(s)}\"؟`;
     if (!confirm(warning)) return;
-    requestDelete(s.id, `🗑 تم حذف ${getStudentName(s)}`, (id) => deleteStudentDoc(MOSQUE_ID, HALAQA_ID, id));
+    requestDelete(s.id, `🗑 تم حذف ${getStudentName(s)}`, (id) => deleteStudentDoc(mosqueId, halaqaId, id));
   }
 
   return (

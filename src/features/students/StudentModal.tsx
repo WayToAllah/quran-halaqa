@@ -2,7 +2,7 @@ import { useState } from 'preact/hooks';
 import { genParentToken } from '../../domain/ids';
 import { saveStudent } from '../../data/students.repo';
 import { useToast } from '../../ui/ToastProvider';
-import { MOSQUE_ID, HALAQA_ID } from '../../config';
+import { useMosque } from '../mosque/MosqueContext';
 import type { Student } from '../../types';
 
 const GRADE_OPTIONS = [
@@ -29,6 +29,7 @@ interface Props {
 }
 
 export function StudentModal({ student, allStudents, onClose }: Props) {
+  const { mosqueId, halaqaId } = useMosque();
   const { showToast } = useToast();
   const [name, setName] = useState(student?.name ?? '');
   const [age, setAge] = useState(student?.age ?? '');
@@ -72,7 +73,7 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
     };
 
     try {
-      await saveStudent(MOSQUE_ID, HALAQA_ID, obj);
+      await saveStudent(mosqueId, halaqaId, obj);
       showToast(student ? '✓ تم التحديث' : '✓ تم الحفظ بنجاح');
       onClose();
     } catch (err) {

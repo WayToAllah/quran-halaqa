@@ -13,7 +13,7 @@ import {
   countRecentlyActiveStudents,
   type StatsSortKey,
 } from '../../domain/statsScreen';
-import { MOSQUE_ID, HALAQA_ID } from '../../config';
+import { useMosque } from '../mosque/MosqueContext';
 import { buildAttendanceCardData, buildAttendanceCardSvg } from '../../domain/attendanceCard';
 import { svgToPngBlob, shareOrDownloadPng } from './shareCard';
 
@@ -56,8 +56,9 @@ const cardCls = 'bg-white border border-hairline rounded-2xl p-[18px]';
 const cardTitleCls = 'text-[13.5px] font-extrabold text-ink-dark mb-3.5';
 
 export function StatsScreen() {
-  const { students, loaded: studentsLoaded } = useStudents(MOSQUE_ID, HALAQA_ID);
-  const { records, loaded: recordsLoaded } = useAllRecords(MOSQUE_ID, HALAQA_ID);
+  const { mosqueId, halaqaId } = useMosque();
+  const { students, loaded: studentsLoaded } = useStudents(mosqueId, halaqaId);
+  const { records, loaded: recordsLoaded } = useAllRecords(mosqueId, halaqaId);
 
   const [monthFilter, setMonthFilter] = useState('all');
   const [sortKey, setSortKey] = useState<StatsSortKey>('attend');

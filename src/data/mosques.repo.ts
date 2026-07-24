@@ -1,7 +1,27 @@
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 import { halaqaConverter, mosqueConverter } from './converters';
-import type { Halaqa, Mosque, MosqueMember } from '../types';
+import type { Halaqa, Mosque, MosqueMember, UserMosques } from '../types';
+
+/**
+ * Reads the `admins/{uid}` doc listing every mosque a signed-in admin can work
+ * on. This is the denormalized lookup the old getMembership() comment
+ * anticipated — one read at login resolves the user's tenant(s) without
+ * probing each mosque's members subcollection. Returns null when the user has
+ * no admin record at all (i.e. not provisioned for any mosque yet).
+ *
+ * Security note: this doc only NAMES the mosques; it grants nothing. Actual
+ * access is still enforced by the per-mosque `members/{uid}` doc and the
+ * Firestore rules — a tampered admins doc can't read data the rules don't
+ * already allow.
+ */
+export async function getUserMosques(uid: string): Promise<UserMosques | null> {
+  const snap = await getDoc(doc(db, 'admins', uid));
+  if (!snap.exists()) return null;
+  const data = snap.data() as Partial<UserMosques>;
+  const mosques = Array.isArray(data.mosques) ? data.mosques.filter((m) => m?.mosqueId && m?.halaqaId) : [];
+  return { mosques };
+}
 
 /**
  * Finds which mosque(s) a signed-in admin belongs to, by checking each

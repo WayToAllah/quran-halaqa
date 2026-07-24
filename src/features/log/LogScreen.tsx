@@ -12,7 +12,7 @@ import { ayahRange, joinSuraNames } from '../../domain/suras';
 import { hijriShort } from '../../domain/hijri';
 import { PlainStars } from '../../ui/StarRating';
 import { useToast } from '../../ui/ToastProvider';
-import { MOSQUE_ID, HALAQA_ID } from '../../config';
+import { useMosque } from '../mosque/MosqueContext';
 import type { SessionRecord } from '../../types';
 
 function formatDate(dateStr: string): string {
@@ -146,8 +146,9 @@ interface LogScreenProps {
 }
 
 export function LogScreen({ onEditRecord }: LogScreenProps = {}) {
-  const { records, loaded, loadMore, loadingMore, hasMore } = useRecentRecords(MOSQUE_ID, HALAQA_ID);
-  const { students } = useStudents(MOSQUE_ID, HALAQA_ID);
+  const { mosqueId, halaqaId } = useMosque();
+  const { records, loaded, loadMore, loadingMore, hasMore } = useRecentRecords(mosqueId, halaqaId);
+  const { students } = useStudents(mosqueId, halaqaId);
   const { pendingIds, requestDelete } = useUndoableDelete();
   const { showToast } = useToast();
   const [query, setQuery] = useState('');
@@ -155,7 +156,7 @@ export function LogScreen({ onEditRecord }: LogScreenProps = {}) {
   const isSearching = query.trim().length > 0;
   // When searching, results come from Firestore (every matching student's full
   // history), not just the paginated slice already in memory.
-  const search = useRecordSearch(MOSQUE_ID, HALAQA_ID, query, students);
+  const search = useRecordSearch(mosqueId, halaqaId, query, students);
 
   const visibleRecords = useMemo(() => {
     const source = isSearching ? search.results : records;
@@ -172,9 +173,9 @@ export function LogScreen({ onEditRecord }: LogScreenProps = {}) {
     const label = r.attendance_only ? `حضور ${name}` : `جلسة ${name}`;
     if (!confirm(`حذف \"${label}\"؟`)) return;
     requestDelete(r.id, `🗑 تم حذف ${label}`, async (id) => {
-      await deleteRecordDoc(MOSQUE_ID, HALAQA_ID, id);
+      await deleteRecordDoc(mosqueId, halaqaId, id);
       // Refresh the parent projection now that this session is gone.
-      if (r.studentId) void republishPublicStatsFor([r.studentId]);
+      if (r.studentId) void republishPublicStatsFor([r.studentId], mosqueId, halaqaId);
     });
   }
 

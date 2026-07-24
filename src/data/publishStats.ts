@@ -69,13 +69,17 @@ export async function publishStudentPublicStats(
  * Fire-and-forget: never awaited by the UI in a way that blocks the user, and
  * failures only warn (the projection self-heals on the next successful save).
  */
-export async function republishPublicStatsFor(studentIds: string[]): Promise<void> {
+export async function republishPublicStatsFor(
+  studentIds: string[],
+  mosqueId: string = MOSQUE_ID,
+  halaqaId: string = HALAQA_ID,
+): Promise<void> {
   if (!studentIds.length) return;
   try {
-    const cached = getCachedHalaqaSnapshot(MOSQUE_ID, HALAQA_ID);
+    const cached = getCachedHalaqaSnapshot(mosqueId, halaqaId);
     const { students: allStudents, records: allRecords } = cached ?? {
-      students: await getAllStudents(MOSQUE_ID, HALAQA_ID),
-      records: await getAllRecords(MOSQUE_ID, HALAQA_ID),
+      students: await getAllStudents(mosqueId, halaqaId),
+      records: await getAllRecords(mosqueId, halaqaId),
     };
     const inputs = computeSharedStatsInputs(allStudents, allRecords);
     await Promise.all(

@@ -19,7 +19,7 @@ import { summarizeMistakes, rebuildMistakeHistory, type MistakeKind } from '../.
 import { StarPicker } from '../../ui/StarPicker';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useToast } from '../../ui/ToastProvider';
-import { MOSQUE_ID, HALAQA_ID } from '../../config';
+import { useMosque } from '../mosque/MosqueContext';
 import type { SuraAssignment, SessionRecord, Student } from '../../types';
 
 function fmtSuraInfo(list: SuraAssignment[]): string {
@@ -68,7 +68,8 @@ interface Props {
 }
 
 export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) {
-  const { students } = useStudents(MOSQUE_ID, HALAQA_ID);
+  const { mosqueId, halaqaId } = useMosque();
+  const { students } = useStudents(mosqueId, halaqaId);
   const { showToast } = useToast();
 
   const [date, setDate] = useState(localDateStr());
@@ -90,7 +91,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   // its loh/madi even when there's no live "previous session" to evaluate).
   const [editingRecordData, setEditingRecordData] = useState<SessionRecord | null>(null);
 
-  const { prev: prevSession } = usePreviousSession(MOSQUE_ID, HALAQA_ID, selectedStudent, editingId ?? undefined);
+  const { prev: prevSession } = usePreviousSession(mosqueId, halaqaId, selectedStudent, editingId ?? undefined);
   const [prevLohScore, setPrevLohScore] = useState('');
   const [prevMadiScore, setPrevMadiScore] = useState('');
   // Mistake-counter history per evaluation. Preserved so reopening the counter
@@ -431,11 +432,11 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     const { rec, message, phone, isEditing, studentId } = pendingSave;
     setSaving(true);
     try {
-      await saveRecord(MOSQUE_ID, HALAQA_ID, rec);
+      await saveRecord(mosqueId, halaqaId, rec);
       showToast(isEditing ? '✓ تم تحديث الجلسة' : '✓ تم الحفظ بنجاح');
       // Refresh the parent-facing projection immediately (fire-and-forget; a
       // failure here must not block the save that already succeeded).
-      void republishPublicStatsFor([studentId]);
+      void republishPublicStatsFor([studentId], mosqueId, halaqaId);
       setPendingSave(null);
       resetForm();
       if (send && phone) {

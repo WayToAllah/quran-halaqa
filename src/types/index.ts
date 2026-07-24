@@ -96,6 +96,23 @@ export interface MosqueMember {
   role: 'owner' | 'admin';
 }
 
+/** One mosque an admin belongs to, denormalized for a single fast lookup at
+ * login. `label` is a display name for the mosque switcher so we don't have
+ * to fetch each mosque doc just to render the picker. */
+export interface UserMosqueLink {
+  mosqueId: string;
+  halaqaId: string;
+  label: string;
+}
+
+/** The `admins/{uid}` doc: every mosque a signed-in admin can work on. Read
+ * once at login to resolve which tenant(s) the user belongs to, replacing the
+ * old hardcoded MOSQUE_ID. A one-element list is the common case (one teacher,
+ * one mosque) and behaves exactly like the single-tenant app did. */
+export interface UserMosques {
+  mosques: UserMosqueLink[];
+}
+
 export interface Halaqa {
   id: string;
   name: string;
