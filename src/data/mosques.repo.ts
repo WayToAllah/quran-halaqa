@@ -16,11 +16,22 @@ import type { Halaqa, Mosque, MosqueMember, UserMosques } from '../types';
  * already allow.
  */
 export async function getUserMosques(uid: string): Promise<UserMosques | null> {
-  const snap = await getDoc(doc(db, 'admins', uid));
-  if (!snap.exists()) return null;
-  const data = snap.data() as Partial<UserMosques>;
-  const mosques = Array.isArray(data.mosques) ? data.mosques.filter((m) => m?.mosqueId) : [];
-  return { mosques };
+  try {
+    const snap = await getDoc(doc(db, 'admins', uid));
+    if (!snap.exists()) return null;
+    const data = snap.data() as Partial<UserMosques>;
+    const mosques = Array.isArray(data.mosques) ? data.mosques.filter((m) => m?.mosqueId) : [];
+    return { mosques };
+  } catch (err) {
+    // CRITICAL: this read is an ENHANCEMENT, never a gate. `admins/{uid}` has
+    // no rule in firestore.rules yet, and Firestore denies anything not
+    // explicitly allowed — so this throws PERMISSION_DENIED on any project
+    // whose rules haven't been updated. Swallowing it here means the app
+    // falls back to single-mosque mode instead of locking the teacher out of
+    // their own halaqa. Real access is still enforced by getMembership().
+    console.warn('getUserMosques: falling back to single-mosque mode —', err);
+    return null;
+  }
 }
 
 /**
