@@ -1,0 +1,20 @@
+{
+  "_comment": "Example provisioning config. Copy, edit, and paste into the provision workflow's config_json input. UIDs come from Firebase Console -> Authentication -> Users. admins/{uid} records are derived automatically from the members lists below - do not write them by hand.",
+
+  "mosques": [
+    {
+      "mosqueId": "altayseer",
+      "name": "مسجد التيسير",
+      "members": [
+        { "uid": "REPLACE_WITH_YOUR_UID", "role": "owner" }
+      ],
+      "halaqat": [
+        {
+          "halaqaId": "main",
+          "name": "الحلقة الرئيسية",
+          "primaryTeacherUid": "REPLACE_WITH_YOUR_UID"
+        }
+      ]
+    }
+  ]
+}
