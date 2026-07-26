@@ -103,7 +103,12 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   // its loh/madi even when there's no live "previous session" to evaluate).
   const [editingRecordData, setEditingRecordData] = useState<SessionRecord | null>(null);
 
-  const { prev: prevSession } = usePreviousSession(MOSQUE_ID, HALAQA_ID, selectedStudent, editingId ?? undefined);
+  const { prev: prevSession, loading: prevLoading } = usePreviousSession(
+    MOSQUE_ID,
+    HALAQA_ID,
+    selectedStudent,
+    editingId ?? undefined,
+  );
   const [prevLohScore, setPrevLohScore] = useState('');
   const [prevMadiScore, setPrevMadiScore] = useState('');
   // Mistake-counter history per evaluation. Preserved so reopening the counter
@@ -188,9 +193,18 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   // first session (no prior session exists) do we fall back to the record
   // itself, so the evaluation fields still render.
   const evalSource = editingId ? (prevSession ?? editingRecordData) : prevSession;
-  const prevLohInfo = evalSource ? fmtSuraInfo(extractAssignedSuras(evalSource.newLoh, evalSource.loh)) : '—';
+  const prevLohList = evalSource ? extractAssignedSuras(evalSource.newLoh, evalSource.loh) : [];
+  const prevLohInfo = fmtSuraInfo(prevLohList);
   const prevMadiList = evalSource ? extractAssignedSuras(evalSource.newMadi, evalSource.madi) : [];
   const prevMadiInfo = fmtSuraInfo(prevMadiList);
+  // Only grade what was actually assigned. A score box under a dash invites a
+  // mark for an assignment that was never given — the madi half already knew
+  // this; the loh half rendered unconditionally. The `!== ''` arm keeps an
+  // existing score visible and editable even when the assignment behind it is
+  // missing, so opening an old session for edit can never hide a mark that is
+  // still stored on the record.
+  const showLohEval = prevLohList.length > 0 || prevLohScore !== '';
+  const showMadiEval = prevMadiList.length > 0 || prevMadiScore !== '';
 
   const lohScoreState = parseScoreField(prevLohScore);
   const madiScoreState = parseScoreField(prevMadiScore);
@@ -551,6 +565,10 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
       // Refresh the parent-facing projection immediately (fire-and-forget; a
       // failure here must not block the save that already succeeded).
       void republishPublicStatsFor([studentId]);
+      // The "مسجّل بالفعل" warning reads the day's coverage snapshot, which is
+      // otherwise only taken when the date changes — without this refresh the
+      // student just saved could be picked again straight away with no warning.
+      void groupAttendance.refresh();
       setPendingSave(null);
       resetForm();
       if (send && phone) {
@@ -767,7 +785,13 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
         </div>
       )}
 
-      {selectedStudent && evalSource && (
+      {/* Reading the last session is a round-trip; without this the card is
+          simply absent and a student WITH history looks like one without. */}
+      {selectedStudent && prevLoading && !evalSource && (
+        <div class={cardCls + ' text-[12px] text-taupe'}>⏳ بنجيب آخر جلسة للطالب…</div>
+      )}
+
+      {selectedStudent && evalSource && (showLohEval || showMadiEval) && (
         <div class={cardCls + ' space-y-3.5'}>
           <div>
             <div class="font-extrabold text-ink-dark text-[13.5px]">📋 ما سمعناه النهارده</div>
@@ -778,57 +802,59 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
             </div>
           </div>
 
-          <div>
-            <div class="text-xs font-semibold text-[#5B5646] mb-1">اللوح</div>
-            <div class="text-sm mb-2 text-ink-dark">{prevLohInfo}</div>
-            <label class="text-xs text-taupe">التقييم (من 100)</label>
-            <div class="flex items-center gap-2 mt-1 flex-wrap">
-              <input
-                type="number"
-                min={0}
-                max={100}
-                placeholder="مثلاً 90"
-                class={
-                  'w-20 text-center font-extrabold text-lg rounded-xl py-2 border ' +
-                  (lohScoreState.invalid
-                    ? 'border-red-400 bg-red-50 text-red-700'
-                    : 'border-mustard/50 bg-[#FFFCF3] text-forest')
-                }
-                value={prevLohScore}
-                onInput={(e) => {
-                  const val = (e.target as HTMLInputElement).value;
-                  setPrevLohScore(val);
-                  autoCloseScoreKeyboard(e, val);
-                }}
-              />
-              {lohTier && (
-                <span
-                  class="text-[11px] font-bold px-2.5 py-1 rounded-full"
-                  style={{ background: lohTier.bg, color: lohTier.color }}
+          {showLohEval && (
+            <div>
+              <div class="text-xs font-semibold text-[#5B5646] mb-1">اللوح</div>
+              <div class="text-sm mb-2 text-ink-dark">{prevLohInfo}</div>
+              <label class="text-xs text-taupe">التقييم (من 100)</label>
+              <div class="flex items-center gap-2 mt-1 flex-wrap">
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  placeholder="مثلاً 90"
+                  class={
+                    'w-20 text-center font-extrabold text-lg rounded-xl py-2 border ' +
+                    (lohScoreState.invalid
+                      ? 'border-red-400 bg-red-50 text-red-700'
+                      : 'border-mustard/50 bg-[#FFFCF3] text-forest')
+                  }
+                  value={prevLohScore}
+                  onInput={(e) => {
+                    const val = (e.target as HTMLInputElement).value;
+                    setPrevLohScore(val);
+                    autoCloseScoreKeyboard(e, val);
+                  }}
+                />
+                {lohTier && (
+                  <span
+                    class="text-[11px] font-bold px-2.5 py-1 rounded-full"
+                    style={{ background: lohTier.bg, color: lohTier.color }}
+                  >
+                    {lohTier.label}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  class="mr-auto text-xs font-semibold text-forest border border-forest/20 rounded-lg px-2.5 py-2"
+                  onClick={() => setMistakeModal('loh')}
                 >
-                  {lohTier.label}
-                </span>
-              )}
-              <button
-                type="button"
-                class="mr-auto text-xs font-semibold text-forest border border-forest/20 rounded-lg px-2.5 py-2"
-                onClick={() => setMistakeModal('loh')}
-              >
-                🧮 عدّاد الأخطاء
-                {lohMistakes.length > 0 ? ` (${lohMistakes.length})` : ''}
-              </button>
-            </div>
-            {lohScoreState.invalid && (
-              <div class="text-[11px] text-red-600 font-semibold mt-1">الدرجة لازم تكون رقم</div>
-            )}
-            {lohScoreState.clamped && (
-              <div class="text-[11px] text-amber-700 font-semibold mt-1">
-                هيتحفظ {lohScoreState.value} (الدرجة من 0 إلى 100)
+                  🧮 عدّاد الأخطاء
+                  {lohMistakes.length > 0 ? ` (${lohMistakes.length})` : ''}
+                </button>
               </div>
-            )}
-          </div>
+              {lohScoreState.invalid && (
+                <div class="text-[11px] text-red-600 font-semibold mt-1">الدرجة لازم تكون رقم</div>
+              )}
+              {lohScoreState.clamped && (
+                <div class="text-[11px] text-amber-700 font-semibold mt-1">
+                  هيتحفظ {lohScoreState.value} (الدرجة من 0 إلى 100)
+                </div>
+              )}
+            </div>
+          )}
 
-          {prevMadiList.length > 0 && (
+          {showMadiEval && (
             <div class="pt-3.5 border-t border-hairline">
               <div class="text-xs font-semibold text-[#5B5646] mb-1">الماضي</div>
               <div class="text-sm mb-2 text-ink-dark">{prevMadiInfo}</div>

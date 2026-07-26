@@ -16,6 +16,7 @@ let studentsForHook: Student[] = students;
 
 const saveRecordMock = vi.fn().mockResolvedValue(undefined);
 let previousSessionForS1: SessionRecord | null = null;
+let previousSessionLoading = false;
 
 vi.mock('../../hooks/useStudents', () => ({
   useStudents: () => ({ students: studentsForHook, loaded: true }),
@@ -23,7 +24,7 @@ vi.mock('../../hooks/useStudents', () => ({
 vi.mock('../../hooks/usePreviousSession', () => ({
   usePreviousSession: (_m: string, _h: string, student: Student | null) => ({
     prev: student?.id === 's_1' ? previousSessionForS1 : null,
-    loading: false,
+    loading: previousSessionLoading,
   }),
 }));
 const getRecordsByDateMock = vi.fn().mockResolvedValue([]);
@@ -78,7 +79,9 @@ async function pickSura(name: string, index = 0) {
 beforeEach(() => {
   vi.clearAllMocks();
   previousSessionForS1 = null;
+  previousSessionLoading = false;
   studentsForHook = students;
+  getRecordsByDateMock.mockResolvedValue([]);
 });
 
 /** The save flow is now two-step: tap the floating "حفظ الجلسة" to open the
@@ -676,5 +679,78 @@ describe('RecordScreen — group attendance tab', () => {
     // Re-render with an edit record is exercised by the edit-mode suite above;
     // here we just confirm group mode itself never shows record-editing UI.
     expect(screen.queryByText(/تعديل جلسة محفوظة/)).not.toBeInTheDocument();
+  });
+});
+
+
+describe('RecordScreen — evaluation card', () => {
+  it('waits visibly while the last session is being read', async () => {
+    previousSessionLoading = true;
+    renderScreen();
+    await selectStudent('زيد احمد');
+    // Without this the card is simply absent, which is exactly what a student
+    // with no history looks like.
+    expect(screen.getByText('⏳ بنجيب آخر جلسة للطالب…')).toBeInTheDocument();
+  });
+
+  it('offers no loh score box when the last session assigned no loh', async () => {
+    previousSessionForS1 = {
+      id: 'r_prev',
+      studentId: 's_1',
+      date: '2026-07-01',
+      newMadi: [{ sura: 'الفاتحة', from: '1', to: '7' }],
+    };
+    renderScreen();
+    await selectStudent('زيد احمد');
+
+    expect(await screen.findByText('الماضي')).toBeInTheDocument();
+    // A score box under a dash invites grading an assignment never given.
+    expect(screen.queryByText('اللوح')).not.toBeInTheDocument();
+  });
+
+  it('hides the whole card when the last session assigned nothing at all', async () => {
+    previousSessionForS1 = { id: 'r_prev', studentId: 's_1', date: '2026-07-01', attendance_only: true };
+    renderScreen();
+    await selectStudent('زيد احمد');
+    expect(screen.queryByText('📋 ما سمعناه النهارده')).not.toBeInTheDocument();
+  });
+
+  it('still shows a stored score whose assignment is missing, so editing cannot hide it', async () => {
+    // Grading a session recorded before the assignment was captured: the mark
+    // exists on the record and must stay visible and editable.
+    const edited: SessionRecord = {
+      id: 'r_edit',
+      studentId: 's_1',
+      date: '2026-07-10',
+      loh: { score: 80, stars: 4 },
+    };
+    previousSessionForS1 = null;
+    renderScreen({ editRecord: edited });
+    expect(await screen.findByText('اللوح')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('80')).toBeInTheDocument();
+  });
+});
+
+describe('RecordScreen — duplicate warning', () => {
+  it('refreshes the day\'s coverage after saving so the same student cannot be recorded twice unwarned', async () => {
+    // The day's coverage answers "is he already recorded today?" — empty until
+    // the save lands, and holding the new session from then on.
+    getRecordsByDateMock.mockImplementation(async () =>
+      saveRecordMock.mock.calls.length
+        ? [{ id: 'r_new', studentId: 's_1', student: 'زيد احمد', date: localDateStr() }]
+        : [],
+    );
+
+    renderScreen();
+    await selectStudent('زيد احمد');
+    await pickSura('البقرة');
+    await saveAndConfirm();
+    await waitFor(() => expect(saveRecordMock).toHaveBeenCalled());
+    // The snapshot used to be re-read only when the date changed, so picking
+    // the same student again in the same sitting drew no warning at all.
+    await waitFor(() => expect(getRecordsByDateMock).toHaveBeenCalledTimes(2));
+
+    await selectStudent('زيد احمد');
+    expect(await screen.findByText(/مسجّل بالفعل/)).toBeInTheDocument();
   });
 });

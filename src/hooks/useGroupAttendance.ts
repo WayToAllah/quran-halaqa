@@ -31,6 +31,18 @@ export function useGroupAttendance(date: string, students: Student[]) {
     };
   }, [date]);
 
+  /** Re-reads the day's coverage. The individual tab needs this too: it warns
+   * "مسجّل بالفعل" off this same snapshot, which is otherwise only taken when
+   * the date changes — so a student saved and then picked again in the same
+   * sitting drew no warning at all. */
+  async function refresh() {
+    try {
+      setDayRecords(await getRecordsByDate(MOSQUE_ID, HALAQA_ID, date));
+    } catch (err) {
+      console.error('getRecordsByDate failed:', err);
+    }
+  }
+
   const sorted = useMemo(
     () => [...students].sort((a, b) => getStudentName(a).localeCompare(getStudentName(b), 'ar')),
     [students],
@@ -85,8 +97,7 @@ export function useGroupAttendance(date: string, students: Student[]) {
       void republishPublicStatsFor(toSave.map((s) => s.id));
       // Refresh day coverage so the just-saved students immediately show as
       // "مسجّل بالفعل" instead of staying checkable until the next date change.
-      const fresh = await getRecordsByDate(MOSQUE_ID, HALAQA_ID, date);
-      setDayRecords(fresh);
+      await refresh();
       setChecked(new Set());
       return true;
     } catch (err) {
@@ -96,5 +107,5 @@ export function useGroupAttendance(date: string, students: Student[]) {
     }
   }
 
-  return { dayRecords, sorted, eligible, checked, toggle, toggleAll, handleSave };
+  return { dayRecords, sorted, eligible, checked, toggle, toggleAll, handleSave, refresh };
 }
