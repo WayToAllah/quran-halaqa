@@ -255,3 +255,83 @@ describe('StudentsScreen — the add control', () => {
     expect(screen.getByText('إضافة طالب جديد')).toBeInTheDocument();
   });
 });
+
+describe('StudentsScreen — duplicate names', () => {
+  // The roster is SEARCHED with normAr, so two spellings that differ only in
+  // hamza are already one name as far as the app is concerned. Letting both in
+  // creates two profiles for one boy with his sessions split between them.
+  it('rejects a name that differs from an existing one only in hamza', async () => {
+    renderScreen();
+    await userEvent.click(screen.getByRole('button', { name: 'إضافة طالب جديد' }));
+    await userEvent.type(screen.getByPlaceholderText('اسم الطالب'), 'زيد أحمد');
+    await userEvent.click(screen.getByRole('button', { name: 'حفظ' }));
+    expect(saveStudentMock).not.toHaveBeenCalled();
+    // Naming the stored spelling — otherwise the warning looks wrong to
+    // someone reading a list that appears not to contain it.
+    expect(screen.getByText(/مسجّل باسم "زيد احمد"/)).toBeInTheDocument();
+  });
+
+  it('rejects a name differing only in spacing', async () => {
+    renderScreen();
+    await userEvent.click(screen.getByRole('button', { name: 'إضافة طالب جديد' }));
+    await userEvent.type(screen.getByPlaceholderText('اسم الطالب'), 'زيد   احمد');
+    await userEvent.click(screen.getByRole('button', { name: 'حفظ' }));
+    expect(saveStudentMock).not.toHaveBeenCalled();
+  });
+
+  it('still allows a genuinely new name', async () => {
+    renderScreen();
+    await userEvent.click(screen.getByRole('button', { name: 'إضافة طالب جديد' }));
+    await userEvent.type(screen.getByPlaceholderText('اسم الطالب'), 'سعيد منصور');
+    await userEvent.click(screen.getByRole('button', { name: 'حفظ' }));
+    await waitFor(() => expect(saveStudentMock).toHaveBeenCalled());
+  });
+});
+
+describe('StudentModal — discarding unsaved work', () => {
+  async function openAndType(text: string) {
+    renderScreen();
+    await userEvent.click(screen.getByRole('button', { name: 'إضافة طالب جديد' }));
+    await userEvent.type(screen.getByPlaceholderText('اسم الطالب'), text);
+  }
+
+  it('closes straight away when nothing was typed', async () => {
+    renderScreen();
+    await userEvent.click(screen.getByRole('button', { name: 'إضافة طالب جديد' }));
+    await userEvent.click(screen.getByRole('button', { name: 'إلغاء' }));
+    expect(screen.queryByText('إضافة طالب جديد')).not.toBeInTheDocument();
+  });
+
+  // A stray tap beside a bottom sheet used to wipe a fully typed profile.
+  it('warns instead of discarding when the backdrop is tapped', async () => {
+    await openAndType('طالب جديد');
+    await userEvent.click(document.querySelector('.fixed.inset-0.z-40') as HTMLElement);
+    expect(screen.getByText('بيانات لسه متحفظتش')).toBeInTheDocument();
+    // The form is still there behind the warning.
+    expect(screen.getByPlaceholderText('اسم الطالب')).toHaveValue('طالب جديد');
+  });
+
+  it('keeps the typed data when the warning is dismissed', async () => {
+    await openAndType('طالب جديد');
+    await userEvent.click(document.querySelector('.fixed.inset-0.z-40') as HTMLElement);
+    await userEvent.click(screen.getByRole('button', { name: 'أكمل التعديل' }));
+    expect(screen.queryByText('بيانات لسه متحفظتش')).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('اسم الطالب')).toHaveValue('طالب جديد');
+  });
+
+  it('closes only once the discard is confirmed', async () => {
+    await openAndType('طالب جديد');
+    await userEvent.click(document.querySelector('.fixed.inset-0.z-40') as HTMLElement);
+    await userEvent.click(screen.getByRole('button', { name: 'اقفل وامسح' }));
+    expect(screen.queryByPlaceholderText('اسم الطالب')).not.toBeInTheDocument();
+    expect(saveStudentMock).not.toHaveBeenCalled();
+  });
+
+  it('warns on an edit that changed a field other than the name', async () => {
+    renderScreen();
+    await userEvent.click(screen.getAllByRole('button', { name: 'تعديل' })[0]);
+    await userEvent.type(screen.getByPlaceholderText('اسم المدرسة'), 'مدرسة جديدة');
+    await userEvent.click(screen.getByRole('button', { name: 'إلغاء' }));
+    expect(screen.getByText('بيانات لسه متحفظتش')).toBeInTheDocument();
+  });
+});
