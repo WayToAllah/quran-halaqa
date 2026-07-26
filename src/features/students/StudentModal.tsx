@@ -1,6 +1,6 @@
-import { useState } from 'preact/hooks';
-import { genParentToken } from '../../domain/ids';
-import { normAr } from '../../domain/text';
+import { useEffect, useState } from 'preact/hooks';
+import { genId, genParentToken } from '../../domain/ids';
+import { normAr, toWesternDigits } from '../../domain/text';
 import { saveStudent } from '../../data/students.repo';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useToast } from '../../ui/ToastProvider';
@@ -23,6 +23,12 @@ const GRADE_OPTIONS = [
   'الصف الثالث الثانوي',
 ];
 
+/** Declared on the age input itself; enforced here so the claim is real. */
+const AGE_MIN = 4;
+const AGE_MAX = 25;
+/** Shortest string that could plausibly reach a phone. */
+const MIN_PHONE_DIGITS = 10;
+
 interface Props {
   /** null = add mode, a Student = edit mode. */
   student: Student | null;
@@ -41,6 +47,8 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
   const [phoneSecondary, setPhoneSecondary] = useState(student?.phoneSecondary ?? '');
   const [saving, setSaving] = useState(false);
   const [nameError, setNameError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  const [ageError, setAgeError] = useState('');
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
   // Anything typed but not yet written. Closing is only worth interrupting
@@ -54,6 +62,14 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
     school !== (student?.school ?? '') ||
     phonePrimary !== (student?.phonePrimary ?? '') ||
     phoneSecondary !== (student?.phoneSecondary ?? '');
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') requestClose();
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  });
 
   /** Every dismissal route goes through here: the backdrop, ✕ and إلغاء. The
    * backdrop is the dangerous one — a stray tap beside a bottom sheet on a
@@ -73,7 +89,10 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
       setNameError('الاسم مطلوب');
       return;
     }
-    const newId = student?.id ?? crypto.randomUUID().replace(/-/g, '').slice(0, 20);
+    // genId('s') — the same shape as every other student id in the data
+    // ('s_<ms>_<rand>'), rather than a bare hex string that reads as a
+    // different kind of record when scanning the collection.
+    const newId = student?.id ?? genId('s');
     // Compared the way the roster is SEARCHED, not byte-for-byte: normAr folds
     // hamza forms, alef maqsura, ta marbuta, diacritics and repeated spaces.
     // An exact match let "زيد أحمد" in alongside an existing "زيد احمد" — two
@@ -91,6 +110,28 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
           : `فيه طالب بنفس الاسم مسجّل باسم "${duplicate.name}"`,
       );
       return;
+    }
+
+    // Enforce what the fields already claim. The age input declares min 4 /
+    // max 25 and the phone is labelled واتساب, but nothing checked either, so
+    // "999 سنة" saved happily and a half-typed number saved as a number that
+    // can never receive the parent's report.
+    if (age.trim()) {
+      const n = Number(toWesternDigits(age));
+      if (!Number.isFinite(n) || n < AGE_MIN || n > AGE_MAX) {
+        setAgeError(`السن لازم يكون بين ${AGE_MIN} و${AGE_MAX}`);
+        return;
+      }
+    }
+    for (const [value, setError] of [
+      [phonePrimary, setPhoneError],
+      [phoneSecondary, setPhoneError],
+    ] as const) {
+      const digits = toWesternDigits(value).replace(/[^0-9]/g, '');
+      if (value.trim() && digits.length < MIN_PHONE_DIGITS) {
+        setError('الرقم قصير — رسالة الأب مش هتوصل على رقم زي ده');
+        return;
+      }
     }
 
     setSaving(true);
@@ -166,8 +207,12 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
                   class="w-full border border-hairline rounded-xl px-3.5 py-2.5 text-sm text-ink-dark"
                   placeholder="مثلاً 10"
                   value={age}
-                  onInput={(e) => setAge((e.target as HTMLInputElement).value)}
+                  onInput={(e) => {
+                    setAge((e.target as HTMLInputElement).value);
+                    setAgeError('');
+                  }}
                 />
+                {ageError && <div class="text-xs text-red-600">{ageError}</div>}
               </div>
               <div class="space-y-1">
                 <label class="text-xs font-semibold text-[#5B5646]">السنة الدراسية</label>
@@ -217,8 +262,12 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
                 class="w-full border border-hairline rounded-xl px-3.5 py-2.5 text-sm text-left text-ink-dark"
                 placeholder="01XXXXXXXXX"
                 value={phonePrimary}
-                onInput={(e) => setPhonePrimary((e.target as HTMLInputElement).value)}
+                onInput={(e) => {
+                  setPhonePrimary((e.target as HTMLInputElement).value);
+                  setPhoneError('');
+                }}
               />
+              {phoneError && <div class="text-xs text-red-600">{phoneError}</div>}
             </div>
 
             <div class="space-y-1">
@@ -231,7 +280,10 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
                 class="w-full border border-hairline rounded-xl px-3.5 py-2.5 text-sm text-left text-ink-dark"
                 placeholder="01XXXXXXXXX"
                 value={phoneSecondary}
-                onInput={(e) => setPhoneSecondary((e.target as HTMLInputElement).value)}
+                onInput={(e) => {
+                  setPhoneSecondary((e.target as HTMLInputElement).value);
+                  setPhoneError('');
+                }}
               />
             </div>
           </div>

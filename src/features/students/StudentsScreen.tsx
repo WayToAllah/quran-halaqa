@@ -3,7 +3,7 @@ import { useStudents } from '../../hooks/useStudents';
 import { useAllRecords } from '../../hooks/useAllRecords';
 import { useUndoableDelete } from '../../hooks/useUndoableDelete';
 import { deleteStudent as deleteStudentDoc, updateStudent } from '../../data/students.repo';
-import { normAr, esc, toArabicDigits } from '../../domain/text';
+import { normAr, toArabicDigits } from '../../domain/text';
 import { getStudentName, recordsForStudent, sortStudentsByName } from '../../domain/students';
 import {
   getAttendanceRanking,
@@ -114,7 +114,11 @@ export function StudentsScreen() {
       <div class="flex items-center justify-between mb-4">
         <div class="text-[19px] font-extrabold text-ink-dark">الطلاب</div>
         <span class="text-xs font-bold text-[#8A6A15] bg-[#FFF8E6] px-3 py-1 rounded-full">
-          {toArabicDigits(students.length)} طالب
+          {/* While searching, count what is actually listed — "٥٣ طالب" over
+              two visible rows just looks wrong. */}
+          {query
+            ? `${toArabicDigits(visibleStudents.length)} من ${toArabicDigits(students.length)}`
+            : `${toArabicDigits(students.length)} طالب`}
         </span>
       </div>
 
@@ -126,18 +130,29 @@ export function StudentsScreen() {
           value={query}
           onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
         />
-        <svg
-          viewBox="0 0 24 24"
-          width="17"
-          height="17"
-          fill="none"
-          stroke="#8A8372"
-          stroke-width="2"
-          class="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
-        >
-          <circle cx="11" cy="11" r="7" />
-          <path d="M21 21l-4.3-4.3" />
-        </svg>
+        {query ? (
+          <button
+            type="button"
+            aria-label="مسح البحث"
+            class="absolute right-2.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full text-taupe text-sm flex items-center justify-center"
+            onClick={() => setQuery('')}
+          >
+            ✕
+          </button>
+        ) : (
+          <svg
+            viewBox="0 0 24 24"
+            width="17"
+            height="17"
+            fill="none"
+            stroke="#8A8372"
+            stroke-width="2"
+            class="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="M21 21l-4.3-4.3" />
+          </svg>
+        )}
       </div>
 
       {!studentsLoaded && (
@@ -151,7 +166,10 @@ export function StudentsScreen() {
       {studentsLoaded && visibleStudents.length === 0 && (
         <div class="text-center py-8">
           <div class="text-sm text-taupe">
-            {query ? `لا يوجد نتائج لـ "${esc(query)}"` : 'لا يوجد طلاب بعد'}
+            {/* No esc() here: JSX escapes text content, so running it first
+                showed the entities themselves (a search for "<" read "&lt;").
+                Left over from the innerHTML-based original. */}
+            {query ? `لا يوجد نتائج لـ "${query}"` : 'لا يوجد طلاب بعد'}
           </div>
           {!query && (
             <button
@@ -192,8 +210,12 @@ export function StudentsScreen() {
                 {metaParts.length > 0 && (
                   <div class="text-xs text-taupe mt-0.5">{metaParts.join(' · ')}</div>
                 )}
-                {s.phonePrimary && (
+                {s.phonePrimary ? (
                   <div class="text-xs text-taupe mt-0.5">واتساب: {s.phonePrimary}</div>
+                ) : (
+                  // Without a number the WhatsApp report simply never goes out,
+                  // and nothing on the screen said so.
+                  <div class="text-xs text-[#B24A3A] mt-0.5">⚠️ مفيش رقم واتساب</div>
                 )}
                 <div class="text-xs text-taupe mt-0.5">{count} جلسة مسجلة</div>
               </div>

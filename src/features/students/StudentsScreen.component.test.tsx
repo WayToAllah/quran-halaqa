@@ -368,3 +368,91 @@ describe('StudentsScreen — ordering', () => {
     expect(names).toEqual(['ابراهيم سمير', 'خالد ماهر', 'ياسين محمود']);
   });
 });
+
+describe('StudentsScreen — search affordances', () => {
+  it('counts what is on screen while searching, and the whole roster otherwise', async () => {
+    renderScreen();
+    expect(screen.getByText('٢ طالب')).toBeInTheDocument();
+    await userEvent.type(screen.getByPlaceholderText('ابحث بالاسم…'), 'زيد');
+    expect(screen.getByText('١ من ٢')).toBeInTheDocument();
+  });
+
+  it('clears the search from the field itself', async () => {
+    renderScreen();
+    await userEvent.type(screen.getByPlaceholderText('ابحث بالاسم…'), 'زيد');
+    expect(screen.queryByText('محمد علي')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'مسح البحث' }));
+    expect(screen.getByPlaceholderText('ابحث بالاسم…')).toHaveValue('');
+    expect(screen.getByText('محمد علي')).toBeInTheDocument();
+  });
+
+  it('shows the query as typed, not as HTML entities', async () => {
+    // esc() ran before JSX's own escaping, so a "<" came back as "&lt;".
+    renderScreen();
+    await userEvent.type(screen.getByPlaceholderText('ابحث بالاسم…'), '<');
+    expect(screen.getByText(/لا يوجد نتائج لـ "<"/)).toBeInTheDocument();
+  });
+});
+
+describe('StudentsScreen — reachability', () => {
+  it('flags a student the parent report can never reach', () => {
+    studentsForHook = [
+      { id: 's_1', name: 'زيد احمد', phonePrimary: '01000000000' },
+      { id: 's_2', name: 'محمد علي' },
+    ];
+    renderScreen();
+    expect(screen.getByText('⚠️ مفيش رقم واتساب')).toBeInTheDocument();
+    expect(screen.getByText('واتساب: 01000000000')).toBeInTheDocument();
+  });
+});
+
+describe('StudentModal — validation', () => {
+  async function openAdd() {
+    renderScreen();
+    await userEvent.click(screen.getByRole('button', { name: 'إضافة طالب جديد' }));
+    await userEvent.type(screen.getByPlaceholderText('اسم الطالب'), 'طالب جديد');
+  }
+
+  it('refuses an age outside the range the field itself declares', async () => {
+    await openAdd();
+    await userEvent.type(screen.getByPlaceholderText('مثلاً 10'), '999');
+    await userEvent.click(screen.getByRole('button', { name: 'حفظ' }));
+    expect(saveStudentMock).not.toHaveBeenCalled();
+    expect(screen.getByText(/السن لازم يكون بين/)).toBeInTheDocument();
+  });
+
+  it('refuses a number too short to ever receive a message', async () => {
+    await openAdd();
+    await userEvent.type(screen.getAllByPlaceholderText('01XXXXXXXXX')[0], '0100');
+    await userEvent.click(screen.getByRole('button', { name: 'حفظ' }));
+    expect(saveStudentMock).not.toHaveBeenCalled();
+    expect(screen.getByText(/الرقم قصير/)).toBeInTheDocument();
+  });
+
+  it('accepts a full number typed in Arabic-Indic digits', async () => {
+    await openAdd();
+    await userEvent.type(screen.getAllByPlaceholderText('01XXXXXXXXX')[0], '٠١٠١٢٣٤٥٦٧٨');
+    await userEvent.click(screen.getByRole('button', { name: 'حفظ' }));
+    await waitFor(() => expect(saveStudentMock).toHaveBeenCalled());
+  });
+
+  it('gives the new student the same id shape as the rest of the data', async () => {
+    await openAdd();
+    await userEvent.click(screen.getByRole('button', { name: 'حفظ' }));
+    await waitFor(() => expect(saveStudentMock).toHaveBeenCalled());
+    expect((saveStudentMock.mock.calls[0][2] as { id: string }).id).toMatch(/^s_\d+_/);
+  });
+
+  it('closes on Escape when nothing was typed', async () => {
+    renderScreen();
+    await userEvent.click(screen.getByRole('button', { name: 'إضافة طالب جديد' }));
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByPlaceholderText('اسم الطالب')).not.toBeInTheDocument();
+  });
+
+  it('warns on Escape when something was typed', async () => {
+    await openAdd();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByText('بيانات لسه متحفظتش')).toBeInTheDocument();
+  });
+});
