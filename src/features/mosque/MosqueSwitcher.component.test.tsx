@@ -5,13 +5,20 @@ import { MosqueProvider } from './MosqueContext';
 import { MosqueSwitcher } from './MosqueSwitcher';
 import type { UserMosqueLink } from '../../types';
 
-const A: UserMosqueLink = { mosqueId: 'altayseer', halaqaId: 'main', label: 'مسجد التيسير' };
-const B: UserMosqueLink = { mosqueId: 'noor', halaqaId: 'main', label: 'مسجد النور' };
+const A: UserMosqueLink = { mosqueId: 'altayseer', label: 'مسجد التيسير' };
+const B: UserMosqueLink = { mosqueId: 'noor', label: 'مسجد النور' };
 
 function renderSwitcher(mosques: UserMosqueLink[], active: UserMosqueLink, switchMosque = vi.fn()) {
   render(
     <MosqueProvider
-      value={{ mosqueId: active.mosqueId, halaqaId: active.halaqaId, mosques, switchMosque }}
+      value={{
+        mosqueId: active.mosqueId,
+        halaqaId: 'main',
+        mosques,
+        halaqat: [],
+        switchMosque,
+        switchHalaqa: () => {},
+      }}
     >
       <MosqueSwitcher />
     </MosqueProvider>,
@@ -22,7 +29,16 @@ function renderSwitcher(mosques: UserMosqueLink[], active: UserMosqueLink, switc
 describe('MosqueSwitcher', () => {
   it('renders nothing for a single-mosque user (unchanged single-tenant UI)', () => {
     const { container } = render(
-      <MosqueProvider value={{ mosqueId: A.mosqueId, halaqaId: A.halaqaId, mosques: [A], switchMosque: vi.fn() }}>
+      <MosqueProvider
+        value={{
+          mosqueId: A.mosqueId,
+          halaqaId: 'main',
+          mosques: [A],
+          halaqat: [],
+          switchMosque: vi.fn(),
+          switchHalaqa: () => {},
+        }}
+      >
         <MosqueSwitcher />
       </MosqueProvider>,
     );

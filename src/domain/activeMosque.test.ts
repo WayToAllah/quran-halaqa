@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { pickActiveMosque } from './activeMosque';
 import type { UserMosqueLink } from '../types';
 
-const A: UserMosqueLink = { mosqueId: 'altayseer', halaqaId: 'main', label: 'مسجد التيسير' };
-const B: UserMosqueLink = { mosqueId: 'noor', halaqaId: 'main', label: 'مسجد النور' };
+const A: UserMosqueLink = { mosqueId: 'altayseer', label: 'مسجد التيسير' };
+const B: UserMosqueLink = { mosqueId: 'noor', label: 'مسجد النور' };
 
 describe('pickActiveMosque', () => {
   it('returns null for an empty list (user belongs to no mosque)', () => {

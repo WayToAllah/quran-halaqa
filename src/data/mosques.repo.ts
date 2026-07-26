@@ -19,7 +19,7 @@ export async function getUserMosques(uid: string): Promise<UserMosques | null> {
   const snap = await getDoc(doc(db, 'admins', uid));
   if (!snap.exists()) return null;
   const data = snap.data() as Partial<UserMosques>;
-  const mosques = Array.isArray(data.mosques) ? data.mosques.filter((m) => m?.mosqueId && m?.halaqaId) : [];
+  const mosques = Array.isArray(data.mosques) ? data.mosques.filter((m) => m?.mosqueId) : [];
   return { mosques };
 }
 

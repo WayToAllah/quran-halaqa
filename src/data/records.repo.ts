@@ -14,7 +14,7 @@ import {
   type Unsubscribe,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { auth, db } from './firebase';
 import { recordConverter } from './converters';
 import type { SessionRecord } from '../types';
 
@@ -157,7 +157,16 @@ export async function getAllRecords(mosqueId: string, halaqaId: string): Promise
 }
 
 export function saveRecord(mosqueId: string, halaqaId: string, record: SessionRecord): Promise<void> {
-  return setDoc(recordDocRef(mosqueId, halaqaId, record.id), record);
+  // Stamp who actually saved this session. Done here (rather than at each call
+  // site) so every path gets it — individual sessions, group attendance, and
+  // any future writer. Any mosque member can record in any halaqa, so this is
+  // how a primary teacher can later tell a substitute's session apart from
+  // their own. Preserves an existing value when re-saving someone else's
+  // record (editing shouldn't rewrite history's author).
+  const stamped: SessionRecord = record.recordedBy
+    ? record
+    : { ...record, recordedBy: auth.currentUser?.uid ?? undefined };
+  return setDoc(recordDocRef(mosqueId, halaqaId, record.id), stamped);
 }
 
 export function updateRecord(

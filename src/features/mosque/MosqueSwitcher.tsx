@@ -14,7 +14,7 @@ export function MosqueSwitcher() {
   if (mosques.length <= 1) return null;
 
   return (
-    <div class="bg-forest/5 border-b border-hairline px-[18px] py-2 flex items-center gap-2">
+    <div class="flex items-center gap-2 min-w-0">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" class="shrink-0">
         <path
           d="M6 20.5V11c0-3.3 2.7-6 6-6s6 2.7 6 6v9.5"

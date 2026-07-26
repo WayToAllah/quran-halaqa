@@ -78,6 +78,11 @@ export interface SessionRecord {
   tajweed?: TajweedEval;
   note?: string;
   attendance_only?: boolean;
+  /** UID of the teacher who actually saved this session. Any member of the
+   * mosque can record in any halaqa (so a substitute can cover an absent
+   * teacher), so this records who did — useful when the primary teacher
+   * later reviews a session they didn't run. Absent on pre-feature records. */
+  recordedBy?: string;
 }
 
 // ============================================================================
@@ -98,10 +103,15 @@ export interface MosqueMember {
 
 /** One mosque an admin belongs to, denormalized for a single fast lookup at
  * login. `label` is a display name for the mosque switcher so we don't have
- * to fetch each mosque doc just to render the picker. */
+ * to fetch each mosque doc just to render the picker.
+ *
+ * Deliberately mosque-level only: membership is scoped to the MOSQUE, and
+ * every halaqa inside it is visible and writable to every member. That's what
+ * lets a substitute teacher cover an absent colleague's halaqa without any
+ * extra provisioning. Which halaqa is currently *selected* is a UI concern
+ * (see HalaqaContext), not a permission. */
 export interface UserMosqueLink {
   mosqueId: string;
-  halaqaId: string;
   label: string;
 }
 
@@ -126,6 +136,11 @@ export interface Halaqa {
    * them from inside the app with no redeploy. Empty/absent → the header shows a
    * default verse instead. */
   niyyat?: string[];
+  /** UID of the halaqa's regular teacher. Purely organizational — it does NOT
+   * restrict access (any mosque member can open and record in any halaqa, so
+   * substitutes work). It's used to pick which halaqa opens by default for a
+   * teacher and to label whose circle it is. */
+  primaryTeacherUid?: string;
 }
 
 export interface Badge {

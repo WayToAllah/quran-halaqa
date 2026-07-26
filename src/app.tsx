@@ -11,7 +11,7 @@ import { NiyyahBar } from './features/niyyat/NiyyahBar';
 import { NiyyatModal } from './features/niyyat/NiyyatModal';
 import { useNiyyat } from './hooks/useNiyyat';
 import { MosqueProvider } from './features/mosque/MosqueContext';
-import { MosqueSwitcher } from './features/mosque/MosqueSwitcher';
+import { ScopeBar } from './features/mosque/ScopeBar';
 import type { SessionRecord } from './types';
 import type { JSX } from 'preact';
 
@@ -50,7 +50,9 @@ function AppShell() {
         mosqueId: auth.active.mosqueId,
         halaqaId: auth.active.halaqaId,
         mosques: auth.active.mosques,
+        halaqat: auth.active.halaqat,
         switchMosque: auth.active.switchMosque,
+        switchHalaqa: auth.active.switchHalaqa,
       }}
     >
       <div class="min-h-screen bg-parchment pb-20" dir="rtl">
@@ -88,7 +90,7 @@ function AppShell() {
         </button>
       </header>
 
-      <MosqueSwitcher />
+      <ScopeBar />
 
       {niyyatOpen && (
         <NiyyatModal niyyat={niyyat} onSave={saveNiyyat} onClose={() => setNiyyatOpen(false)} />
