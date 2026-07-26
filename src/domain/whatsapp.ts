@@ -2,7 +2,7 @@ import type { SessionRecord } from '../types';
 import { CHILD_STATS_BASE_URL } from '../config';
 import { hasScore, scoreName, scoreToHalfStars } from './scoring';
 import { extractAssignedSuras } from './record';
-import { joinSuraNames } from './suras';
+import { joinSuraNames, ayahRange } from './suras';
 
 /**
  * Plain-text star string (not JSX) for a 0-100 SCORE — WhatsApp fonts render
@@ -69,7 +69,9 @@ export function buildWhatsAppMessage(rec: SessionRecord, prevSession: SessionRec
 
   if (rec.tajweed?.sura) {
     msg += '📐 *التجويد*' + nl;
-    msg += '• ' + rec.tajweed.sura + ' (' + rec.tajweed.from + '–' + rec.tajweed.to + ')';
+    // ayahRange() omits the parentheses entirely when no ayat were entered —
+    // the hand-built version printed a bare "(–)" to the parent instead.
+    msg += '• ' + rec.tajweed.sura + ayahRange(rec.tajweed.from, rec.tajweed.to);
     msg += rec.tajweed.score
       ? '  ←  ' + rec.tajweed.score + '/100 ' + starsTextFromScore(rec.tajweed.score) + ' ' + scoreName(rec.tajweed.score)
       : '  ' + starsTextFromCount(rec.tajweed.stars ?? 0);

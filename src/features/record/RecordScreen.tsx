@@ -9,6 +9,7 @@ import { localDateStr, genId, hijriLong, hijriShort, gregorianLong } from '../..
 import { scoreToStars, scoreName, parseScoreField, isScoreEntryComplete, type ScoreFieldState } from '../../domain/scoring';
 import { extractAssignedSuras, validateAyahRange, isRowComplete, cleanAssignmentRow, cleanTajweed } from '../../domain/record';
 import { computeNextLoh, computeNextMadi } from '../../domain/nextTask';
+import { suraLabel } from '../../domain/suras';
 import { buildWhatsAppMessage, normalizeWhatsAppPhone } from '../../domain/whatsapp';
 import { SuraRow } from './SuraRow';
 import { FloatingSaveButton } from './FloatingSaveButton';
@@ -22,11 +23,16 @@ import { useToast } from '../../ui/ToastProvider';
 import { MOSQUE_ID, HALAQA_ID } from '../../config';
 import type { SuraAssignment, SessionRecord, Student } from '../../types';
 
+/** Sura info line for the "ما سمعناه النهارده" evaluation card.
+ *
+ * Delegates the per-item label to the shared `suraLabel` so a whole-sura range
+ * reads "من X إلى Y" here exactly as it does in the log, the WhatsApp message
+ * and the parent page. This used to be a private re-implementation that knew
+ * nothing about range mode: it printed only the START sura and dropped the end
+ * of the range, so the teacher graded a shorter assignment than was given. */
 function fmtSuraInfo(list: SuraAssignment[]): string {
   if (!list.length) return '—';
-  return list
-    .map((l) => 'سورة ' + l.sura + (l.from && l.to ? ` (${l.from}–${l.to})` : l.from ? ` (من ${l.from})` : ''))
-    .join(' + ');
+  return list.map((l) => (l.range && l.toSura ? suraLabel(l) : 'سورة ' + suraLabel(l))).join(' + ');
 }
 
 /** Tier badge colors ported from the approved design, keyed by the real
@@ -179,6 +185,14 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     setPrevMadiScore('');
     setLohMistakes([]);
     setMadiMistakes([]);
+    // The tajweed section belongs to one student's session only. Nothing
+    // auto-fills it (the last-session autofill covers اللوح/الماضي only), so
+    // anything sitting here was typed for whoever was picked before — leaving
+    // it in place would quietly attach their tajweed to this student.
+    setTajweedEnabled(false);
+    setTajweed(emptyRow());
+    setTajweedStars(0);
+    setTajweedNote('');
   }
 
   function resetForm() {

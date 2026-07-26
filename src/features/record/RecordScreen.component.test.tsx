@@ -167,6 +167,22 @@ describe('RecordScreen — previous session card', () => {
     expect(screen.getByText(/سورة البقرة/)).toBeInTheDocument();
   });
 
+  // The card used to re-implement its own sura formatter, which knew nothing
+  // about whole-sura range mode: it printed the start sura alone, so a "من
+  // الناس إلى الفلق" assignment looked like a single-sura one and the teacher
+  // graded less than was actually given.
+  it('shows the full span of a whole-sura range assignment', async () => {
+    previousSessionForS1 = {
+      id: 'r_prev',
+      studentId: 's_1',
+      date: '2026-07-01',
+      newLoh: [{ sura: 'الناس', toSura: 'الفلق', range: true }],
+    };
+    renderScreen();
+    await selectStudent('زيد احمد');
+    expect(screen.getByText('من الناس إلى الفلق')).toBeInTheDocument();
+  });
+
   it('only shows the madi sub-section when a previous madi assignment exists', async () => {
     previousSessionForS1 = {
       id: 'r_prev',
@@ -382,6 +398,35 @@ describe('RecordScreen — tajweed toggle', () => {
     const saved = saveRecordMock.mock.calls[0][2] as SessionRecord;
     expect(saved.tajweed).toEqual({ sura: 'الناس', from: '', to: '', stars: 0, note: '' });
     expect(JSON.stringify(saved)).not.toContain('undefined');
+  });
+
+  // Nothing auto-fills tajweed, so a filled-in section always belongs to the
+  // student who was picked before — switching students mid-entry must not
+  // carry it over onto the next one.
+  it('clears the tajweed section when a different student is picked', async () => {
+    renderScreen();
+    await selectStudent('زيد احمد');
+    await userEvent.click(screen.getByRole('switch'));
+
+    const suraInputs = screen.getAllByPlaceholderText('اكتب اسم السورة…');
+    await userEvent.type(suraInputs[suraInputs.length - 1], 'الناس');
+    await userEvent.click(await screen.findByRole('button', { name: /\d+\. الناس/ }));
+    const noteInput = screen.getByPlaceholderText('اختيارية');
+    await userEvent.type(noteInput, 'إخفاء');
+    expect(screen.getByText('سورة التجويد')).toBeInTheDocument();
+
+    // Switching students: the picker input still holds the first name, so
+    // clear it before searching for the second.
+    const studentInput = screen.getByPlaceholderText('ابحث أو اختر اسم الطالب…');
+    await userEvent.clear(studentInput);
+    await userEvent.type(studentInput, 'محمد علي');
+    await userEvent.click(await screen.findByRole('button', { name: 'محمد علي' }));
+
+    // Toggle back off, fields gone with it.
+    expect(screen.queryByText('سورة التجويد')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('switch'));
+    expect(screen.getByPlaceholderText('اختيارية')).toHaveValue('');
+    expect(screen.queryByText('الناس')).not.toBeInTheDocument();
   });
 });
 

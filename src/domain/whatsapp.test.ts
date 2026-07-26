@@ -115,3 +115,16 @@ describe('normalizeWhatsAppPhone', () => {
     expect(normalizeWhatsAppPhone('')).toBe('');
   });
 });
+
+describe('buildWhatsAppMessage — tajweed without ayah numbers', () => {
+  it('omits the parentheses instead of sending the parent a bare "(–)"', () => {
+    const msg = buildWhatsAppMessage(
+      { id: 'r1', studentId: 's_1', student: 'زيد احمد', date: '2026-07-20', tajweed: { sura: 'الناس', from: '', to: '', stars: 4 } },
+      null,
+      undefined,
+    );
+    expect(msg).toContain('• الناس');
+    expect(msg).not.toContain('(–)');
+    expect(msg).not.toContain('(');
+  });
+});
