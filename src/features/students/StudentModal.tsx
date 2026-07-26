@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { genId, genParentToken } from '../../domain/ids';
-import { normAr, toWesternDigits } from '../../domain/text';
+import { normAr, stripWhitespace, toWesternDigits } from '../../domain/text';
 import { saveStudent } from '../../data/students.repo';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useToast } from '../../ui/ToastProvider';
@@ -142,8 +142,11 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
       grade: grade || '',
       joinDate: joinDate || '',
       school: school.trim(),
-      phonePrimary: phonePrimary.trim(),
-      phoneSecondary: phoneSecondary.trim(),
+      // Every space, not just the ones at the ends: a number typed as
+      // "0100 123 4567" is the same number as "01001234567" and should be
+      // stored as one.
+      phonePrimary: stripWhitespace(phonePrimary),
+      phoneSecondary: stripWhitespace(phoneSecondary),
       // Carry the existing token forward on edit — this is a full document
       // write, so omitting it would silently break the student's child
       // portal link on every profile edit.

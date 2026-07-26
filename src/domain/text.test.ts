@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { esc, normAr, toArabicOrdinal, toWesternDigits } from './text';
+import { esc, normAr, toArabicOrdinal, toWesternDigits, stripWhitespace } from './text';
 
 describe('esc', () => {
   it('escapes all five HTML-significant characters', () => {
@@ -73,5 +73,20 @@ describe('toWesternDigits', () => {
   it('leaves ASCII digits and surrounding text alone', () => {
     expect(toWesternDigits('01012345678')).toBe('01012345678');
     expect(toWesternDigits('رقم ٠١٠ هنا')).toBe('رقم 010 هنا');
+  });
+});
+
+describe('stripWhitespace', () => {
+  it('removes spaces anywhere in the value, not just at the ends', () => {
+    expect(stripWhitespace('  0100 123 4567 ')).toBe('01001234567');
+  });
+
+  it('removes non-breaking and other Unicode spaces', () => {
+    expect(stripWhitespace('0100\u00a0123\u202f4567')).toBe('01001234567');
+  });
+
+  it('handles empty and missing values', () => {
+    expect(stripWhitespace('')).toBe('');
+    expect(stripWhitespace(undefined)).toBe('');
   });
 });

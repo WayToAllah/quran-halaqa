@@ -456,3 +456,22 @@ describe('StudentModal — validation', () => {
     expect(screen.getByText('بيانات لسه متحفظتش')).toBeInTheDocument();
   });
 });
+
+describe('StudentModal — phone storage', () => {
+  it('stores a spaced-out number without its spaces', async () => {
+    renderScreen();
+    await userEvent.click(screen.getByRole('button', { name: 'إضافة طالب جديد' }));
+    await userEvent.type(screen.getByPlaceholderText('اسم الطالب'), 'طالب جديد');
+    await userEvent.type(screen.getAllByPlaceholderText('01XXXXXXXXX')[0], '0100 123 4567');
+    await userEvent.type(screen.getAllByPlaceholderText('01XXXXXXXXX')[1], ' 0111 765 4321 ');
+    await userEvent.click(screen.getByRole('button', { name: 'حفظ' }));
+
+    await waitFor(() => expect(saveStudentMock).toHaveBeenCalled());
+    const saved = saveStudentMock.mock.calls[0][2] as {
+      phonePrimary: string;
+      phoneSecondary: string;
+    };
+    expect(saved.phonePrimary).toBe('01001234567');
+    expect(saved.phoneSecondary).toBe('01117654321');
+  });
+});

@@ -43,6 +43,18 @@ export function toArabicDigits(input: string | number): string {
 }
 
 /**
+ * Strip every whitespace character, including the non-breaking and Arabic
+ * spaces a phone keyboard can produce.
+ *
+ * Phone numbers get typed with spaces for readability ("0100 123 4567").
+ * Stored that way they read inconsistently down the roster and never compare
+ * equal to the same number typed without them.
+ */
+export function stripWhitespace(input: string | undefined | null): string {
+  return String(input ?? '').replace(/\s+/g, '');
+}
+
+/**
  * Convert Arabic-Indic (٠-٩) and Extended/Persian (۰-۹) digits to ASCII.
  *
  * Anything that has to be read as a NUMBER rather than shown to a reader needs
