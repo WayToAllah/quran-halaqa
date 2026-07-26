@@ -62,6 +62,20 @@ service cloud.firestore {
       }
     }
 
+    // Which mosque(s) an admin belongs to. Read by the app at login to resolve
+    // the active tenant instead of a hardcoded mosque id. A user may only read
+    // THEIR OWN record — the collection can never be listed or enumerated.
+    //
+    // This doc grants nothing on its own: it only NAMES mosques. Actual access
+    // is still gated by mosques/{id}/members/{uid} above, so even a tampered
+    // admins doc can't reach data the member rules don't already allow.
+    // Provisioned out-of-band (Console / Admin SDK script), never by a client.
+    match /admins/{uid} {
+      allow get: if isSignedIn() && request.auth.uid == uid;
+      allow list: if false;
+      allow write: if false;
+    }
+
     match /publicStats/{token} {
       allow get: if true;
       allow list: if false;

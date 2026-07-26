@@ -115,6 +115,28 @@ describe('mosques/{id} and members/{uid} — no client writes ever', () => {
   });
 });
 
+describe('admins/{uid} — own record only, never writable or listable', () => {
+  it('allows a signed-in user to read their OWN admins record', async () => {
+    const db = testEnv.authenticatedContext(ADMIN_UID).firestore();
+    await assertSucceeds(getDoc(doc(db, 'admins', ADMIN_UID)));
+  });
+
+  it("denies reading someone ELSE's admins record", async () => {
+    const db = testEnv.authenticatedContext(OUTSIDER_UID).firestore();
+    await assertFails(getDoc(doc(db, 'admins', ADMIN_UID)));
+  });
+
+  it('denies an unauthenticated read', async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(db, 'admins', ADMIN_UID)));
+  });
+
+  it('denies a client from writing its own admins record (no self-provisioning)', async () => {
+    const db = testEnv.authenticatedContext(ADMIN_UID).firestore();
+    await assertFails(setDoc(doc(db, 'admins', ADMIN_UID), { mosques: [{ mosqueId: 'anywhere', label: 'x' }] }));
+  });
+});
+
 describe('publicStats/{token} — public get, no list, member-only write (transitional)', () => {
   it('allows an unauthenticated read of a single known token', async () => {
     const db = testEnv.unauthenticatedContext().firestore();
