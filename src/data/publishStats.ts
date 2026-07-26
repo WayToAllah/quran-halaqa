@@ -1,6 +1,10 @@
 import type { SessionRecord, Student } from '../types';
 import { buildStudentPublicStats } from '../domain/stats';
-import { getAttendanceRanking, ATTENDANCE_BADGE_THRESHOLD, sortedHalaqaDatesDesc } from '../domain/attendance';
+import {
+  getAttendanceRanking,
+  ATTENDANCE_BADGE_THRESHOLD,
+  sortedHalaqaDatesDesc,
+} from '../domain/attendance';
 import { setPublicStats } from './publicStats.repo';
 import { getAllRecords } from './records.repo';
 import { getAllStudents } from './students.repo';
@@ -14,7 +18,11 @@ import { MOSQUE_ID, HALAQA_ID } from '../config';
  * students at once (bulk attendance) computes them a single time.
  */
 export function computeSharedStatsInputs(students: Student[], records: SessionRecord[]) {
-  const { totalHalaqaDays, list } = getAttendanceRanking(students, records, ATTENDANCE_BADGE_THRESHOLD);
+  const { totalHalaqaDays, list } = getAttendanceRanking(
+    students,
+    records,
+    ATTENDANCE_BADGE_THRESHOLD,
+  );
   // Keyed by stable student id, NOT display name — two students with the same
   // name must never share/steal a rank (same principle as studentMatch()).
   const rankById: Record<string, number> = {};
@@ -41,9 +49,18 @@ export async function publishStudentPublicStats(
 ): Promise<void> {
   if (!student.parentToken) return;
   try {
-    const { totalHalaqaDays, rankById, halaqaDatesDesc } = computeSharedStatsInputs(allStudents, allRecords);
+    const { totalHalaqaDays, rankById, halaqaDatesDesc } = computeSharedStatsInputs(
+      allStudents,
+      allRecords,
+    );
     const rank = rankById[student.id] ?? null;
-    const stats = buildStudentPublicStats(student, allRecords, totalHalaqaDays, rank, halaqaDatesDesc);
+    const stats = buildStudentPublicStats(
+      student,
+      allRecords,
+      totalHalaqaDays,
+      rank,
+      halaqaDatesDesc,
+    );
     await setPublicStats(student.parentToken, stats);
   } catch (err) {
     console.warn('publishStudentPublicStats failed for', student.id, err);
@@ -84,7 +101,13 @@ export async function republishPublicStatsFor(studentIds: string[]): Promise<voi
         if (!student?.parentToken) return;
         try {
           const rank = inputs.rankById[student.id] ?? null;
-          const stats = buildStudentPublicStats(student, allRecords, inputs.totalHalaqaDays, rank, inputs.halaqaDatesDesc);
+          const stats = buildStudentPublicStats(
+            student,
+            allRecords,
+            inputs.totalHalaqaDays,
+            rank,
+            inputs.halaqaDatesDesc,
+          );
           await setPublicStats(student.parentToken, stats);
         } catch (err) {
           console.warn('republishPublicStatsFor: failed for', id, err);

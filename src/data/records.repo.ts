@@ -19,11 +19,15 @@ import { recordConverter } from './converters';
 import type { SessionRecord } from '../types';
 
 function recordsCollection(mosqueId: string, halaqaId: string) {
-  return collection(db, 'mosques', mosqueId, 'halaqat', halaqaId, 'records').withConverter(recordConverter);
+  return collection(db, 'mosques', mosqueId, 'halaqat', halaqaId, 'records').withConverter(
+    recordConverter,
+  );
 }
 
 export function recordDocRef(mosqueId: string, halaqaId: string, recordId: string) {
-  return doc(db, 'mosques', mosqueId, 'halaqat', halaqaId, 'records', recordId).withConverter(recordConverter);
+  return doc(db, 'mosques', mosqueId, 'halaqat', halaqaId, 'records', recordId).withConverter(
+    recordConverter,
+  );
 }
 
 /**
@@ -45,7 +49,11 @@ export function subscribeRecentRecords(
   const q = query(recordsCollection(mosqueId, halaqaId), orderBy('date', 'desc'), limit(pageSize));
   return onSnapshot(
     q,
-    (snap) => onChange(snap.docs.map((d) => d.data()), snap.docs[snap.docs.length - 1] ?? null),
+    (snap) =>
+      onChange(
+        snap.docs.map((d) => d.data()),
+        snap.docs[snap.docs.length - 1] ?? null,
+      ),
     onError,
   );
 }
@@ -65,7 +73,10 @@ export async function loadMoreRecords(
     limit(pageSize),
   );
   const snap = await getDocs(q);
-  return { records: snap.docs.map((d) => d.data()), lastDoc: snap.docs[snap.docs.length - 1] ?? null };
+  return {
+    records: snap.docs.map((d) => d.data()),
+    lastDoc: snap.docs[snap.docs.length - 1] ?? null,
+  };
 }
 
 /**
@@ -96,7 +107,11 @@ export async function getAllRecordsForStudent(
   halaqaId: string,
   studentId: string,
 ): Promise<SessionRecord[]> {
-  const q = query(recordsCollection(mosqueId, halaqaId), where('studentId', '==', studentId), orderBy('date', 'desc'));
+  const q = query(
+    recordsCollection(mosqueId, halaqaId),
+    where('studentId', '==', studentId),
+    orderBy('date', 'desc'),
+  );
   const snap = await getDocs(q);
   return snap.docs.map((d) => d.data());
 }
@@ -136,13 +151,21 @@ export function subscribeAllRecords(
   onChange: (records: SessionRecord[]) => void,
   onError: (err: unknown) => void,
 ): Unsubscribe {
-  return onSnapshot(recordsCollection(mosqueId, halaqaId), (snap) => onChange(snap.docs.map((d) => d.data())), onError);
+  return onSnapshot(
+    recordsCollection(mosqueId, halaqaId),
+    (snap) => onChange(snap.docs.map((d) => d.data())),
+    onError,
+  );
 }
 
 /** All records on one specific date — used by group attendance to find
  * students already covered that day, without loading the whole halaqa's
  * history. Single-field equality filter, no composite index needed. */
-export async function getRecordsByDate(mosqueId: string, halaqaId: string, dateStr: string): Promise<SessionRecord[]> {
+export async function getRecordsByDate(
+  mosqueId: string,
+  halaqaId: string,
+  dateStr: string,
+): Promise<SessionRecord[]> {
   const q = query(recordsCollection(mosqueId, halaqaId), where('date', '==', dateStr));
   const snap = await getDocs(q);
   return snap.docs.map((d) => d.data());
@@ -156,7 +179,11 @@ export async function getAllRecords(mosqueId: string, halaqaId: string): Promise
   return snap.docs.map((d) => d.data());
 }
 
-export function saveRecord(mosqueId: string, halaqaId: string, record: SessionRecord): Promise<void> {
+export function saveRecord(
+  mosqueId: string,
+  halaqaId: string,
+  record: SessionRecord,
+): Promise<void> {
   return setDoc(recordDocRef(mosqueId, halaqaId, record.id), record);
 }
 

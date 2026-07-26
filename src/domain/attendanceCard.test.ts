@@ -30,7 +30,10 @@ const distinctRecords: SessionRecord[] = [
 
 describe('buildAttendanceCardData', () => {
   it('assigns crown/gold/silver/bronze in rank order, matching the mockup medal emoji for 2nd/3rd', () => {
-    const data = buildAttendanceCardData(students, distinctRecords, { minPct: 0, now: new Date('2026-07-06') });
+    const data = buildAttendanceCardData(students, distinctRecords, {
+      minPct: 0,
+      now: new Date('2026-07-06'),
+    });
     expect(data.stars[0].style.kind).toBe('crown');
     expect(data.stars[1]).toMatchObject({ style: { kind: 'gold', medalEmoji: '🥇' } });
     expect(data.stars[2]).toMatchObject({ style: { kind: 'silver', medalEmoji: '🥈' } });
@@ -49,7 +52,10 @@ describe('buildAttendanceCardData', () => {
       { id: 'y2', studentId: 's3', date: '2026-07-02' },
       { id: 'y3', studentId: 's3', date: '2026-07-03' },
     ];
-    const data = buildAttendanceCardData(students, tiedRecords, { minPct: 0, now: new Date('2026-07-06') });
+    const data = buildAttendanceCardData(students, tiedRecords, {
+      minPct: 0,
+      now: new Date('2026-07-06'),
+    });
     expect(data.stars[1].rank).toBe(2);
     expect(data.stars[2].rank).toBe(2);
     expect(data.stars[1].style.kind).toBe('gold');
@@ -57,12 +63,18 @@ describe('buildAttendanceCardData', () => {
   });
 
   it('includes only students at/above the badge threshold by default (70%)', () => {
-    const data = buildAttendanceCardData(students, distinctRecords, { now: new Date('2026-07-06') });
+    const data = buildAttendanceCardData(students, distinctRecords, {
+      now: new Date('2026-07-06'),
+    });
     expect(data.stars.map((s) => s.name)).toEqual(['زيد أحمد', 'عمر خالد']); // 100% and 80%
   });
 
   it('respects a custom limit', () => {
-    const data = buildAttendanceCardData(students, distinctRecords, { minPct: 0, limit: 1, now: new Date('2026-07-06') });
+    const data = buildAttendanceCardData(students, distinctRecords, {
+      minPct: 0,
+      limit: 1,
+      now: new Date('2026-07-06'),
+    });
     expect(data.stars).toHaveLength(1);
     expect(data.stars[0].name).toBe('زيد أحمد');
   });
@@ -77,7 +89,10 @@ describe('buildAttendanceCardData', () => {
   });
 
   it('computes the star count from the attendance percentage', () => {
-    const data = buildAttendanceCardData(students, distinctRecords, { minPct: 0, now: new Date('2026-07-06') });
+    const data = buildAttendanceCardData(students, distinctRecords, {
+      minPct: 0,
+      now: new Date('2026-07-06'),
+    });
     expect(data.stars[0].filledStars).toBe(5); // 100%
     expect(data.stars[1].filledStars).toBe(4); // 80%
   });
@@ -85,7 +100,10 @@ describe('buildAttendanceCardData', () => {
 
 describe('buildAttendanceCardSvg', () => {
   it('produces a well-formed svg containing the title, mosque, and each star name', () => {
-    const data = buildAttendanceCardData(students, distinctRecords, { minPct: 0, now: new Date('2026-07-06') });
+    const data = buildAttendanceCardData(students, distinctRecords, {
+      minPct: 0,
+      now: new Date('2026-07-06'),
+    });
     const svg = buildAttendanceCardSvg(data);
     expect(svg.startsWith('<svg')).toBe(true);
     expect(svg.trimEnd().endsWith('</svg>')).toBe(true);
@@ -98,13 +116,19 @@ describe('buildAttendanceCardSvg', () => {
   });
 
   it('draws the exact mockup crown path for 1st place', () => {
-    const data = buildAttendanceCardData(students, distinctRecords, { minPct: 0, now: new Date('2026-07-06') });
+    const data = buildAttendanceCardData(students, distinctRecords, {
+      minPct: 0,
+      now: new Date('2026-07-06'),
+    });
     const svg = buildAttendanceCardSvg(data);
     expect(svg).toContain('M3 8l4 3 5-6 5 6 4-3-1.6 10H4.6L3 8z');
   });
 
   it('never sets direction=rtl on the svg root (it flips text-anchor start/end in SVG and pushes names into the badge circles — regression guard)', () => {
-    const data = buildAttendanceCardData(students, distinctRecords, { minPct: 0, now: new Date('2026-07-06') });
+    const data = buildAttendanceCardData(students, distinctRecords, {
+      minPct: 0,
+      now: new Date('2026-07-06'),
+    });
     const svg = buildAttendanceCardSvg(data);
     expect(svg).not.toMatch(/<svg[^>]*direction="rtl"/);
   });

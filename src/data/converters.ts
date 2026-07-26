@@ -1,4 +1,8 @@
-import type { FirestoreDataConverter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import type {
+  FirestoreDataConverter,
+  QueryDocumentSnapshot,
+  DocumentData,
+} from 'firebase/firestore';
 import type { Student, SessionRecord, PublicStats, Halaqa, Mosque } from '../types';
 
 /** Generic converter factory: Firestore stores no `id` field on the document

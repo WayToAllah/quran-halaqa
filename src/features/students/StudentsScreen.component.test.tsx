@@ -49,7 +49,10 @@ function renderScreen() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubGlobal('confirm', vi.fn(() => true));
+  vi.stubGlobal(
+    'confirm',
+    vi.fn(() => true),
+  );
   Object.defineProperty(navigator, 'clipboard', {
     value: { writeText: vi.fn().mockResolvedValue(undefined) },
     configurable: true,
@@ -188,7 +191,10 @@ describe('StudentsScreen — delete with undo', () => {
   });
 
   it('does not ask for confirmation twice, and respects a cancelled confirm()', async () => {
-    vi.stubGlobal('confirm', vi.fn(() => false));
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => false),
+    );
     renderScreen();
     const row = screen.getByText('زيد احمد').closest('.rounded-2xl') as HTMLElement;
     await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));

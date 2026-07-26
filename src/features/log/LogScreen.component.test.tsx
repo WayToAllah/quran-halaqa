@@ -50,7 +50,8 @@ vi.mock('../../hooks/useStudents', () => ({
 }));
 vi.mock('../../data/records.repo', () => ({
   deleteRecord: (...args: unknown[]) => deleteRecordMock(...args),
-  getAllRecordsForStudent: (m: string, h: string, id: string) => getAllRecordsForStudentMock(m, h, id),
+  getAllRecordsForStudent: (m: string, h: string, id: string) =>
+    getAllRecordsForStudentMock(m, h, id),
 }));
 // See RecordScreen.component.test.tsx: republish is fire-and-forget after a
 // delete and must be mocked so it never reaches unmocked repo exports.
@@ -69,7 +70,10 @@ function renderScreen(props: { onEditRecord?: (r: SessionRecord) => void } = {})
 beforeEach(() => {
   vi.clearAllMocks();
   hasMoreValue = true;
-  vi.stubGlobal('confirm', vi.fn(() => true));
+  vi.stubGlobal(
+    'confirm',
+    vi.fn(() => true),
+  );
 });
 
 describe('LogScreen — rendering', () => {
@@ -148,7 +152,10 @@ describe('LogScreen — delete with undo', () => {
   });
 
   it('respects a cancelled confirm() and keeps the entry', async () => {
-    vi.stubGlobal('confirm', vi.fn(() => false));
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => false),
+    );
     renderScreen();
     const row = screen.getByText('زيد احمد').closest('.rounded-2xl') as HTMLElement;
     await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));

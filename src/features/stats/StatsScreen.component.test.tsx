@@ -10,7 +10,13 @@ const students: Student[] = [
 ];
 
 const records: SessionRecord[] = [
-  { id: 'r1', studentId: 's_1', date: '2026-07-01', loh: { score: 0 }, newLoh: [{ sura: 'البقرة', from: '1', to: '20' }] },
+  {
+    id: 'r1',
+    studentId: 's_1',
+    date: '2026-07-01',
+    loh: { score: 0 },
+    newLoh: [{ sura: 'البقرة', from: '1', to: '20' }],
+  },
   { id: 'r2', studentId: 's_1', date: '2026-07-02', loh: { score: 90 } },
   { id: 'r3', studentId: 's_2', date: '2026-06-01', loh: { score: 80 } },
 ];

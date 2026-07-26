@@ -190,6 +190,8 @@ describe('SURAS_IN_LOH_ORDER', () => {
   });
   it('contains every sura exactly once, same set as SURAS', () => {
     expect(SURAS_IN_LOH_ORDER.length).toBe(SURAS.length);
-    expect(new Set(SURAS_IN_LOH_ORDER.map((s) => s.name))).toEqual(new Set(SURAS.map((s) => s.name)));
+    expect(new Set(SURAS_IN_LOH_ORDER.map((s) => s.name))).toEqual(
+      new Set(SURAS.map((s) => s.name)),
+    );
   });
 });

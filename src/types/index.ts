@@ -117,7 +117,6 @@ export interface Badge {
   label: string;
 }
 
-
 /** Precomputed, publicly-readable per-student stats (denormalized for child.html). */
 export interface PublicStats {
   name: string;

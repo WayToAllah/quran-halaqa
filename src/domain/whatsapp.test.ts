@@ -12,7 +12,12 @@ describe('buildWhatsAppMessage', () => {
   };
 
   it('includes the student first name in the header', () => {
-    const rec: SessionRecord = { id: 'r1', studentId: 's_1', student: 'زيد احمد', date: '2026-07-03' };
+    const rec: SessionRecord = {
+      id: 'r1',
+      studentId: 's_1',
+      student: 'زيد احمد',
+      date: '2026-07-03',
+    };
     const msg = buildWhatsAppMessage(rec, null);
     expect(msg).toContain('زيد');
   });
@@ -84,13 +89,24 @@ describe('buildWhatsAppMessage', () => {
   });
 
   it('includes the note when present', () => {
-    const rec: SessionRecord = { id: 'r1', studentId: 's_1', student: 'زيد احمد', date: '2026-07-03', note: 'ملحوظة تجريبية' };
+    const rec: SessionRecord = {
+      id: 'r1',
+      studentId: 's_1',
+      student: 'زيد احمد',
+      date: '2026-07-03',
+      note: 'ملحوظة تجريبية',
+    };
     const msg = buildWhatsAppMessage(rec, null);
     expect(msg).toContain('ملحوظة تجريبية');
   });
 
   it('includes the child-portal link only when a parentToken is given', () => {
-    const rec: SessionRecord = { id: 'r1', studentId: 's_1', student: 'زيد احمد', date: '2026-07-03' };
+    const rec: SessionRecord = {
+      id: 'r1',
+      studentId: 's_1',
+      student: 'زيد احمد',
+      date: '2026-07-03',
+    };
     const withToken = buildWhatsAppMessage(rec, null, 'TOKEN123');
     const withoutToken = buildWhatsAppMessage(rec, null);
     expect(withToken).toContain('child.html?t=TOKEN123');
@@ -98,7 +114,12 @@ describe('buildWhatsAppMessage', () => {
   });
 
   it('never crashes on a bare-minimum record with nothing filled in', () => {
-    const rec: SessionRecord = { id: 'r1', studentId: 's_1', student: 'زيد احمد', date: '2026-07-03' };
+    const rec: SessionRecord = {
+      id: 'r1',
+      studentId: 's_1',
+      student: 'زيد احمد',
+      date: '2026-07-03',
+    };
     expect(() => buildWhatsAppMessage(rec, null)).not.toThrow();
   });
 });
@@ -119,7 +140,13 @@ describe('normalizeWhatsAppPhone', () => {
 describe('buildWhatsAppMessage — tajweed without ayah numbers', () => {
   it('omits the parentheses instead of sending the parent a bare "(–)"', () => {
     const msg = buildWhatsAppMessage(
-      { id: 'r1', studentId: 's_1', student: 'زيد احمد', date: '2026-07-20', tajweed: { sura: 'الناس', from: '', to: '', stars: 4 } },
+      {
+        id: 'r1',
+        studentId: 's_1',
+        student: 'زيد احمد',
+        date: '2026-07-20',
+        tajweed: { sura: 'الناس', from: '', to: '', stars: 4 },
+      },
       null,
       undefined,
     );

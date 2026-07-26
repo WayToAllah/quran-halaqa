@@ -4,10 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { ToastProvider } from '../../ui/ToastProvider';
 import { WhatsAppModal } from './WhatsAppModal';
 
-function renderModal(
-  phone: string,
-  opts: { isEditing?: boolean; busy?: boolean } = {},
-) {
+function renderModal(phone: string, opts: { isEditing?: boolean; busy?: boolean } = {}) {
   const onBack = vi.fn();
   const onSaveOnly = vi.fn();
   const onSaveAndSend = vi.fn();

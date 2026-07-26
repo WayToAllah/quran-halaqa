@@ -66,7 +66,9 @@ export function useRecordSearch(
     // Debounce so we don't fire a Firestore query on every keystroke.
     const timer = setTimeout(() => {
       Promise.all(
-        matchingStudents.map((s) => getAllRecordsForStudent(mosqueId, halaqaId, s.id).catch(() => [])),
+        matchingStudents.map((s) =>
+          getAllRecordsForStudent(mosqueId, halaqaId, s.id).catch(() => []),
+        ),
       )
         .then((lists) => {
           if (runId !== runIdRef.current) return; // a newer query superseded this one

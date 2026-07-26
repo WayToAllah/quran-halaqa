@@ -9,7 +9,13 @@ const students: Student[] = [
 
 // s_1 attends 2 of 2 days (100%), s_2 attends 1 of 2 (50%) → dense ranks 1 and 2.
 const records: SessionRecord[] = [
-  { id: 'r1', studentId: 's_1', date: '2026-07-01', loh: { score: 90 }, newLoh: [{ sura: 'البقرة', from: '1', to: '10' }] },
+  {
+    id: 'r1',
+    studentId: 's_1',
+    date: '2026-07-01',
+    loh: { score: 90 },
+    newLoh: [{ sura: 'البقرة', from: '1', to: '10' }],
+  },
   { id: 'r2', studentId: 's_1', date: '2026-07-03', loh: { score: 80 } },
   { id: 'r3', studentId: 's_2', date: '2026-07-01' },
 ];

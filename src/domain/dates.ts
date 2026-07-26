@@ -23,7 +23,10 @@ function toAnchoredDate(input: Date | string): Date {
  * Returns '' for an unparseable input (callers can fall back to the raw
  * string themselves if that's preferable to blank).
  */
-export function gregorianStr(input: Date | string, opts: GregorianOptions = GREGORIAN_DEFAULT_OPTS): string {
+export function gregorianStr(
+  input: Date | string,
+  opts: GregorianOptions = GREGORIAN_DEFAULT_OPTS,
+): string {
   try {
     const d = toAnchoredDate(input);
     if (isNaN(d.getTime())) return '';

@@ -97,7 +97,7 @@ describe('countRecentlyActiveStudents', () => {
     expect(countRecentlyActiveStudents(students, records, 30, today)).toBe(0);
   });
 
-  it('uses each student\'s MOST RECENT session, not their first', () => {
+  it("uses each student's MOST RECENT session, not their first", () => {
     const records: SessionRecord[] = [
       { id: 'r1', studentId: 's_1', date: '2026-01-01' }, // old
       { id: 'r2', studentId: 's_1', date: '2026-07-15' }, // recent — this one counts
@@ -187,8 +187,18 @@ describe('computeScoreDistribution', () => {
 describe('computeTopAyat', () => {
   it('ranks students by total ayat, highest first', () => {
     const records: SessionRecord[] = [
-      { id: 'r1', studentId: 's_1', date: '2026-07-01', newLoh: [{ sura: 'البقرة', from: '1', to: '50' }] },
-      { id: 'r2', studentId: 's_2', date: '2026-07-01', newLoh: [{ sura: 'البقرة', from: '1', to: '10' }] },
+      {
+        id: 'r1',
+        studentId: 's_1',
+        date: '2026-07-01',
+        newLoh: [{ sura: 'البقرة', from: '1', to: '50' }],
+      },
+      {
+        id: 'r2',
+        studentId: 's_2',
+        date: '2026-07-01',
+        newLoh: [{ sura: 'البقرة', from: '1', to: '10' }],
+      },
     ];
     const top = computeTopAyat(students, records);
     expect(top[0].name).toBe('زيد احمد');
@@ -202,7 +212,10 @@ describe('computeTopAyat', () => {
   });
 
   it('respects the limit parameter', () => {
-    const many: Student[] = Array.from({ length: 5 }, (_, i) => ({ id: `s_${i}`, name: `طالب ${i}` }));
+    const many: Student[] = Array.from({ length: 5 }, (_, i) => ({
+      id: `s_${i}`,
+      name: `طالب ${i}`,
+    }));
     const records: SessionRecord[] = many.map((s, i) => ({
       id: `r${i}`,
       studentId: s.id,
@@ -241,6 +254,8 @@ describe('computeStudentStatsRows / sortStudentStatsRows', () => {
   it('sorts by name using Arabic locale comparison', () => {
     const rows = computeStudentStatsRows(students, records, 2);
     const sorted = sortStudentStatsRows(rows, 'name');
-    expect(sorted.map((r) => r.name)).toEqual([...rows.map((r) => r.name)].sort((a, b) => a.localeCompare(b, 'ar')));
+    expect(sorted.map((r) => r.name)).toEqual(
+      [...rows.map((r) => r.name)].sort((a, b) => a.localeCompare(b, 'ar')),
+    );
   });
 });

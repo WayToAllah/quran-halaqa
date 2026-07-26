@@ -84,14 +84,19 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
   }
 
   return (
-    <div class="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center" onClick={onClose}>
+    <div
+      class="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center"
+      onClick={onClose}
+    >
       <div
         class="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
         dir="rtl"
       >
         <div class="flex items-center justify-between px-5 py-4 border-b border-hairline sticky top-0 bg-white">
-          <span class="font-extrabold text-ink-dark">{student ? 'تعديل بيانات الطالب' : 'إضافة طالب جديد'}</span>
+          <span class="font-extrabold text-ink-dark">
+            {student ? 'تعديل بيانات الطالب' : 'إضافة طالب جديد'}
+          </span>
           <button class="text-taupe text-lg" onClick={onClose}>
             ✕
           </button>
@@ -193,7 +198,10 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
         </div>
 
         <div class="flex gap-3 px-5 py-4 border-t border-hairline sticky bottom-0 bg-white">
-          <button class="flex-1 py-2.5 rounded-xl border border-hairline text-sm font-semibold text-[#5B5646]" onClick={onClose}>
+          <button
+            class="flex-1 py-2.5 rounded-xl border border-hairline text-sm font-semibold text-[#5B5646]"
+            onClick={onClose}
+          >
             إلغاء
           </button>
           <button

@@ -5,7 +5,11 @@ import { useUndoableDelete } from '../../hooks/useUndoableDelete';
 import { deleteStudent as deleteStudentDoc, updateStudent } from '../../data/students.repo';
 import { normAr, esc, toArabicDigits } from '../../domain/text';
 import { getStudentName, recordsForStudent } from '../../domain/students';
-import { getAttendanceRanking, ATTENDANCE_BADGE_THRESHOLD, rankBadgeEmoji } from '../../domain/attendance';
+import {
+  getAttendanceRanking,
+  ATTENDANCE_BADGE_THRESHOLD,
+  rankBadgeEmoji,
+} from '../../domain/attendance';
 import { genParentToken } from '../../domain/ids';
 import { useToast } from '../../ui/ToastProvider';
 import { MOSQUE_ID, HALAQA_ID } from '../../config';
@@ -92,7 +96,9 @@ export function StudentsScreen() {
       ? `حذف \"${getStudentName(s)}\"؟\n\nله ${linkedCount} جلسة مسجلة — هتفضل موجودة في السجل والإحصائيات باسمه الحالي لكن بدون إمكانية ربطها بملفه بعد الحذف.`
       : `حذف \"${getStudentName(s)}\"؟`;
     if (!confirm(warning)) return;
-    requestDelete(s.id, `🗑 تم حذف ${getStudentName(s)}`, (id) => deleteStudentDoc(MOSQUE_ID, HALAQA_ID, id));
+    requestDelete(s.id, `🗑 تم حذف ${getStudentName(s)}`, (id) =>
+      deleteStudentDoc(MOSQUE_ID, HALAQA_ID, id),
+    );
   }
 
   return (
@@ -143,11 +149,16 @@ export function StudentsScreen() {
       <div class="space-y-2.5 mb-4">
         {visibleStudents.map((s) => {
           const name = getStudentName(s);
-          const metaParts = [s.age ? s.age + ' سنة' : '', s.grade || '', s.school || ''].filter(Boolean);
+          const metaParts = [s.age ? s.age + ' سنة' : '', s.grade || '', s.school || ''].filter(
+            Boolean,
+          );
           const count = recordsForStudent(s, records).length;
           const rank = topRanks[s.id];
           return (
-            <div key={s.id} class="bg-white border border-hairline rounded-2xl p-3.5 flex items-start gap-3">
+            <div
+              key={s.id}
+              class="bg-white border border-hairline rounded-2xl p-3.5 flex items-start gap-3"
+            >
               <div
                 class="w-11 h-11 shrink-0 rounded-full bg-[#F1ECDD] text-forest font-extrabold flex items-center justify-center text-sm cursor-pointer"
                 onClick={() => openEditModal(s)}
@@ -159,8 +170,12 @@ export function StudentsScreen() {
                   <span>{name}</span>
                   {rank && <span title={`المركز ${rank} في الحضور`}>{rankBadgeEmoji(rank)}</span>}
                 </div>
-                {metaParts.length > 0 && <div class="text-xs text-taupe mt-0.5">{metaParts.join(' · ')}</div>}
-                {s.phonePrimary && <div class="text-xs text-taupe mt-0.5">واتساب: {s.phonePrimary}</div>}
+                {metaParts.length > 0 && (
+                  <div class="text-xs text-taupe mt-0.5">{metaParts.join(' · ')}</div>
+                )}
+                {s.phonePrimary && (
+                  <div class="text-xs text-taupe mt-0.5">واتساب: {s.phonePrimary}</div>
+                )}
                 <div class="text-xs text-taupe mt-0.5">{count} جلسة مسجلة</div>
               </div>
               <div class="flex gap-1 shrink-0">
@@ -200,7 +215,11 @@ export function StudentsScreen() {
       </button>
 
       {modalOpen && (
-        <StudentModal student={editingStudent} allStudents={students} onClose={() => setModalOpen(false)} />
+        <StudentModal
+          student={editingStudent}
+          allStudents={students}
+          onClose={() => setModalOpen(false)}
+        />
       )}
     </div>
   );

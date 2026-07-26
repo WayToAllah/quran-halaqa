@@ -36,7 +36,10 @@ export function findPreviousSession(
 /** Reads the "assigned" sura list off a session, preferring the modern
  * newLoh/newMadi array shape and falling back to the legacy single-object
  * shape for pre-migration records. */
-export function extractAssignedSuras(field: SuraAssignment[] | undefined, legacy: unknown): SuraAssignment[] {
+export function extractAssignedSuras(
+  field: SuraAssignment[] | undefined,
+  legacy: unknown,
+): SuraAssignment[] {
   if (field?.length) return field.filter((f) => f?.sura);
   const legacyObj = legacy as SuraAssignment | undefined;
   if (legacyObj?.sura) return [legacyObj];

@@ -6,7 +6,13 @@ import { republishPublicStatsFor } from '../../data/publishStats';
 import { normAr } from '../../domain/text';
 import { getStudentName, findStudentRecordOnDate } from '../../domain/students';
 import { localDateStr, genId, hijriLong, hijriShort, gregorianLong } from '../../domain';
-import { scoreToStars, scoreName, parseScoreField, isScoreEntryComplete, type ScoreFieldState } from '../../domain/scoring';
+import {
+  scoreToStars,
+  scoreName,
+  parseScoreField,
+  isScoreEntryComplete,
+  type ScoreFieldState,
+} from '../../domain/scoring';
 import {
   extractAssignedSuras,
   validateAyahRange,
@@ -45,11 +51,11 @@ function fmtSuraInfo(list: SuraAssignment[]): string {
 /** Tier badge colors ported from the approved design, keyed by the real
  * scoreName() bands (85/75/65/50 — see domain/scoring.ts), not re-derived. */
 const TIER_COLORS: Record<string, { bg: string; color: string }> = {
-  'ممتاز': { bg: '#E7F2EC', color: '#0F3D2E' },
+  ممتاز: { bg: '#E7F2EC', color: '#0F3D2E' },
   'جيد جداً': { bg: '#EFF6E8', color: '#3E6B22' },
-  'جيد': { bg: '#FFF8E6', color: '#8A6A15' },
-  'مقبول': { bg: '#FBEEE3', color: '#9A5A24' },
-  'إعادة': { bg: '#FBEAE7', color: '#B24A3A' },
+  جيد: { bg: '#FFF8E6', color: '#8A6A15' },
+  مقبول: { bg: '#FBEEE3', color: '#9A5A24' },
+  إعادة: { bg: '#FBEAE7', color: '#B24A3A' },
 };
 /** Blurs a score input once its value is unambiguously complete, so the
  * on-screen keyboard dismisses itself instead of the teacher having to tap
@@ -236,7 +242,10 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     setTajweedStars(0);
     setTajweedNote('');
     setNote('');
-    pristineRowsRef.current = { loh: rowsSignature([emptyRow()]), madi: rowsSignature([emptyRow()]) };
+    pristineRowsRef.current = {
+      loh: rowsSignature([emptyRow()]),
+      madi: rowsSignature([emptyRow()]),
+    };
   }
 
   /** True when the form holds something the teacher entered themselves, as
@@ -338,7 +347,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
       (r.student ? students.find((s) => getStudentName(s) === r.student) : undefined) ??
       null;
     setSelectedStudent(student);
-    setStudentQuery(student ? getStudentName(student) : r.student ?? '');
+    setStudentQuery(student ? getStudentName(student) : (r.student ?? ''));
     if (r.date) setDate(r.date);
 
     setPrevLohScore(r.loh?.score != null ? String(r.loh.score) : '');
@@ -478,7 +487,11 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     const activeMadiRows = madiRows.filter(isRowComplete).map(cleanAssignmentRow);
     // Ayah-range validation applies only to per-sura rows; whole-sura range
     // rows carry no ayah numbers, so skip them here.
-    const rowErrors = [...activeLohRows, ...activeMadiRows, ...(tajweedEnabled ? [tajweed] : [])].some((r) => {
+    const rowErrors = [
+      ...activeLohRows,
+      ...activeMadiRows,
+      ...(tajweedEnabled ? [tajweed] : []),
+    ].some((r) => {
       if (r.range) return false;
       const e = validateAyahRange(r.sura || '', r.from || '', r.to || '');
       return e.fromError || e.toError;
@@ -524,7 +537,12 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     }
 
     const hasContent =
-      rec.newLoh!.length > 0 || rec.newMadi!.length > 0 || !!rec.tajweed || lohScore != null || madiScore != null || !!rec.note;
+      rec.newLoh!.length > 0 ||
+      rec.newMadi!.length > 0 ||
+      !!rec.tajweed ||
+      lohScore != null ||
+      madiScore != null ||
+      !!rec.note;
     if (!hasContent) {
       setConfirmDialog({
         title: 'جلسة فارغة',
@@ -602,7 +620,15 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
       )}
 
       <div class="bg-white border border-hairline rounded-2xl p-2.5 flex items-center gap-2.5">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#0F3D2E" stroke-width="1.8" class="shrink-0">
+        <svg
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+          fill="none"
+          stroke="#0F3D2E"
+          stroke-width="1.8"
+          class="shrink-0"
+        >
           <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
           <path d="M3.5 9.5h17M8 3v3.5M16 3v3.5" />
         </svg>
@@ -656,7 +682,11 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
             <div class="text-[13px] font-bold text-ink-dark">
               حضور اليوم — {groupAttendance.sorted.length} طالب
             </div>
-            <button type="button" class="text-xs font-bold text-forest" onClick={groupAttendance.toggleAll}>
+            <button
+              type="button"
+              class="text-xs font-bold text-forest"
+              onClick={groupAttendance.toggleAll}
+            >
               تحديد الكل / إلغاء
             </button>
           </div>
@@ -679,9 +709,16 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
                     class={'flex items-center gap-3 py-2.5 ' + (already ? 'opacity-50' : '')}
                   >
                     <div class="w-[34px] h-[34px] rounded-full bg-[#F1ECDD] text-forest font-bold flex items-center justify-center text-xs shrink-0">
-                      {getStudentName(s).trim().split(' ').slice(0, 2).map((w) => w[0]).join('')}
+                      {getStudentName(s)
+                        .trim()
+                        .split(' ')
+                        .slice(0, 2)
+                        .map((w) => w[0])
+                        .join('')}
                     </div>
-                    <span class="flex-1 text-[13.5px] font-semibold text-ink-dark">{getStudentName(s)}</span>
+                    <span class="flex-1 text-[13.5px] font-semibold text-ink-dark">
+                      {getStudentName(s)}
+                    </span>
                     {already ? (
                       <span class="text-[11px] text-taupe shrink-0">مسجّل بالفعل</span>
                     ) : (
@@ -699,7 +736,14 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
                         onClick={() => groupAttendance.toggle(s.id, !isChecked)}
                       >
                         {isChecked && (
-                          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="white" stroke-width="3">
+                          <svg
+                            viewBox="0 0 24 24"
+                            width="15"
+                            height="15"
+                            fill="none"
+                            stroke="white"
+                            stroke-width="3"
+                          >
                             <path d="M5 12l5 5 9-10" />
                           </svg>
                         )}
@@ -715,308 +759,321 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
 
       {mode === 'individual' && (
         <>
-        <div class={cardCls + ' relative'}>
-        <label class="text-xs font-semibold text-[#5B5646] block mb-2">الطالب</label>
-        <div class="relative">
-          <input
-            type="text"
-            class="w-full border border-hairline rounded-xl px-3.5 py-3 pr-10 text-sm text-ink-dark"
-            placeholder="ابحث أو اختر اسم الطالب…"
-            value={studentQuery}
-            onInput={(e) => {
-              cancelStudentBlurClose();
-              setStudentQuery((e.target as HTMLInputElement).value);
-              setDropdownOpen(true);
-              if (selectedStudent) setSelectedStudent(null);
-            }}
-            onFocus={() => {
-              cancelStudentBlurClose();
-              setDropdownOpen(true);
-            }}
-            onBlur={() => {
-              studentBlurTimer.current = setTimeout(() => setDropdownOpen(false), 120);
-            }}
-          />
-          <svg
-            viewBox="0 0 24 24"
-            width="17"
-            height="17"
-            fill="none"
-            stroke="#8A8372"
-            stroke-width="2"
-            class="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
-          >
-            <circle cx="11" cy="11" r="7" />
-            <path d="M21 21l-4.3-4.3" />
-          </svg>
-        </div>
-        {dropdownOpen && (
-          <div class="absolute z-10 inset-x-[18px] top-full mt-1 bg-white border border-hairline rounded-xl shadow-lg max-h-56 overflow-y-auto">
-            {studentMatches.length === 0 && <div class="p-3 text-xs text-taupe">لا يوجد نتائج</div>}
-            {studentMatches.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                class="w-full text-right px-3.5 py-2.5 text-sm hover:bg-parchment"
-                onMouseDown={() => selectStudent(s)}
-              >
-                {getStudentName(s)}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {duplicateRecord && (
-        <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between gap-2.5">
-          <span class="text-xs font-semibold text-amber-800">
-            ⚠️ {getStudentName(selectedStudent!)} مسجّل بالفعل بتاريخ {dateDisplay || date}
-          </span>
-          <button
-            type="button"
-            class="shrink-0 text-xs font-bold text-amber-800 underline"
-            onClick={() => {
-              consumedEditIdRef.current = duplicateRecord.id;
-              enterEditMode(duplicateRecord);
-            }}
-          >
-            فتح الجلسة الموجودة
-          </button>
-        </div>
-      )}
-
-      {/* Reading the last session is a round-trip; without this the card is
-          simply absent and a student WITH history looks like one without. */}
-      {selectedStudent && prevLoading && !evalSource && (
-        <div class={cardCls + ' text-[12px] text-taupe'}>⏳ بنجيب آخر جلسة للطالب…</div>
-      )}
-
-      {selectedStudent && evalSource && (showLohEval || showMadiEval) && (
-        <div class={cardCls + ' space-y-3.5'}>
-          <div>
-            <div class="font-extrabold text-ink-dark text-[13.5px]">📋 ما سمعناه النهارده</div>
-            <div class="text-[11px] text-taupe mt-0.5">
-              {editingId
-                ? 'تقييم هذه الجلسة'
-                : `من جلسة ${hijriLong(evalSource.date) ? hijriLong(evalSource.date) + ' — ' : ''}${new Date(evalSource.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}`}
-            </div>
-          </div>
-
-          {showLohEval && (
-            <div>
-              <div class="text-xs font-semibold text-[#5B5646] mb-1">اللوح</div>
-              <div class="text-sm mb-2 text-ink-dark">{prevLohInfo}</div>
-              <label class="text-xs text-taupe">التقييم (من 100)</label>
-              <div class="flex items-center gap-2 mt-1 flex-wrap">
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  placeholder="مثلاً 90"
-                  class={
-                    'w-20 text-center font-extrabold text-lg rounded-xl py-2 border ' +
-                    (lohScoreState.invalid
-                      ? 'border-red-400 bg-red-50 text-red-700'
-                      : 'border-mustard/50 bg-[#FFFCF3] text-forest')
-                  }
-                  value={prevLohScore}
-                  onInput={(e) => {
-                    const val = (e.target as HTMLInputElement).value;
-                    setPrevLohScore(val);
-                    autoCloseScoreKeyboard(e, val);
-                  }}
-                />
-                {lohTier && (
-                  <span
-                    class="text-[11px] font-bold px-2.5 py-1 rounded-full"
-                    style={{ background: lohTier.bg, color: lohTier.color }}
-                  >
-                    {lohTier.label}
-                  </span>
-                )}
-                <button
-                  type="button"
-                  class="mr-auto text-xs font-semibold text-forest border border-forest/20 rounded-lg px-2.5 py-2"
-                  onClick={() => setMistakeModal('loh')}
-                >
-                  🧮 عدّاد الأخطاء
-                  {lohMistakes.length > 0 ? ` (${lohMistakes.length})` : ''}
-                </button>
-              </div>
-              {lohScoreState.invalid && (
-                <div class="text-[11px] text-red-600 font-semibold mt-1">الدرجة لازم تكون رقم</div>
-              )}
-              {lohScoreState.clamped && (
-                <div class="text-[11px] text-amber-700 font-semibold mt-1">
-                  هيتحفظ {lohScoreState.value} (الدرجة من 0 إلى 100)
-                </div>
-              )}
-            </div>
-          )}
-
-          {showMadiEval && (
-            <div class="pt-3.5 border-t border-hairline">
-              <div class="text-xs font-semibold text-[#5B5646] mb-1">الماضي</div>
-              <div class="text-sm mb-2 text-ink-dark">{prevMadiInfo}</div>
-              <label class="text-xs text-taupe">التقييم (من 100)</label>
-              <div class="flex items-center gap-2 mt-1 flex-wrap">
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  placeholder="مثلاً 85"
-                  class={
-                    'w-20 text-center font-extrabold text-lg rounded-xl py-2 border ' +
-                    (madiScoreState.invalid
-                      ? 'border-red-400 bg-red-50 text-red-700'
-                      : 'border-mustard/50 bg-[#FFFCF3] text-forest')
-                  }
-                  value={prevMadiScore}
-                  onInput={(e) => {
-                    const val = (e.target as HTMLInputElement).value;
-                    setPrevMadiScore(val);
-                    autoCloseScoreKeyboard(e, val);
-                  }}
-                />
-                {madiTier && (
-                  <span
-                    class="text-[11px] font-bold px-2.5 py-1 rounded-full"
-                    style={{ background: madiTier.bg, color: madiTier.color }}
-                  >
-                    {madiTier.label}
-                  </span>
-                )}
-                <button
-                  type="button"
-                  class="mr-auto text-xs font-semibold text-forest border border-forest/20 rounded-lg px-2.5 py-2"
-                  onClick={() => setMistakeModal('madi')}
-                >
-                  🧮 عدّاد الأخطاء
-                  {madiMistakes.length > 0 ? ` (${madiMistakes.length})` : ''}
-                </button>
-              </div>
-              {madiScoreState.invalid && (
-                <div class="text-[11px] text-red-600 font-semibold mt-1">الدرجة لازم تكون رقم</div>
-              )}
-              {madiScoreState.clamped && (
-                <div class="text-[11px] text-amber-700 font-semibold mt-1">
-                  هيتحفظ {madiScoreState.value} (الدرجة من 0 إلى 100)
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div class={cardCls}>
-        <div class="flex items-center gap-2 mb-3.5">
-          <div class="w-2 h-2 rounded-full bg-forest" />
-          <div class="text-[13.5px] font-extrabold text-ink-dark">اللوح الجديد</div>
-        </div>
-        {lohRows.map((row, i) => (
-          <SuraRow
-            key={i}
-            label={i === 0 ? 'السورة الأولى' : `سورة ${i + 1}`}
-            value={row}
-            onChange={(v) => setLohRows((rows) => rows.map((r, idx) => (idx === i ? v : r)))}
-            onRemove={i > 0 ? () => setLohRows((rows) => rows.filter((_, idx) => idx !== i)) : undefined}
-          />
-        ))}
-        <button
-          type="button"
-          class="w-full py-2.5 rounded-[11px] border-[1.5px] border-dashed border-mustard bg-[#FFFCF3] text-[#8A6A15] text-[13px] font-bold"
-          onClick={() => setLohRows((rows) => [...rows, emptyRow()])}
-        >
-          + إضافة سورة
-        </button>
-      </div>
-
-      <div class={cardCls}>
-        <div class="flex items-center gap-2 mb-3.5">
-          <div class="w-2 h-2 rounded-full bg-mustard" />
-          <div class="text-[13.5px] font-extrabold text-ink-dark">مراجعة الماضي</div>
-        </div>
-        {madiRows.map((row, i) => (
-          <SuraRow
-            key={i}
-            label={i === 0 ? 'السورة الأولى' : `سورة ${i + 1}`}
-            value={row}
-            onChange={(v) => setMadiRows((rows) => rows.map((r, idx) => (idx === i ? v : r)))}
-            onRemove={i > 0 ? () => setMadiRows((rows) => rows.filter((_, idx) => idx !== i)) : undefined}
-          />
-        ))}
-        <button
-          type="button"
-          class="w-full py-2.5 rounded-[11px] border-[1.5px] border-dashed border-mustard bg-[#FFFCF3] text-[#8A6A15] text-[13px] font-bold"
-          onClick={() => setMadiRows((rows) => [...rows, emptyRow()])}
-        >
-          + إضافة سورة
-        </button>
-      </div>
-
-      <div class={cardCls + ' space-y-3'}>
-        <label class="flex items-center justify-between">
-          <div>
-            <div class="text-[13.5px] font-bold text-ink-dark">تسجيل ملاحظات التجويد</div>
-            <div class="text-[11.5px] text-taupe mt-0.5">اختياري — لتتبع أخطاء التجويد الشائعة</div>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={tajweedEnabled}
-            class="w-[46px] h-[26px] rounded-full relative shrink-0 transition-colors"
-            style={{ background: tajweedEnabled ? '#0F3D2E' : '#E7E1D3' }}
-            onClick={() => setTajweedEnabled((v) => !v)}
-          >
-            <span
-              class="absolute top-[3px] w-5 h-5 rounded-full bg-white shadow transition-all"
-              style={{ right: tajweedEnabled ? '23px' : '3px' }}
-            />
-          </button>
-        </label>
-        {tajweedEnabled && (
-          <div class="space-y-3 pt-1">
-            <SuraRow label="سورة التجويد" value={tajweed} onChange={setTajweed} allowRange={false} />
-            <div>
-              <label class="text-xs text-taupe block mb-1">التقييم</label>
-              <StarPicker value={tajweedStars} onChange={setTajweedStars} />
-            </div>
-            <div>
-              <label class="text-xs text-taupe block mb-1">ملاحظة</label>
+          <div class={cardCls + ' relative'}>
+            <label class="text-xs font-semibold text-[#5B5646] block mb-2">الطالب</label>
+            <div class="relative">
               <input
                 type="text"
-                class="w-full border border-hairline rounded-[11px] px-3.5 py-2.5 text-sm text-ink-dark"
-                placeholder="اختيارية"
-                value={tajweedNote}
-                onInput={(e) => setTajweedNote((e.target as HTMLInputElement).value)}
+                class="w-full border border-hairline rounded-xl px-3.5 py-3 pr-10 text-sm text-ink-dark"
+                placeholder="ابحث أو اختر اسم الطالب…"
+                value={studentQuery}
+                onInput={(e) => {
+                  cancelStudentBlurClose();
+                  setStudentQuery((e.target as HTMLInputElement).value);
+                  setDropdownOpen(true);
+                  if (selectedStudent) setSelectedStudent(null);
+                }}
+                onFocus={() => {
+                  cancelStudentBlurClose();
+                  setDropdownOpen(true);
+                }}
+                onBlur={() => {
+                  studentBlurTimer.current = setTimeout(() => setDropdownOpen(false), 120);
+                }}
               />
+              <svg
+                viewBox="0 0 24 24"
+                width="17"
+                height="17"
+                fill="none"
+                stroke="#8A8372"
+                stroke-width="2"
+                class="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <path d="M21 21l-4.3-4.3" />
+              </svg>
             </div>
+            {dropdownOpen && (
+              <div class="absolute z-10 inset-x-[18px] top-full mt-1 bg-white border border-hairline rounded-xl shadow-lg max-h-56 overflow-y-auto">
+                {studentMatches.length === 0 && (
+                  <div class="p-3 text-xs text-taupe">لا يوجد نتائج</div>
+                )}
+                {studentMatches.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    class="w-full text-right px-3.5 py-2.5 text-sm hover:bg-parchment"
+                    onMouseDown={() => selectStudent(s)}
+                  >
+                    {getStudentName(s)}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      <div class={cardCls}>
-        <label class="text-xs font-semibold text-[#5B5646] block mb-2">ملاحظة (اختياري)</label>
-        <textarea
-          class="w-full border border-hairline rounded-[11px] px-3.5 py-3 text-[13.5px] text-ink-dark resize-none"
-          rows={3}
-          placeholder="أي ملاحظة عن أداء الطالب اليوم…"
-          value={note}
-          onInput={(e) => setNote((e.target as HTMLTextAreaElement).value)}
-        />
-      </div>
+          {duplicateRecord && (
+            <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between gap-2.5">
+              <span class="text-xs font-semibold text-amber-800">
+                ⚠️ {getStudentName(selectedStudent!)} مسجّل بالفعل بتاريخ {dateDisplay || date}
+              </span>
+              <button
+                type="button"
+                class="shrink-0 text-xs font-bold text-amber-800 underline"
+                onClick={() => {
+                  consumedEditIdRef.current = duplicateRecord.id;
+                  enterEditMode(duplicateRecord);
+                }}
+              >
+                فتح الجلسة الموجودة
+              </button>
+            </div>
+          )}
+
+          {/* Reading the last session is a round-trip; without this the card is
+          simply absent and a student WITH history looks like one without. */}
+          {selectedStudent && prevLoading && !evalSource && (
+            <div class={cardCls + ' text-[12px] text-taupe'}>⏳ بنجيب آخر جلسة للطالب…</div>
+          )}
+
+          {selectedStudent && evalSource && (showLohEval || showMadiEval) && (
+            <div class={cardCls + ' space-y-3.5'}>
+              <div>
+                <div class="font-extrabold text-ink-dark text-[13.5px]">📋 ما سمعناه النهارده</div>
+                <div class="text-[11px] text-taupe mt-0.5">
+                  {editingId
+                    ? 'تقييم هذه الجلسة'
+                    : `من جلسة ${hijriLong(evalSource.date) ? hijriLong(evalSource.date) + ' — ' : ''}${new Date(evalSource.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}`}
+                </div>
+              </div>
+
+              {showLohEval && (
+                <div>
+                  <div class="text-xs font-semibold text-[#5B5646] mb-1">اللوح</div>
+                  <div class="text-sm mb-2 text-ink-dark">{prevLohInfo}</div>
+                  <label class="text-xs text-taupe">التقييم (من 100)</label>
+                  <div class="flex items-center gap-2 mt-1 flex-wrap">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      placeholder="مثلاً 90"
+                      class={
+                        'w-20 text-center font-extrabold text-lg rounded-xl py-2 border ' +
+                        (lohScoreState.invalid
+                          ? 'border-red-400 bg-red-50 text-red-700'
+                          : 'border-mustard/50 bg-[#FFFCF3] text-forest')
+                      }
+                      value={prevLohScore}
+                      onInput={(e) => {
+                        const val = (e.target as HTMLInputElement).value;
+                        setPrevLohScore(val);
+                        autoCloseScoreKeyboard(e, val);
+                      }}
+                    />
+                    {lohTier && (
+                      <span
+                        class="text-[11px] font-bold px-2.5 py-1 rounded-full"
+                        style={{ background: lohTier.bg, color: lohTier.color }}
+                      >
+                        {lohTier.label}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      class="mr-auto text-xs font-semibold text-forest border border-forest/20 rounded-lg px-2.5 py-2"
+                      onClick={() => setMistakeModal('loh')}
+                    >
+                      🧮 عدّاد الأخطاء
+                      {lohMistakes.length > 0 ? ` (${lohMistakes.length})` : ''}
+                    </button>
+                  </div>
+                  {lohScoreState.invalid && (
+                    <div class="text-[11px] text-red-600 font-semibold mt-1">
+                      الدرجة لازم تكون رقم
+                    </div>
+                  )}
+                  {lohScoreState.clamped && (
+                    <div class="text-[11px] text-amber-700 font-semibold mt-1">
+                      هيتحفظ {lohScoreState.value} (الدرجة من 0 إلى 100)
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {showMadiEval && (
+                <div class="pt-3.5 border-t border-hairline">
+                  <div class="text-xs font-semibold text-[#5B5646] mb-1">الماضي</div>
+                  <div class="text-sm mb-2 text-ink-dark">{prevMadiInfo}</div>
+                  <label class="text-xs text-taupe">التقييم (من 100)</label>
+                  <div class="flex items-center gap-2 mt-1 flex-wrap">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      placeholder="مثلاً 85"
+                      class={
+                        'w-20 text-center font-extrabold text-lg rounded-xl py-2 border ' +
+                        (madiScoreState.invalid
+                          ? 'border-red-400 bg-red-50 text-red-700'
+                          : 'border-mustard/50 bg-[#FFFCF3] text-forest')
+                      }
+                      value={prevMadiScore}
+                      onInput={(e) => {
+                        const val = (e.target as HTMLInputElement).value;
+                        setPrevMadiScore(val);
+                        autoCloseScoreKeyboard(e, val);
+                      }}
+                    />
+                    {madiTier && (
+                      <span
+                        class="text-[11px] font-bold px-2.5 py-1 rounded-full"
+                        style={{ background: madiTier.bg, color: madiTier.color }}
+                      >
+                        {madiTier.label}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      class="mr-auto text-xs font-semibold text-forest border border-forest/20 rounded-lg px-2.5 py-2"
+                      onClick={() => setMistakeModal('madi')}
+                    >
+                      🧮 عدّاد الأخطاء
+                      {madiMistakes.length > 0 ? ` (${madiMistakes.length})` : ''}
+                    </button>
+                  </div>
+                  {madiScoreState.invalid && (
+                    <div class="text-[11px] text-red-600 font-semibold mt-1">
+                      الدرجة لازم تكون رقم
+                    </div>
+                  )}
+                  {madiScoreState.clamped && (
+                    <div class="text-[11px] text-amber-700 font-semibold mt-1">
+                      هيتحفظ {madiScoreState.value} (الدرجة من 0 إلى 100)
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div class={cardCls}>
+            <div class="flex items-center gap-2 mb-3.5">
+              <div class="w-2 h-2 rounded-full bg-forest" />
+              <div class="text-[13.5px] font-extrabold text-ink-dark">اللوح الجديد</div>
+            </div>
+            {lohRows.map((row, i) => (
+              <SuraRow
+                key={i}
+                label={i === 0 ? 'السورة الأولى' : `سورة ${i + 1}`}
+                value={row}
+                onChange={(v) => setLohRows((rows) => rows.map((r, idx) => (idx === i ? v : r)))}
+                onRemove={
+                  i > 0 ? () => setLohRows((rows) => rows.filter((_, idx) => idx !== i)) : undefined
+                }
+              />
+            ))}
+            <button
+              type="button"
+              class="w-full py-2.5 rounded-[11px] border-[1.5px] border-dashed border-mustard bg-[#FFFCF3] text-[#8A6A15] text-[13px] font-bold"
+              onClick={() => setLohRows((rows) => [...rows, emptyRow()])}
+            >
+              + إضافة سورة
+            </button>
+          </div>
+
+          <div class={cardCls}>
+            <div class="flex items-center gap-2 mb-3.5">
+              <div class="w-2 h-2 rounded-full bg-mustard" />
+              <div class="text-[13.5px] font-extrabold text-ink-dark">مراجعة الماضي</div>
+            </div>
+            {madiRows.map((row, i) => (
+              <SuraRow
+                key={i}
+                label={i === 0 ? 'السورة الأولى' : `سورة ${i + 1}`}
+                value={row}
+                onChange={(v) => setMadiRows((rows) => rows.map((r, idx) => (idx === i ? v : r)))}
+                onRemove={
+                  i > 0
+                    ? () => setMadiRows((rows) => rows.filter((_, idx) => idx !== i))
+                    : undefined
+                }
+              />
+            ))}
+            <button
+              type="button"
+              class="w-full py-2.5 rounded-[11px] border-[1.5px] border-dashed border-mustard bg-[#FFFCF3] text-[#8A6A15] text-[13px] font-bold"
+              onClick={() => setMadiRows((rows) => [...rows, emptyRow()])}
+            >
+              + إضافة سورة
+            </button>
+          </div>
+
+          <div class={cardCls + ' space-y-3'}>
+            <label class="flex items-center justify-between">
+              <div>
+                <div class="text-[13.5px] font-bold text-ink-dark">تسجيل ملاحظات التجويد</div>
+                <div class="text-[11.5px] text-taupe mt-0.5">
+                  اختياري — لتتبع أخطاء التجويد الشائعة
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={tajweedEnabled}
+                class="w-[46px] h-[26px] rounded-full relative shrink-0 transition-colors"
+                style={{ background: tajweedEnabled ? '#0F3D2E' : '#E7E1D3' }}
+                onClick={() => setTajweedEnabled((v) => !v)}
+              >
+                <span
+                  class="absolute top-[3px] w-5 h-5 rounded-full bg-white shadow transition-all"
+                  style={{ right: tajweedEnabled ? '23px' : '3px' }}
+                />
+              </button>
+            </label>
+            {tajweedEnabled && (
+              <div class="space-y-3 pt-1">
+                <SuraRow
+                  label="سورة التجويد"
+                  value={tajweed}
+                  onChange={setTajweed}
+                  allowRange={false}
+                />
+                <div>
+                  <label class="text-xs text-taupe block mb-1">التقييم</label>
+                  <StarPicker value={tajweedStars} onChange={setTajweedStars} />
+                </div>
+                <div>
+                  <label class="text-xs text-taupe block mb-1">ملاحظة</label>
+                  <input
+                    type="text"
+                    class="w-full border border-hairline rounded-[11px] px-3.5 py-2.5 text-sm text-ink-dark"
+                    placeholder="اختيارية"
+                    value={tajweedNote}
+                    onInput={(e) => setTajweedNote((e.target as HTMLInputElement).value)}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div class={cardCls}>
+            <label class="text-xs font-semibold text-[#5B5646] block mb-2">ملاحظة (اختياري)</label>
+            <textarea
+              class="w-full border border-hairline rounded-[11px] px-3.5 py-3 text-[13.5px] text-ink-dark resize-none"
+              rows={3}
+              placeholder="أي ملاحظة عن أداء الطالب اليوم…"
+              value={note}
+              onInput={(e) => setNote((e.target as HTMLTextAreaElement).value)}
+            />
+          </div>
         </>
       )}
 
       <FloatingSaveButton
         icon={mode === 'group' ? '✅' : '💾'}
-        label={
-          mode === 'group'
-            ? 'حفظ الحضور'
-            : editingId
-              ? 'تحديث الجلسة'
-              : 'حفظ الجلسة'
-        }
+        label={mode === 'group' ? 'حفظ الحضور' : editingId ? 'تحديث الجلسة' : 'حفظ الجلسة'}
         busy={mode === 'individual' ? saving : groupSaving}
         onClick={async () => {
           if (mode === 'group') {

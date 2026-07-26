@@ -106,21 +106,47 @@ async function main() {
   const staleStudentKeys = idsOnlyInSource(Object.keys(rtdbStudents), fsStudentKeys);
   const staleRecordKeys = idsOnlyInSource(Object.keys(rtdbRecords), fsRecordKeys);
 
-  console.log(`\nLive RTDB currently has ${Object.keys(rtdbStudents).length} students, ${Object.keys(rtdbRecords).length} records.`);
-  console.log(`Upsert (set by id) would write ${students.length} students, ${records.length} records, ${publicStats.length} publicStats.`);
+  console.log(
+    `\nLive RTDB currently has ${Object.keys(rtdbStudents).length} students, ${Object.keys(rtdbRecords).length} records.`,
+  );
+  console.log(
+    `Upsert (set by id) would write ${students.length} students, ${records.length} records, ${publicStats.length} publicStats.`,
+  );
   if (args.prune) {
-    console.log(`Prune would additionally remove ${staleStudentKeys.length} students, ${staleRecordKeys.length} records from RTDB (not in Firestore).`);
+    console.log(
+      `Prune would additionally remove ${staleStudentKeys.length} students, ${staleRecordKeys.length} records from RTDB (not in Firestore).`,
+    );
   }
 
   if (args.dryRun) {
     console.log('\n--dry-run: no writes. Samples of what would be written:');
-    if (students[0]) console.log('  students/' + fbKey(String(students[0].id)), JSON.stringify(students[0]).slice(0, 150));
-    if (records[0]) console.log('  records/' + fbKey(String(records[0].id)), JSON.stringify(records[0]).slice(0, 150));
-    if (publicStats[0]) console.log('  publicStats/' + fbKey(publicStats[0].token), JSON.stringify(publicStats[0].data).slice(0, 150));
+    if (students[0])
+      console.log(
+        '  students/' + fbKey(String(students[0].id)),
+        JSON.stringify(students[0]).slice(0, 150),
+      );
+    if (records[0])
+      console.log(
+        '  records/' + fbKey(String(records[0].id)),
+        JSON.stringify(records[0]).slice(0, 150),
+      );
+    if (publicStats[0])
+      console.log(
+        '  publicStats/' + fbKey(publicStats[0].token),
+        JSON.stringify(publicStats[0].data).slice(0, 150),
+      );
     if (args.prune && (staleStudentKeys.length || staleRecordKeys.length)) {
       console.log('\n  Would prune these RTDB keys (absent from Firestore):');
-      for (const k of staleStudentKeys) console.log('    students/' + k, '|', rtdbStudents[k]?.name ?? '—');
-      for (const k of staleRecordKeys) console.log('    records/' + k, '|', rtdbRecords[k]?.date ?? '—', '|', rtdbRecords[k]?.student ?? '—');
+      for (const k of staleStudentKeys)
+        console.log('    students/' + k, '|', rtdbStudents[k]?.name ?? '—');
+      for (const k of staleRecordKeys)
+        console.log(
+          '    records/' + k,
+          '|',
+          rtdbRecords[k]?.date ?? '—',
+          '|',
+          rtdbRecords[k]?.student ?? '—',
+        );
     }
     console.log('\nRe-run without --dry-run to actually write.');
     return;
@@ -154,8 +180,16 @@ async function main() {
   if (args.prune) {
     const total = staleStudentKeys.length + staleRecordKeys.length;
     console.log(`\nPrune: ${total} RTDB entr(ies) not present in Firestore.`);
-    for (const k of staleStudentKeys) console.log('    students/' + k, '|', rtdbStudents[k]?.name ?? '—');
-    for (const k of staleRecordKeys) console.log('    records/' + k, '|', rtdbRecords[k]?.date ?? '—', '|', rtdbRecords[k]?.student ?? '—');
+    for (const k of staleStudentKeys)
+      console.log('    students/' + k, '|', rtdbStudents[k]?.name ?? '—');
+    for (const k of staleRecordKeys)
+      console.log(
+        '    records/' + k,
+        '|',
+        rtdbRecords[k]?.date ?? '—',
+        '|',
+        rtdbRecords[k]?.student ?? '—',
+      );
     if (!args.confirm) {
       console.log('\n  --prune preview only (no --confirm): nothing deleted.');
     } else if (total) {

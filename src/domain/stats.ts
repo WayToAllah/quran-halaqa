@@ -5,7 +5,12 @@ import { itemAyat } from './suras';
 import { getStudentName, recordsForStudent } from './students';
 import { computeAttendanceStreak } from './attendance';
 
-export const AYAT_MILESTONES: ReadonlyArray<{ key: string; threshold: number; icon: string; label: string }> = [
+export const AYAT_MILESTONES: ReadonlyArray<{
+  key: string;
+  threshold: number;
+  icon: string;
+  label: string;
+}> = [
   { key: 'ayat100', threshold: 100, icon: '📖', label: 'حافظ ١٠٠ آية' },
   { key: 'ayat200', threshold: 200, icon: '📗', label: 'حافظ ٢٠٠ آية' },
   { key: 'ayat500', threshold: 500, icon: '📘', label: 'حافظ ٥٠٠ آية' },
@@ -48,7 +53,8 @@ export interface BuildBadgesOptions {
 }
 
 export function buildStudentBadges(opts: BuildBadgesOptions): Badge[] {
-  const { attendPct, allRecs, realRecsNewestFirst, totalAyat, avgLoh, avgMadi, halaqaDatesDesc } = opts;
+  const { attendPct, allRecs, realRecsNewestFirst, totalAyat, avgLoh, avgMadi, halaqaDatesDesc } =
+    opts;
   const badges: Badge[] = [];
 
   if (attendPct >= 100) badges.push({ key: 'perfectAttendance', icon: '💯', label: 'حضور مثالي' });
@@ -115,7 +121,8 @@ export function buildStudentPublicStats(
   });
 
   const uniqueDays = new Set(allRecs.map((r) => r.date)).size;
-  const attendPct = totalHalaqaDays > 0 ? Math.min(100, Math.round((uniqueDays / totalHalaqaDays) * 100)) : 0;
+  const attendPct =
+    totalHalaqaDays > 0 ? Math.min(100, Math.round((uniqueDays / totalHalaqaDays) * 100)) : 0;
 
   const latest = realRecs[0];
   const currentTask = latest
@@ -128,13 +135,17 @@ export function buildStudentPublicStats(
 
   const recentSessions = realRecs.slice(0, 10).map((r) => ({
     date: r.date || '',
-    loh: hasScore(r.loh) ? { score: r.loh!.score!, ...(r.loh!.mistakes ? { mistakes: r.loh!.mistakes } : {}) } : null,
+    loh: hasScore(r.loh)
+      ? { score: r.loh!.score!, ...(r.loh!.mistakes ? { mistakes: r.loh!.mistakes } : {}) }
+      : null,
     madi: hasScore(r.madi)
       ? { score: r.madi!.score!, ...(r.madi!.mistakes ? { mistakes: r.madi!.mistakes } : {}) }
       : null,
     newLoh: (r.newLoh ?? []).filter((l) => l?.sura),
     newMadi: (r.newMadi ?? []).filter((m) => m?.sura),
-    tajweed: r.tajweed?.sura ? { sura: r.tajweed.sura, from: r.tajweed.from || '', to: r.tajweed.to || '' } : null,
+    tajweed: r.tajweed?.sura
+      ? { sura: r.tajweed.sura, from: r.tajweed.from || '', to: r.tajweed.to || '' }
+      : null,
     note: r.note || '',
   }));
 
@@ -161,7 +172,10 @@ export function buildStudentPublicStats(
     const monthAllRecs = allRecs.filter((r) => r.date?.slice(0, 7) === month);
     const monthRealRecs = realRecs.filter((r) => r.date?.slice(0, 7) === month);
     const monthUniqueDays = new Set(monthAllRecs.map((r) => r.date)).size;
-    const monthAttendPct = monthHalaqaDays > 0 ? Math.min(100, Math.round((monthUniqueDays / monthHalaqaDays) * 100)) : 0;
+    const monthAttendPct =
+      monthHalaqaDays > 0
+        ? Math.min(100, Math.round((monthUniqueDays / monthHalaqaDays) * 100))
+        : 0;
     const monthScoredLoh = monthRealRecs.filter((r) => hasScore(r.loh));
     const monthAvgLoh = monthScoredLoh.length
       ? Math.round(monthScoredLoh.reduce((a, r) => a + r.loh!.score!, 0) / monthScoredLoh.length)

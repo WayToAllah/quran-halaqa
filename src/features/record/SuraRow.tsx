@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { SURAS_IN_LOH_ORDER, suraNumber, suraPageLabel, findSuraByName, type SuraInfo } from '../../domain/suras';
+import {
+  SURAS_IN_LOH_ORDER,
+  suraNumber,
+  suraPageLabel,
+  findSuraByName,
+  type SuraInfo,
+} from '../../domain/suras';
 import { validateAyahRange } from '../../domain/record';
 import { normAr } from '../../domain/text';
 import type { SuraAssignment } from '../../types';
@@ -62,7 +68,15 @@ export function SuraRow({ value, onChange, onRemove, label, allowRange = true }:
               onClick={onRemove}
               aria-label="حذف"
             >
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#B24A3A" stroke-width="1.8" stroke-linecap="round">
+              <svg
+                viewBox="0 0 24 24"
+                width="15"
+                height="15"
+                fill="none"
+                stroke="#B24A3A"
+                stroke-width="1.8"
+                stroke-linecap="round"
+              >
                 <path d="M5 6.5h14M9.5 6.5V4.8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1.7M7 6.5l.8 12.7a1.5 1.5 0 0 0 1.5 1.4h5.4a1.5 1.5 0 0 0 1.5-1.4l.8-12.7" />
               </svg>
             </button>

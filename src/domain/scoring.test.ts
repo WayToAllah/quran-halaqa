@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { hasScore, isScoreEntryComplete, parseScoreField, scoreName, scoreToHalfStars, scoreToStars } from './scoring';
+import {
+  hasScore,
+  isScoreEntryComplete,
+  parseScoreField,
+  scoreName,
+  scoreToHalfStars,
+  scoreToStars,
+} from './scoring';
 
 describe('scoreName', () => {
   it('returns إعادة for a genuine zero score (regression: was returning "")', () => {

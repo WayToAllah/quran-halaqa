@@ -123,7 +123,14 @@ describe('SuraRow — allowRange', () => {
   });
 
   it('hides the range toggle when allowRange is false', () => {
-    render(<SuraRow value={{ sura: '', from: '', to: '' }} onChange={vi.fn()} label="سورة التجويد" allowRange={false} />);
+    render(
+      <SuraRow
+        value={{ sura: '', from: '', to: '' }}
+        onChange={vi.fn()}
+        label="سورة التجويد"
+        allowRange={false}
+      />,
+    );
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     expect(screen.queryByText('🔗 نطاق سور')).not.toBeInTheDocument();
   });

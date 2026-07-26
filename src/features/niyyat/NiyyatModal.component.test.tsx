@@ -4,7 +4,11 @@ import userEvent from '@testing-library/user-event';
 import { ToastProvider } from '../../ui/ToastProvider';
 import { NiyyatModal } from './NiyyatModal';
 
-function renderModal(niyyat: string[], onSave = vi.fn().mockResolvedValue(undefined), onClose = vi.fn()) {
+function renderModal(
+  niyyat: string[],
+  onSave = vi.fn().mockResolvedValue(undefined),
+  onClose = vi.fn(),
+) {
   return {
     onSave,
     onClose,
@@ -21,8 +25,8 @@ beforeEach(() => vi.clearAllMocks());
 describe('NiyyatModal', () => {
   it('pre-fills existing niyyat, one row each', () => {
     renderModal(['نية ١', 'نية ٢']);
-    expect((screen.getByDisplayValue('نية ١') as HTMLInputElement)).toBeInTheDocument();
-    expect((screen.getByDisplayValue('نية ٢') as HTMLInputElement)).toBeInTheDocument();
+    expect(screen.getByDisplayValue('نية ١') as HTMLInputElement).toBeInTheDocument();
+    expect(screen.getByDisplayValue('نية ٢') as HTMLInputElement).toBeInTheDocument();
   });
 
   it('starts with one empty row when there are no niyyat, and warns about the fallback', () => {

@@ -44,7 +44,15 @@ interface CollectionCache<T> {
 }
 
 function makeCache<T>(): CollectionCache<T> {
-  return { key: '', data: [], loaded: false, refCount: 0, unsub: null, listeners: new Set(), errListeners: new Set() };
+  return {
+    key: '',
+    data: [],
+    loaded: false,
+    refCount: 0,
+    unsub: null,
+    listeners: new Set(),
+    errListeners: new Set(),
+  };
 }
 
 const studentsCache = makeCache<Student>();

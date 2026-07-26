@@ -21,7 +21,11 @@ export const ATTENDANCE_BADGE_THRESHOLD = 70;
  */
 export function sortedHalaqaDatesDesc(allRecords: SessionRecord[]): string[] {
   return Array.from(
-    new Set(allRecords.map((r) => r.date).filter((d): d is string => !!d && !EXCLUDED_HALAQA_DATES.includes(d))),
+    new Set(
+      allRecords
+        .map((r) => r.date)
+        .filter((d): d is string => !!d && !EXCLUDED_HALAQA_DATES.includes(d)),
+    ),
   ).sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
 }
 
@@ -29,7 +33,10 @@ export function sortedHalaqaDatesDesc(allRecords: SessionRecord[]): string[] {
  * Counts backward from the most recent halaqa day: how many in a row this
  * student has an attendance record for, stopping at the first gap.
  */
-export function computeAttendanceStreak(studentDatesSet: Set<string>, halaqaDatesDesc: string[]): number {
+export function computeAttendanceStreak(
+  studentDatesSet: Set<string>,
+  halaqaDatesDesc: string[],
+): number {
   let streak = 0;
   for (const d of halaqaDatesDesc) {
     if (studentDatesSet.has(d)) streak++;
@@ -66,7 +73,9 @@ export function getAttendanceRanking(
   minPct?: number,
 ): { totalHalaqaDays: number; list: AttendanceRankEntry[] } {
   const totalHalaqaDays = new Set(
-    recordsFilter.map((r) => r.date).filter((d): d is string => !!d && !EXCLUDED_HALAQA_DATES.includes(d)),
+    recordsFilter
+      .map((r) => r.date)
+      .filter((d): d is string => !!d && !EXCLUDED_HALAQA_DATES.includes(d)),
   ).size;
 
   const per = students
@@ -75,13 +84,21 @@ export function getAttendanceRanking(
       const recs = recordsForStudent(s, recordsFilter);
       if (!recs.length) return null;
       const uniqueDays = new Set(recs.map((r) => r.date)).size;
-      const attendPct = totalHalaqaDays > 0 ? Math.min(100, Math.round((uniqueDays / totalHalaqaDays) * 100)) : 0;
+      const attendPct =
+        totalHalaqaDays > 0 ? Math.min(100, Math.round((uniqueDays / totalHalaqaDays) * 100)) : 0;
       return { id: s.id, name, uniqueDays, attendPct };
     })
-    .filter((x): x is { id: string; name: string; uniqueDays: number; attendPct: number } => x !== null);
+    .filter(
+      (x): x is { id: string; name: string; uniqueDays: number; attendPct: number } => x !== null,
+    );
 
   // ترتيب تنازلي؛ الأيام الفريدة والاسم معيار ثانوي للترتيب البصري فقط (مش للمركز)
-  per.sort((a, b) => b.attendPct - a.attendPct || b.uniqueDays - a.uniqueDays || a.name.localeCompare(b.name, 'ar'));
+  per.sort(
+    (a, b) =>
+      b.attendPct - a.attendPct ||
+      b.uniqueDays - a.uniqueDays ||
+      a.name.localeCompare(b.name, 'ar'),
+  );
 
   const uniquePcts = [...new Set(per.map((x) => x.attendPct))].sort((a, b) => b - a);
   const rankByPct: Record<number, number> = {};

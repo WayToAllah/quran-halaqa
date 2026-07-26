@@ -10,11 +10,19 @@ import { localDateStr } from './dates';
  * the per-student breakdown so the two totals can never drift apart. */
 function ayatInRecord(r: SessionRecord): number {
   let sum = 0;
-  const lohArr = r.newLoh?.length ? r.newLoh : r.loh && (r.loh as unknown as { sura?: string }).sura ? [r.loh as never] : [];
+  const lohArr = r.newLoh?.length
+    ? r.newLoh
+    : r.loh && (r.loh as unknown as { sura?: string }).sura
+      ? [r.loh as never]
+      : [];
   lohArr.forEach((l) => {
     if (l?.sura) sum += itemAyat(l);
   });
-  const madiArr = r.newMadi?.length ? r.newMadi : r.madi && (r.madi as unknown as { sura?: string }).sura ? [r.madi as never] : [];
+  const madiArr = r.newMadi?.length
+    ? r.newMadi
+    : r.madi && (r.madi as unknown as { sura?: string }).sura
+      ? [r.madi as never]
+      : [];
   madiArr.forEach((m) => {
     if (m?.sura) sum += itemAyat(m);
   });
@@ -55,11 +63,19 @@ export function computeSummaryStats(records: SessionRecord[]): SummaryStats {
   let lohAyat = 0;
   let madiAyat = 0;
   records.forEach((r) => {
-    const lohArr = r.newLoh?.length ? r.newLoh : r.loh && (r.loh as unknown as { sura?: string }).sura ? [r.loh as never] : [];
+    const lohArr = r.newLoh?.length
+      ? r.newLoh
+      : r.loh && (r.loh as unknown as { sura?: string }).sura
+        ? [r.loh as never]
+        : [];
     lohArr.forEach((l) => {
       if (l?.sura) lohAyat += itemAyat(l);
     });
-    const madiArr = r.newMadi?.length ? r.newMadi : r.madi && (r.madi as unknown as { sura?: string }).sura ? [r.madi as never] : [];
+    const madiArr = r.newMadi?.length
+      ? r.newMadi
+      : r.madi && (r.madi as unknown as { sura?: string }).sura
+        ? [r.madi as never]
+        : [];
     madiArr.forEach((m) => {
       if (m?.sura) madiAyat += itemAyat(m);
     });
@@ -68,7 +84,9 @@ export function computeSummaryStats(records: SessionRecord[]): SummaryStats {
   const totalAyat = lohAyat + madiAyat + tajweedAyat;
 
   const totalHalaqaDays = new Set(
-    records.map((r) => r.date).filter((d): d is string => !!d && !EXCLUDED_HALAQA_DATES.includes(d)),
+    records
+      .map((r) => r.date)
+      .filter((d): d is string => !!d && !EXCLUDED_HALAQA_DATES.includes(d)),
   ).size;
 
   return { totalSessions, activeStudents, totalAyat, lohAyat, madiAyat, avgLoh, totalHalaqaDays };
@@ -149,7 +167,9 @@ const SCORE_DISTRIBUTION_ORDER = ['ممتاز', 'جيد جداً', 'جيد', 'م
  * performance labels, across ALL evaluations in the given records (a
  * student with 3 scored items contributes 3 counts, not 1). */
 export function computeScoreDistribution(records: SessionRecord[]): ScoreDistributionRow[] {
-  const buckets: Record<string, number> = Object.fromEntries(SCORE_DISTRIBUTION_ORDER.map((l) => [l, 0]));
+  const buckets: Record<string, number> = Object.fromEntries(
+    SCORE_DISTRIBUTION_ORDER.map((l) => [l, 0]),
+  );
   let total = 0;
   records.forEach((r) => {
     [r.loh, r.madi, r.tajweed].forEach((obj) => {
@@ -177,7 +197,11 @@ export interface TopAyatEntry {
 
 /** Top-N students by total ayat memorized in the given (already
  * period-filtered) records — independent of attendance ranking. */
-export function computeTopAyat(students: Student[], records: SessionRecord[], limit = 3): TopAyatEntry[] {
+export function computeTopAyat(
+  students: Student[],
+  records: SessionRecord[],
+  limit = 3,
+): TopAyatEntry[] {
   const per = students
     .map((s) => {
       const recs = recordsForStudent(s, records);
@@ -218,13 +242,24 @@ export function computeStudentStatsRows(
         : Math.round((recs.reduce((a, r) => a + (r.loh?.stars ?? 0), 0) / recs.length) * 20);
       const ayat = recs.reduce((sum, r) => sum + ayatInRecord(r), 0);
       const uniqueDays = new Set(recs.map((r) => r.date)).size;
-      const attendPct = totalHalaqaDays > 0 ? Math.min(100, Math.round((uniqueDays / totalHalaqaDays) * 100)) : 0;
-      return { name: getStudentName(s), sessionsCount: recs.length, uniqueDays, attendPct, avg, ayat };
+      const attendPct =
+        totalHalaqaDays > 0 ? Math.min(100, Math.round((uniqueDays / totalHalaqaDays) * 100)) : 0;
+      return {
+        name: getStudentName(s),
+        sessionsCount: recs.length,
+        uniqueDays,
+        attendPct,
+        avg,
+        ayat,
+      };
     })
     .filter((x): x is StudentStatsRow => x !== null);
 }
 
-export function sortStudentStatsRows(rows: StudentStatsRow[], key: StatsSortKey): StudentStatsRow[] {
+export function sortStudentStatsRows(
+  rows: StudentStatsRow[],
+  key: StatsSortKey,
+): StudentStatsRow[] {
   const sortFns: Record<StatsSortKey, (a: StudentStatsRow, b: StudentStatsRow) => number> = {
     attend: (a, b) => b.attendPct - a.attendPct,
     ayat: (a, b) => b.ayat - a.ayat,

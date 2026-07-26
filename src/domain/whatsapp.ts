@@ -33,11 +33,20 @@ function starsTextFromCount(count: number): string {
  * entirely (see firestore.rules), so that has to happen server-side
  * (Phase 5). If `parentToken` is omitted, the link line is simply left out.
  */
-export function buildWhatsAppMessage(rec: SessionRecord, prevSession: SessionRecord | null, parentToken?: string): string {
+export function buildWhatsAppMessage(
+  rec: SessionRecord,
+  prevSession: SessionRecord | null,
+  parentToken?: string,
+): string {
   const nl = '\n';
   const firstName = (rec.student || '').split(' ')[0] || 'الطالب';
   const dateStr = rec.date
-    ? new Date(rec.date).toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    ? new Date(rec.date).toLocaleDateString('ar-EG', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
     : '';
 
   let msg = 'السلام عليكم ورحمة الله وبركاته 🌿' + nl + nl;
@@ -52,17 +61,45 @@ export function buildWhatsAppMessage(rec: SessionRecord, prevSession: SessionRec
     msg += '📖 *ما تم تسميعه اليوم*' + nl;
     if (todayLoh.length) {
       msg += '• اللوح: ' + joinSuraNames(todayLoh);
-      if (hasScore(rec.loh)) msg += '  ←  ' + rec.loh!.score + '/100 ' + starsTextFromScore(rec.loh!.score!) + ' ' + scoreName(rec.loh!.score);
+      if (hasScore(rec.loh))
+        msg +=
+          '  ←  ' +
+          rec.loh!.score +
+          '/100 ' +
+          starsTextFromScore(rec.loh!.score!) +
+          ' ' +
+          scoreName(rec.loh!.score);
       msg += nl;
     } else if (hasScore(rec.loh)) {
-      msg += '• اللوح: ' + rec.loh!.score + '/100 ' + starsTextFromScore(rec.loh!.score!) + ' ' + scoreName(rec.loh!.score) + nl;
+      msg +=
+        '• اللوح: ' +
+        rec.loh!.score +
+        '/100 ' +
+        starsTextFromScore(rec.loh!.score!) +
+        ' ' +
+        scoreName(rec.loh!.score) +
+        nl;
     }
     if (todayMadi.length) {
       msg += '• الماضي: ' + joinSuraNames(todayMadi);
-      if (hasScore(rec.madi)) msg += '  ←  ' + rec.madi!.score + '/100 ' + starsTextFromScore(rec.madi!.score!) + ' ' + scoreName(rec.madi!.score);
+      if (hasScore(rec.madi))
+        msg +=
+          '  ←  ' +
+          rec.madi!.score +
+          '/100 ' +
+          starsTextFromScore(rec.madi!.score!) +
+          ' ' +
+          scoreName(rec.madi!.score);
       msg += nl;
     } else if (hasScore(rec.madi)) {
-      msg += '• الماضي: ' + rec.madi!.score + '/100 ' + starsTextFromScore(rec.madi!.score!) + ' ' + scoreName(rec.madi!.score) + nl;
+      msg +=
+        '• الماضي: ' +
+        rec.madi!.score +
+        '/100 ' +
+        starsTextFromScore(rec.madi!.score!) +
+        ' ' +
+        scoreName(rec.madi!.score) +
+        nl;
     }
     msg += nl;
   }
@@ -73,7 +110,12 @@ export function buildWhatsAppMessage(rec: SessionRecord, prevSession: SessionRec
     // the hand-built version printed a bare "(–)" to the parent instead.
     msg += '• ' + rec.tajweed.sura + ayahRange(rec.tajweed.from, rec.tajweed.to);
     msg += rec.tajweed.score
-      ? '  ←  ' + rec.tajweed.score + '/100 ' + starsTextFromScore(rec.tajweed.score) + ' ' + scoreName(rec.tajweed.score)
+      ? '  ←  ' +
+        rec.tajweed.score +
+        '/100 ' +
+        starsTextFromScore(rec.tajweed.score) +
+        ' ' +
+        scoreName(rec.tajweed.score)
       : '  ' + starsTextFromCount(rec.tajweed.stars ?? 0);
     msg += nl;
     if (rec.tajweed.note) msg += '• ملاحظة: ' + rec.tajweed.note + nl;

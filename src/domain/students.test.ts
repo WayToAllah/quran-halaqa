@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { displayStudentName, findStudentRecordOnDate, getStudentName, recordsForStudent, studentHasRecordOnDate, studentMatch } from './students';
+import {
+  displayStudentName,
+  findStudentRecordOnDate,
+  getStudentName,
+  recordsForStudent,
+  studentHasRecordOnDate,
+  studentMatch,
+} from './students';
 import type { SessionRecord, Student } from '../types';
 
 const zaid: Student = { id: 's_1', name: 'زيد احمد' };

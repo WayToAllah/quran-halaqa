@@ -71,35 +71,49 @@ beforeEach(async () => {
 describe('students/records — mosque membership required', () => {
   it('denies an unauthenticated client from reading students', async () => {
     const db = testEnv.unauthenticatedContext().firestore();
-    await assertFails(getDoc(doc(db, 'mosques', MOSQUE_ID, 'halaqat', HALAQA_ID, 'students', 's_1')));
+    await assertFails(
+      getDoc(doc(db, 'mosques', MOSQUE_ID, 'halaqat', HALAQA_ID, 'students', 's_1')),
+    );
   });
 
   it('denies an unauthenticated client from writing students', async () => {
     const db = testEnv.unauthenticatedContext().firestore();
     await assertFails(
-      setDoc(doc(db, 'mosques', MOSQUE_ID, 'halaqat', HALAQA_ID, 'students', 's_evil'), { name: 'x' }),
+      setDoc(doc(db, 'mosques', MOSQUE_ID, 'halaqat', HALAQA_ID, 'students', 's_evil'), {
+        name: 'x',
+      }),
     );
   });
 
   it('denies a signed-in user who is NOT a member of this mosque', async () => {
     const db = testEnv.authenticatedContext(OUTSIDER_UID).firestore();
-    await assertFails(getDoc(doc(db, 'mosques', MOSQUE_ID, 'halaqat', HALAQA_ID, 'students', 's_1')));
     await assertFails(
-      setDoc(doc(db, 'mosques', MOSQUE_ID, 'halaqat', HALAQA_ID, 'students', 's_1'), { name: 'مخترق' }),
+      getDoc(doc(db, 'mosques', MOSQUE_ID, 'halaqat', HALAQA_ID, 'students', 's_1')),
+    );
+    await assertFails(
+      setDoc(doc(db, 'mosques', MOSQUE_ID, 'halaqat', HALAQA_ID, 'students', 's_1'), {
+        name: 'مخترق',
+      }),
     );
   });
 
   it('allows a mosque member to read and write students', async () => {
     const db = testEnv.authenticatedContext(ADMIN_UID).firestore();
-    await assertSucceeds(getDoc(doc(db, 'mosques', MOSQUE_ID, 'halaqat', HALAQA_ID, 'students', 's_1')));
     await assertSucceeds(
-      setDoc(doc(db, 'mosques', MOSQUE_ID, 'halaqat', HALAQA_ID, 'students', 's_2'), { name: 'طالب جديد' }),
+      getDoc(doc(db, 'mosques', MOSQUE_ID, 'halaqat', HALAQA_ID, 'students', 's_1')),
+    );
+    await assertSucceeds(
+      setDoc(doc(db, 'mosques', MOSQUE_ID, 'halaqat', HALAQA_ID, 'students', 's_2'), {
+        name: 'طالب جديد',
+      }),
     );
   });
 
   it('allows a mosque member to delete a student', async () => {
     const db = testEnv.authenticatedContext(ADMIN_UID).firestore();
-    await assertSucceeds(deleteDoc(doc(db, 'mosques', MOSQUE_ID, 'halaqat', HALAQA_ID, 'students', 's_1')));
+    await assertSucceeds(
+      deleteDoc(doc(db, 'mosques', MOSQUE_ID, 'halaqat', HALAQA_ID, 'students', 's_1')),
+    );
   });
 });
 
@@ -111,7 +125,9 @@ describe('mosques/{id} and members/{uid} — no client writes ever', () => {
 
   it('denies any client from writing a membership doc (self-granting access)', async () => {
     const db = testEnv.authenticatedContext(OUTSIDER_UID).firestore();
-    await assertFails(setDoc(doc(db, 'mosques', MOSQUE_ID, 'members', OUTSIDER_UID), { role: 'owner' }));
+    await assertFails(
+      setDoc(doc(db, 'mosques', MOSQUE_ID, 'members', OUTSIDER_UID), { role: 'owner' }),
+    );
   });
 });
 
@@ -134,7 +150,9 @@ describe('publicStats/{token} — public get, no list, member-only write (transi
     const dbAnonAuth = testEnv
       .authenticatedContext('anon_visitor_1', { firebase: { sign_in_provider: 'anonymous' } })
       .firestore();
-    await assertFails(setDoc(doc(dbAnonAuth, 'publicStats', TOKEN), { name: 'مزوّر', attendPct: 0 }));
+    await assertFails(
+      setDoc(doc(dbAnonAuth, 'publicStats', TOKEN), { name: 'مزوّر', attendPct: 0 }),
+    );
   });
 
   it('denies a signed-in NON-member (e.g. self-registered email account) from writing publicStats', async () => {
@@ -144,6 +162,8 @@ describe('publicStats/{token} — public get, no list, member-only write (transi
 
   it('allows a mosque MEMBER to write publicStats (transitional — moves to Cloud Function in Phase 5)', async () => {
     const dbAdmin = testEnv.authenticatedContext(ADMIN_UID).firestore();
-    await assertSucceeds(setDoc(doc(dbAdmin, 'publicStats', TOKEN), { name: 'زيد احمد', attendPct: 80 }));
+    await assertSucceeds(
+      setDoc(doc(dbAdmin, 'publicStats', TOKEN), { name: 'زيد احمد', attendPct: 80 }),
+    );
   });
 });

@@ -41,7 +41,9 @@ vi.mock('../../data/publishStats', () => ({
   republishPublicStatsFor: (...args: unknown[]) => republishMock(...args),
 }));
 
-function renderScreen(props: { editRecord?: SessionRecord | null; onEditConsumed?: () => void } = {}) {
+function renderScreen(
+  props: { editRecord?: SessionRecord | null; onEditConsumed?: () => void } = {},
+) {
   return render(
     <ToastProvider>
       <RecordScreen editRecord={props.editRecord ?? null} onEditConsumed={props.onEditConsumed} />
@@ -100,7 +102,9 @@ async function saveAndConfirm(via: 'send' | 'saveOnly' = 'saveOnly') {
 describe('RecordScreen — student picker', () => {
   it('defaults the date to today', () => {
     renderScreen();
-    const dateInput = screen.getByDisplayValue(new Date().toISOString().slice(0, 10)) as HTMLInputElement;
+    const dateInput = screen.getByDisplayValue(
+      new Date().toISOString().slice(0, 10),
+    ) as HTMLInputElement;
     expect(dateInput).toBeInTheDocument();
   });
 
@@ -278,13 +282,20 @@ describe('RecordScreen — save validation', () => {
     await userEvent.click(screen.getByRole('button', { name: /حفظ الجلسة/ }));
     await userEvent.click(screen.getByRole('button', { name: 'حفظ برضه' }));
     // the WhatsApp review modal is now the one open
-    await waitFor(() => expect(screen.getByRole('button', { name: /احفظ بدون إرسال|احفظ الجلسة/ })).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: /احفظ بدون إرسال|احفظ الجلسة/ }),
+      ).toBeInTheDocument(),
+    );
   });
 
   it('saves without confirmation when a note is present (non-empty session)', async () => {
     renderScreen();
     await selectStudent('زيد احمد');
-    await userEvent.type(screen.getByPlaceholderText('أي ملاحظة عن أداء الطالب اليوم…'), 'ملاحظة تجريبية');
+    await userEvent.type(
+      screen.getByPlaceholderText('أي ملاحظة عن أداء الطالب اليوم…'),
+      'ملاحظة تجريبية',
+    );
     await saveAndConfirm();
     await waitFor(() => expect(saveRecordMock).toHaveBeenCalledTimes(1));
   });
@@ -443,7 +454,7 @@ describe('RecordScreen — switching students', () => {
   // (or an incomplete one) — the autofill overwrote the rows otherwise. That is
   // exactly the case where the wrong assignment is hardest to notice: a student
   // with no history to contradict it.
-  it('does not carry the previous student\'s assignment onto a student with no history', async () => {
+  it("does not carry the previous student's assignment onto a student with no history", async () => {
     previousSessionForS1 = {
       id: 'r_prev',
       studentId: 's_1',
@@ -452,7 +463,9 @@ describe('RecordScreen — switching students', () => {
     };
     renderScreen();
     await selectStudent('زيد احمد'); // autofills اللوح from his own last session
-    await waitFor(() => expect(screen.getAllByPlaceholderText('اكتب اسم السورة…')[0]).toHaveValue('البقرة'));
+    await waitFor(() =>
+      expect(screen.getAllByPlaceholderText('اكتب اسم السورة…')[0]).toHaveValue('البقرة'),
+    );
 
     // محمد علي has no previous session, so nothing refills the row for him.
     await switchStudentTo('محمد علي');
@@ -460,13 +473,18 @@ describe('RecordScreen — switching students', () => {
     // Untouched autofill is the app's own suggestion, not the teacher's work —
     // no confirmation should interrupt the switch.
     expect(screen.queryByText('بيانات لسه متحفظتش')).not.toBeInTheDocument();
-    await waitFor(() => expect(screen.getAllByPlaceholderText('اكتب اسم السورة…')[0]).toHaveValue(''));
+    await waitFor(() =>
+      expect(screen.getAllByPlaceholderText('اكتب اسم السورة…')[0]).toHaveValue(''),
+    );
   });
 
   it('warns before discarding work the teacher typed, and keeps it on cancel', async () => {
     renderScreen();
     await selectStudent('زيد احمد');
-    await userEvent.type(screen.getByPlaceholderText('أي ملاحظة عن أداء الطالب اليوم…'), 'ممتاز النهارده');
+    await userEvent.type(
+      screen.getByPlaceholderText('أي ملاحظة عن أداء الطالب اليوم…'),
+      'ممتاز النهارده',
+    );
 
     await switchStudentTo('محمد علي');
     expect(await screen.findByText('بيانات لسه متحفظتش')).toBeInTheDocument();
@@ -475,13 +493,18 @@ describe('RecordScreen — switching students', () => {
 
     // Still زيد, still his note.
     expect(screen.getByPlaceholderText('ابحث أو اختر اسم الطالب…')).toHaveValue('زيد احمد');
-    expect(screen.getByPlaceholderText('أي ملاحظة عن أداء الطالب اليوم…')).toHaveValue('ممتاز النهارده');
+    expect(screen.getByPlaceholderText('أي ملاحظة عن أداء الطالب اليوم…')).toHaveValue(
+      'ممتاز النهارده',
+    );
   });
 
-  it('discards the previous student\'s note once the switch is confirmed', async () => {
+  it("discards the previous student's note once the switch is confirmed", async () => {
     renderScreen();
     await selectStudent('زيد احمد');
-    await userEvent.type(screen.getByPlaceholderText('أي ملاحظة عن أداء الطالب اليوم…'), 'ممتاز النهارده');
+    await userEvent.type(
+      screen.getByPlaceholderText('أي ملاحظة عن أداء الطالب اليوم…'),
+      'ممتاز النهارده',
+    );
 
     await switchStudentTo('محمد علي');
     await userEvent.click(await screen.findByRole('button', { name: 'ابدأ من جديد' }));
@@ -625,7 +648,9 @@ describe('RecordScreen — group attendance tab', () => {
     const dateInputs = document.querySelectorAll('input[type="date"]');
     const dateInput = dateInputs[0] as HTMLInputElement;
     fireEvent.input(dateInput, { target: { value: '2026-07-07' } });
-    await waitFor(() => expect(getRecordsByDateMock.mock.calls.length).toBeGreaterThan(callsBefore));
+    await waitFor(() =>
+      expect(getRecordsByDateMock.mock.calls.length).toBeGreaterThan(callsBefore),
+    );
   });
 
   it('selects/deselects all eligible students via the toggle', async () => {
@@ -682,7 +707,6 @@ describe('RecordScreen — group attendance tab', () => {
   });
 });
 
-
 describe('RecordScreen — evaluation card', () => {
   it('waits visibly while the last session is being read', async () => {
     previousSessionLoading = true;
@@ -709,7 +733,12 @@ describe('RecordScreen — evaluation card', () => {
   });
 
   it('hides the whole card when the last session assigned nothing at all', async () => {
-    previousSessionForS1 = { id: 'r_prev', studentId: 's_1', date: '2026-07-01', attendance_only: true };
+    previousSessionForS1 = {
+      id: 'r_prev',
+      studentId: 's_1',
+      date: '2026-07-01',
+      attendance_only: true,
+    };
     renderScreen();
     await selectStudent('زيد احمد');
     expect(screen.queryByText('📋 ما سمعناه النهارده')).not.toBeInTheDocument();
@@ -732,7 +761,7 @@ describe('RecordScreen — evaluation card', () => {
 });
 
 describe('RecordScreen — duplicate warning', () => {
-  it('refreshes the day\'s coverage after saving so the same student cannot be recorded twice unwarned', async () => {
+  it("refreshes the day's coverage after saving so the same student cannot be recorded twice unwarned", async () => {
     // The day's coverage answers "is he already recorded today?" — empty until
     // the save lands, and holding the new session from then on.
     getRecordsByDateMock.mockImplementation(async () =>

@@ -38,7 +38,10 @@ describe('buildStudentBadges', () => {
   });
 
   it('awards the streak badge at the threshold, not one below', () => {
-    const halaqaDatesDesc = Array.from({ length: ATTENDANCE_STREAK_THRESHOLD }, (_, i) => `2026-07-${(i + 1).toString().padStart(2, '0')}`).reverse();
+    const halaqaDatesDesc = Array.from(
+      { length: ATTENDANCE_STREAK_THRESHOLD },
+      (_, i) => `2026-07-${(i + 1).toString().padStart(2, '0')}`,
+    ).reverse();
     const allRecsFull = halaqaDatesDesc.map((date, i) => ({ id: `r${i}`, date }) as SessionRecord);
     const fullBadges = buildStudentBadges({
       attendPct: 50,

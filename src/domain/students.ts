@@ -26,7 +26,11 @@ export function recordsForStudent(student: Student, allRecords: SessionRecord[])
 /** Whether this student already has ANY record (session or attendance-only)
  * on the given date — used by group attendance to skip already-covered
  * students instead of creating a duplicate entry. */
-export function studentHasRecordOnDate(student: Student, dateStr: string, allRecords: SessionRecord[]): boolean {
+export function studentHasRecordOnDate(
+  student: Student,
+  dateStr: string,
+  allRecords: SessionRecord[],
+): boolean {
   return allRecords.some((r) => studentMatch(r, student) && r.date === dateStr);
 }
 

@@ -106,7 +106,7 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
       dir="rtl"
       style={
         cssVars(theme) +
-        ';min-height:100vh;background:var(--bg);color:var(--text);display:flex;justify-content:center;font-family:Tajawal,system-ui,\'Segoe UI\',Tahoma,sans-serif;transition:background 0.25s ease,color 0.25s ease'
+        ";min-height:100vh;background:var(--bg);color:var(--text);display:flex;justify-content:center;font-family:Tajawal,system-ui,'Segoe UI',Tahoma,sans-serif;transition:background 0.25s ease,color 0.25s ease"
       }
     >
       <div style="width:100%;max-width:440px;min-height:100vh;background:var(--bg)">{children}</div>
@@ -146,7 +146,8 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
   const rankText = rankBadgeText(stats.rank);
 
   // End-of-line value labels, nudged apart when the two points sit close.
-  const close = chart.lohLast && chart.madiLast && Math.abs(chart.lohLast.y - chart.madiLast.y) < 14;
+  const close =
+    chart.lohLast && chart.madiLast && Math.abs(chart.lohLast.y - chart.madiLast.y) < 14;
   const lohLabelY = chart.lohLast ? chart.lohLast.y - (close ? 12 : 10) : 0;
   const madiLabelY = chart.madiLast ? chart.madiLast.y + (close ? 12 : 18) : 0;
   const pctLeft = (x: number) => (x / 320) * 100 + '%';
@@ -327,7 +328,10 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
             )}
           </div>
           <div
-            style={'text-align:center;font-size:13px;font-weight:700;margin-top:8px;color:' + trendColor[trend.tone]}
+            style={
+              'text-align:center;font-size:13px;font-weight:700;margin-top:8px;color:' +
+              trendColor[trend.tone]
+            }
           >
             {trend.text}
           </div>
@@ -371,7 +375,9 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
                 </div>
 
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-                  <span style="font-size:12px;color:var(--text-muted);width:44px;flex-shrink:0">اللوح</span>
+                  <span style="font-size:12px;color:var(--text-muted);width:44px;flex-shrink:0">
+                    اللوح
+                  </span>
                   {s.newLoh && (
                     <span style="font-size:12.5px;color:var(--text);font-weight:500;max-width:108px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0">
                       {s.newLoh}
@@ -379,7 +385,10 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
                   )}
                   <div style="flex:1;height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden">
                     <div
-                      style={'height:100%;border-radius:3px;background:var(--ink);transition:width 0.6s ease;width:' + s.lohPct}
+                      style={
+                        'height:100%;border-radius:3px;background:var(--ink);transition:width 0.6s ease;width:' +
+                        s.lohPct
+                      }
                     ></div>
                   </div>
                   <span style="font-size:12.5px;font-weight:700;color:var(--ink);width:32px;text-align:left">
@@ -388,7 +397,9 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
                 </div>
 
                 <div style="display:flex;align-items:center;gap:10px">
-                  <span style="font-size:12px;color:var(--text-muted);width:44px;flex-shrink:0">الماضي</span>
+                  <span style="font-size:12px;color:var(--text-muted);width:44px;flex-shrink:0">
+                    الماضي
+                  </span>
                   {s.newMadi && (
                     <span style="font-size:12.5px;color:var(--text);font-weight:500;max-width:108px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0">
                       {s.newMadi}
@@ -396,7 +407,10 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
                   )}
                   <div style="flex:1;height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden">
                     <div
-                      style={'height:100%;border-radius:3px;background:var(--accent);transition:width 0.6s ease;width:' + s.madiPct}
+                      style={
+                        'height:100%;border-radius:3px;background:var(--accent);transition:width 0.6s ease;width:' +
+                        s.madiPct
+                      }
                     ></div>
                   </div>
                   <span style="font-size:12.5px;font-weight:700;color:var(--accent);width:32px;text-align:left">

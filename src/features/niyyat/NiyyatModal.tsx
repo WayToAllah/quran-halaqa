@@ -51,7 +51,10 @@ export function NiyyatModal({ niyyat, onSave, onClose }: Props) {
   const cleanedCount = cleanNiyyat(rows).length;
 
   return (
-    <div class="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center" onClick={onClose}>
+    <div
+      class="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center"
+      onClick={onClose}
+    >
       <div
         class="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
@@ -59,9 +62,7 @@ export function NiyyatModal({ niyyat, onSave, onClose }: Props) {
         <div class="flex items-center justify-between px-5 pt-5 pb-3 border-b border-hairline sticky top-0 bg-white">
           <div>
             <div class="text-base font-extrabold text-ink-dark">النوايا</div>
-            <div class="text-[11px] text-taupe mt-0.5">
-              بتظهر بالتناوب فوق. كل سطر نية.
-            </div>
+            <div class="text-[11px] text-taupe mt-0.5">بتظهر بالتناوب فوق. كل سطر نية.</div>
           </div>
           <button class="text-taupe text-lg" onClick={onClose} aria-label="إغلاق">
             ✕
@@ -85,7 +86,15 @@ export function NiyyatModal({ niyyat, onSave, onClose }: Props) {
                 onClick={() => removeRow(i)}
                 aria-label="حذف النية"
               >
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#B24A3A" stroke-width="1.8" stroke-linecap="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="15"
+                  height="15"
+                  fill="none"
+                  stroke="#B24A3A"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                >
                   <path d="M5 6.5h14M9.5 6.5V4.8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1.7M7 6.5l.8 12.7a1.5 1.5 0 0 0 1.5 1.4h5.4a1.5 1.5 0 0 0 1.5-1.4l.8-12.7" />
                 </svg>
               </button>

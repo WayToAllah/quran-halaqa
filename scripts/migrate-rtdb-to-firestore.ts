@@ -134,7 +134,9 @@ async function main() {
   const recordIds = Object.keys(records);
   const tokenIds = Object.keys(publicStats);
 
-  console.log(`Found: ${studentIds.length} students, ${recordIds.length} records, ${tokenIds.length} publicStats entries`);
+  console.log(
+    `Found: ${studentIds.length} students, ${recordIds.length} records, ${tokenIds.length} publicStats entries`,
+  );
   console.log(`Target: mosques/${args.mosqueId}/halaqat/${args.halaqaId}`);
   console.log(`Admin UID for membership: ${args.adminUid}`);
 
@@ -147,13 +149,22 @@ async function main() {
       '{ name: "الحلقة الرئيسية", excludedDates: ["2026-06-04"], attendanceBadgeThreshold: 70 }',
     );
     if (studentIds[0]) {
-      console.log(`  .../students/${studentIds[0]}`, JSON.stringify(students[studentIds[0]]).slice(0, 150));
+      console.log(
+        `  .../students/${studentIds[0]}`,
+        JSON.stringify(students[studentIds[0]]).slice(0, 150),
+      );
     }
     if (recordIds[0]) {
-      console.log(`  .../records/${recordIds[0]}`, JSON.stringify(records[recordIds[0]]).slice(0, 150));
+      console.log(
+        `  .../records/${recordIds[0]}`,
+        JSON.stringify(records[recordIds[0]]).slice(0, 150),
+      );
     }
     if (tokenIds[0]) {
-      console.log(`  publicStats/${tokenIds[0]}`, JSON.stringify(publicStats[tokenIds[0]]).slice(0, 150));
+      console.log(
+        `  publicStats/${tokenIds[0]}`,
+        JSON.stringify(publicStats[tokenIds[0]]).slice(0, 150),
+      );
     }
 
     // Reconciliation (read-only): when reading live data (Firebase already
@@ -220,8 +231,12 @@ async function main() {
   const halaqaRef = db.doc(`mosques/${args.mosqueId}/halaqat/${args.halaqaId}`);
 
   console.log('\nWriting mosque + membership + halaqa metadata...');
-  await db.doc(`mosques/${args.mosqueId}`).set({ name: 'مسجد التيسير', createdAt: Date.now() }, { merge: true });
-  await db.doc(`mosques/${args.mosqueId}/members/${args.adminUid}`).set({ role: 'owner' }, { merge: true });
+  await db
+    .doc(`mosques/${args.mosqueId}`)
+    .set({ name: 'مسجد التيسير', createdAt: Date.now() }, { merge: true });
+  await db
+    .doc(`mosques/${args.mosqueId}/members/${args.adminUid}`)
+    .set({ role: 'owner' }, { merge: true });
   await halaqaRef.set(
     { name: 'الحلقة الرئيسية', excludedDates: ['2026-06-04'], attendanceBadgeThreshold: 70 },
     { merge: true },
@@ -326,11 +341,15 @@ async function main() {
     // A prune preview (no --confirm) intentionally leaves extras in place, so a
     // count mismatch there is expected — not a failure.
     if (args.prune && !args.confirm) {
-      console.log('\n(Count mismatch is expected in --prune preview mode — extras not yet deleted.)');
+      console.log(
+        '\n(Count mismatch is expected in --prune preview mode — extras not yet deleted.)',
+      );
       console.log('Re-run with --prune --confirm to delete them and reach an exact match.');
       return;
     }
-    console.error('\n⚠️  MISMATCH — do not switch the app over to Firestore until this is resolved.');
+    console.error(
+      '\n⚠️  MISMATCH — do not switch the app over to Firestore until this is resolved.',
+    );
     process.exit(1);
   }
   console.log('\n✅ Migration complete and verified.');

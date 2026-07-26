@@ -19,11 +19,15 @@ import type { Student } from '../types';
  * storage or add caching later without touching feature code.
  */
 function studentsCollection(mosqueId: string, halaqaId: string) {
-  return collection(db, 'mosques', mosqueId, 'halaqat', halaqaId, 'students').withConverter(studentConverter);
+  return collection(db, 'mosques', mosqueId, 'halaqat', halaqaId, 'students').withConverter(
+    studentConverter,
+  );
 }
 
 export function studentDocRef(mosqueId: string, halaqaId: string, studentId: string) {
-  return doc(db, 'mosques', mosqueId, 'halaqat', halaqaId, 'students', studentId).withConverter(studentConverter);
+  return doc(db, 'mosques', mosqueId, 'halaqat', halaqaId, 'students', studentId).withConverter(
+    studentConverter,
+  );
 }
 
 /** Live-subscribes to the full student list for a halaqa (typically ≤50 rows —
@@ -63,6 +67,10 @@ export function updateStudent(
   return updateDoc(studentDocRef(mosqueId, halaqaId, studentId), patch);
 }
 
-export function deleteStudent(mosqueId: string, halaqaId: string, studentId: string): Promise<void> {
+export function deleteStudent(
+  mosqueId: string,
+  halaqaId: string,
+  studentId: string,
+): Promise<void> {
   return deleteDoc(studentDocRef(mosqueId, halaqaId, studentId));
 }

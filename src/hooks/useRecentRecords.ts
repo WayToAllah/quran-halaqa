@@ -32,7 +32,12 @@ export function useRecentRecords(mosqueId: string, halaqaId: string) {
     if (!lastDocRef.current || loadingMore) return;
     setLoadingMore(true);
     try {
-      const { records: more, lastDoc } = await loadMoreRecords(mosqueId, halaqaId, PAGE_SIZE, lastDocRef.current);
+      const { records: more, lastDoc } = await loadMoreRecords(
+        mosqueId,
+        halaqaId,
+        PAGE_SIZE,
+        lastDocRef.current,
+      );
       setRecords((prev) => [...prev, ...more]);
       lastDocRef.current = lastDoc;
       if (more.length < PAGE_SIZE) setHasMore(false);

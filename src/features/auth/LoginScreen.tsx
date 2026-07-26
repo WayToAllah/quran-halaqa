@@ -64,10 +64,7 @@ export function LoginScreen({ auth }: Props) {
         <p class="text-sm text-taupe">{statusText}</p>
 
         {auth.status === 'denied' && (
-          <button
-            class="text-xs text-taupe underline"
-            onClick={() => auth.signOutUser()}
-          >
+          <button class="text-xs text-taupe underline" onClick={() => auth.signOutUser()}>
             تسجيل خروج وتجربة حساب آخر
           </button>
         )}
@@ -111,7 +108,11 @@ export function LoginScreen({ auth }: Props) {
             >
               {submitting ? 'جاري الدخول…' : 'دخول'}
             </button>
-            <button type="button" class="text-xs text-taupe underline block mx-auto" onClick={handleReset}>
+            <button
+              type="button"
+              class="text-xs text-taupe underline block mx-auto"
+              onClick={handleReset}
+            >
               نسيت كلمة السر؟
             </button>
           </form>

@@ -27,11 +27,11 @@ function formatDate(dateStr: string): string {
 /** Tier badge colors ported from the mockup, keyed by the real scoreName()
  * bands (85/75/65/50) — same lookup used on the Record screen. */
 const TIER_COLORS: Record<string, { bg: string; color: string }> = {
-  'ممتاز': { bg: '#E7F2EC', color: '#0F3D2E' },
+  ممتاز: { bg: '#E7F2EC', color: '#0F3D2E' },
   'جيد جداً': { bg: '#EFF6E8', color: '#3E6B22' },
-  'جيد': { bg: '#FFF8E6', color: '#8A6A15' },
-  'مقبول': { bg: '#FBEEE3', color: '#9A5A24' },
-  'إعادة': { bg: '#FBEAE7', color: '#B24A3A' },
+  جيد: { bg: '#FFF8E6', color: '#8A6A15' },
+  مقبول: { bg: '#FBEEE3', color: '#9A5A24' },
+  إعادة: { bg: '#FBEAE7', color: '#B24A3A' },
 };
 
 function ScoreBar({ label, score, barColor }: { label: string; score: number; barColor: string }) {
@@ -41,7 +41,10 @@ function ScoreBar({ label, score, barColor }: { label: string; score: number; ba
     <div>
       <div class="flex items-center justify-between mb-1.5">
         <span class="text-[11.5px] text-taupe font-semibold">{label}</span>
-        <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full" style={{ background: tc.bg, color: tc.color }}>
+        <span
+          class="text-[11px] font-bold px-2.5 py-0.5 rounded-full"
+          style={{ background: tc.bg, color: tc.color }}
+        >
           {tier}
         </span>
       </div>
@@ -49,7 +52,10 @@ function ScoreBar({ label, score, barColor }: { label: string; score: number; ba
         <div class="flex-1 h-1.5 rounded-full bg-[#F1ECDD] overflow-hidden">
           <div class="h-full rounded-full" style={{ width: score + '%', background: barColor }} />
         </div>
-        <span class="text-[12.5px] font-extrabold shrink-0 w-9 text-left" style={{ color: barColor }}>
+        <span
+          class="text-[12.5px] font-extrabold shrink-0 w-9 text-left"
+          style={{ color: barColor }}
+        >
           {toArabicDigits(score)}
         </span>
       </div>
@@ -93,7 +99,16 @@ function LogEntry({
               aria-label="تعديل"
               onClick={onEdit}
             >
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#5B5646" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="#5B5646"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <path d="M14.5 4.5l5 5L8 21H3v-5z" />
               </svg>
             </button>
@@ -103,7 +118,15 @@ function LogEntry({
             aria-label="حذف"
             onClick={onDelete}
           >
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#B24A3A" stroke-width="1.8" stroke-linecap="round">
+            <svg
+              viewBox="0 0 24 24"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="#B24A3A"
+              stroke-width="1.8"
+              stroke-linecap="round"
+            >
               <path d="M5 6.5h14M9.5 6.5V4.8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1.7M7 6.5l.8 12.7a1.5 1.5 0 0 0 1.5 1.4h5.4a1.5 1.5 0 0 0 1.5-1.4l.8-12.7" />
             </svg>
           </button>
@@ -114,11 +137,19 @@ function LogEntry({
         <div class="text-xs text-taupe">✅ حضور فقط</div>
       ) : (
         <>
-          {hasScore(r.loh) && <ScoreBar label="تقييم اللوح" score={r.loh!.score!} barColor="#0F3D2E" />}
-          {lohArr.length > 0 && <div class="text-[12px] text-[#5B5646]">📝 لوح جديد: {joinSuraNames(lohArr)}</div>}
+          {hasScore(r.loh) && (
+            <ScoreBar label="تقييم اللوح" score={r.loh!.score!} barColor="#0F3D2E" />
+          )}
+          {lohArr.length > 0 && (
+            <div class="text-[12px] text-[#5B5646]">📝 لوح جديد: {joinSuraNames(lohArr)}</div>
+          )}
 
-          {hasScore(r.madi) && <ScoreBar label="تقييم الماضي" score={r.madi!.score!} barColor="#C9A227" />}
-          {madiArr.length > 0 && <div class="text-[12px] text-[#5B5646]">🔄 ماضي جديد: {joinSuraNames(madiArr)}</div>}
+          {hasScore(r.madi) && (
+            <ScoreBar label="تقييم الماضي" score={r.madi!.score!} barColor="#C9A227" />
+          )}
+          {madiArr.length > 0 && (
+            <div class="text-[12px] text-[#5B5646]">🔄 ماضي جديد: {joinSuraNames(madiArr)}</div>
+          )}
 
           {r.tajweed?.sura && (
             <div class="text-[12px] text-[#5B5646] flex items-center gap-1.5 flex-wrap">
@@ -132,7 +163,9 @@ function LogEntry({
           )}
 
           {r.note && (
-            <div class="text-[12.5px] text-taupe italic pt-2.5 border-t border-dashed border-hairline">💬 {r.note}</div>
+            <div class="text-[12.5px] text-taupe italic pt-2.5 border-t border-dashed border-hairline">
+              💬 {r.note}
+            </div>
           )}
         </>
       )}
@@ -146,7 +179,10 @@ interface LogScreenProps {
 }
 
 export function LogScreen({ onEditRecord }: LogScreenProps = {}) {
-  const { records, loaded, loadMore, loadingMore, hasMore } = useRecentRecords(MOSQUE_ID, HALAQA_ID);
+  const { records, loaded, loadMore, loadingMore, hasMore } = useRecentRecords(
+    MOSQUE_ID,
+    HALAQA_ID,
+  );
   const { students } = useStudents(MOSQUE_ID, HALAQA_ID);
   const { pendingIds, requestDelete } = useUndoableDelete();
   const { showToast } = useToast();
@@ -165,7 +201,9 @@ export function LogScreen({ onEditRecord }: LogScreenProps = {}) {
   // Skeleton shows for the initial paginated load, or while a search resolves.
   const showSkeleton = isSearching ? search.searching : !loaded;
   // "No results" only after the relevant load has actually finished.
-  const showEmpty = isSearching ? search.resolved && visibleRecords.length === 0 : loaded && visibleRecords.length === 0;
+  const showEmpty = isSearching
+    ? search.resolved && visibleRecords.length === 0
+    : loaded && visibleRecords.length === 0;
 
   function handleDelete(r: SessionRecord) {
     const name = displayStudentName(r, students);

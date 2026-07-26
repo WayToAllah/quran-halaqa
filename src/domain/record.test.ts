@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { findPreviousSession, extractAssignedSuras, validateAyahRange, isRowComplete, cleanAssignmentRow, cleanTajweed, rowsSignature } from './record';
+import {
+  findPreviousSession,
+  extractAssignedSuras,
+  validateAyahRange,
+  isRowComplete,
+  cleanAssignmentRow,
+  cleanTajweed,
+  rowsSignature,
+} from './record';
 import type { SessionRecord, Student } from '../types';
 
 const zaid: Student = { id: 's_1', name: 'زيد احمد' };
@@ -18,7 +26,9 @@ describe('findPreviousSession', () => {
   });
 
   it('excludes attendance-only records entirely', () => {
-    const onlyAttendance: SessionRecord[] = [{ id: 'a1', studentId: 's_1', date: '2026-07-01', attendance_only: true }];
+    const onlyAttendance: SessionRecord[] = [
+      { id: 'a1', studentId: 's_1', date: '2026-07-01', attendance_only: true },
+    ];
     expect(findPreviousSession(zaid, onlyAttendance)).toBeNull();
   });
 
@@ -40,7 +50,9 @@ describe('findPreviousSession', () => {
 
 describe('extractAssignedSuras', () => {
   it('prefers the modern array field when present', () => {
-    const result = extractAssignedSuras([{ sura: 'البقرة', from: '1', to: '10' }], { sura: 'legacy' });
+    const result = extractAssignedSuras([{ sura: 'البقرة', from: '1', to: '10' }], {
+      sura: 'legacy',
+    });
     expect(result).toEqual([{ sura: 'البقرة', from: '1', to: '10' }]);
   });
 
@@ -184,7 +196,9 @@ describe('rowsSignature', () => {
     const base = rowsSignature([{ sura: 'البقرة', from: '1', to: '10' }]);
     expect(rowsSignature([{ sura: 'البقرة', from: '1', to: '11' }])).not.toBe(base);
     expect(rowsSignature([{ sura: 'آل عمران', from: '1', to: '10' }])).not.toBe(base);
-    expect(rowsSignature([{ sura: 'البقرة', from: '1', to: '10' }, { sura: 'النساء' }])).not.toBe(base);
+    expect(rowsSignature([{ sura: 'البقرة', from: '1', to: '10' }, { sura: 'النساء' }])).not.toBe(
+      base,
+    );
   });
 
   it('distinguishes a whole-sura range from an ordinary row on the same sura', () => {

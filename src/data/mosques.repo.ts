@@ -23,11 +23,15 @@ export async function getMosque(mosqueId: string): Promise<Mosque | null> {
 }
 
 export async function getHalaqa(mosqueId: string, halaqaId: string): Promise<Halaqa | null> {
-  const snap = await getDoc(doc(db, 'mosques', mosqueId, 'halaqat', halaqaId).withConverter(halaqaConverter));
+  const snap = await getDoc(
+    doc(db, 'mosques', mosqueId, 'halaqat', halaqaId).withConverter(halaqaConverter),
+  );
   return snap.exists() ? snap.data() : null;
 }
 
 export async function listHalaqat(mosqueId: string): Promise<Halaqa[]> {
-  const snap = await getDocs(collection(db, 'mosques', mosqueId, 'halaqat').withConverter(halaqaConverter));
+  const snap = await getDocs(
+    collection(db, 'mosques', mosqueId, 'halaqat').withConverter(halaqaConverter),
+  );
   return snap.docs.map((d) => d.data());
 }

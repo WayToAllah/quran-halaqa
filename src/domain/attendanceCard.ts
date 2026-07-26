@@ -58,7 +58,12 @@ const RANK_STYLES: Record<number, RankStyle> = {
   3: { kind: 'silver', bg: '#dadee3', border: '#b2b8bf', color: '#9AA0A6', medalEmoji: '🥈' },
   4: { kind: 'bronze', bg: '#e8d0bb', border: '#c08a55', color: '#A8672E', medalEmoji: '🥉' },
 };
-const FALLBACK_STYLE: RankStyle = { kind: 'number', bg: '#f2e5db', border: '#d7b79e', color: '#B8722E' };
+const FALLBACK_STYLE: RankStyle = {
+  kind: 'number',
+  bg: '#f2e5db',
+  border: '#d7b79e',
+  color: '#B8722E',
+};
 
 function rankStyle(rank: number): RankStyle {
   return RANK_STYLES[rank] ?? FALLBACK_STYLE;
