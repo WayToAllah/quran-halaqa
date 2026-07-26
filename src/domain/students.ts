@@ -60,3 +60,13 @@ export function displayStudentName(
   }
   return rec.student || '—';
 }
+
+/**
+ * The roster in the order a person reads it. Firestore returns documents in
+ * document-id order, and the ids are opaque (and of two different vintages),
+ * so the screen was effectively showing ~50 students shuffled. Uses Arabic
+ * collation so أ/ا/إ and the rest land where a reader expects them.
+ */
+export function sortStudentsByName(students: Student[]): Student[] {
+  return [...students].sort((a, b) => getStudentName(a).localeCompare(getStudentName(b), 'ar'));
+}

@@ -6,6 +6,7 @@ import {
   recordsForStudent,
   studentHasRecordOnDate,
   studentMatch,
+  sortStudentsByName,
 } from './students';
 import type { SessionRecord, Student } from '../types';
 
@@ -101,5 +102,29 @@ describe('getStudentName', () => {
   });
   it('accepts a Student object', () => {
     expect(getStudentName(zaid)).toBe('زيد احمد');
+  });
+});
+
+describe('sortStudentsByName', () => {
+  it('orders by Arabic collation, not by arrival order', () => {
+    const list = [
+      { id: 's_1', name: 'ياسين محمود' },
+      { id: 's_2', name: 'ابراهيم سمير' },
+      { id: 's_3', name: 'خالد ماهر' },
+    ];
+    expect(sortStudentsByName(list).map((s) => s.name)).toEqual([
+      'ابراهيم سمير',
+      'خالد ماهر',
+      'ياسين محمود',
+    ]);
+  });
+
+  it('does not mutate the input', () => {
+    const list = [
+      { id: 's_1', name: 'ياسين' },
+      { id: 's_2', name: 'ابراهيم' },
+    ];
+    sortStudentsByName(list);
+    expect(list.map((s) => s.name)).toEqual(['ياسين', 'ابراهيم']);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { esc, normAr, toArabicOrdinal } from './text';
+import { esc, normAr, toArabicOrdinal, toWesternDigits } from './text';
 
 describe('esc', () => {
   it('escapes all five HTML-significant characters', () => {
@@ -61,5 +61,17 @@ describe('toArabicOrdinal', () => {
     expect(toArabicOrdinal(0)).toBe('٠');
     expect(toArabicOrdinal(100)).toBe('١٠٠');
     expect(toArabicOrdinal(-1)).toBe('-١');
+  });
+});
+
+describe('toWesternDigits', () => {
+  it('converts Arabic-Indic and Persian digits to ASCII', () => {
+    expect(toWesternDigits('٠١٢٣٤٥٦٧٨٩')).toBe('0123456789');
+    expect(toWesternDigits('۰۱۲۳۴۵۶۷۸۹')).toBe('0123456789');
+  });
+
+  it('leaves ASCII digits and surrounding text alone', () => {
+    expect(toWesternDigits('01012345678')).toBe('01012345678');
+    expect(toWesternDigits('رقم ٠١٠ هنا')).toBe('رقم 010 هنا');
   });
 });

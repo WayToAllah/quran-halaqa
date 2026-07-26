@@ -173,10 +173,16 @@ describe('StudentsScreen — edit student', () => {
 });
 
 describe('StudentsScreen — delete with undo', () => {
+  /** Row delete button + the in-app confirmation that now stands in front of it. */
+  async function deleteStudent(name: string) {
+    const row = screen.getByText(name).closest('.rounded-2xl') as HTMLElement;
+    await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));
+    await userEvent.click(screen.getByRole('button', { name: 'احذف الطالب' }));
+  }
+
   it('hides the student immediately and shows an undo toast', async () => {
     renderScreen();
-    const row = screen.getByText('محمد علي').closest('.rounded-2xl') as HTMLElement;
-    await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));
+    await deleteStudent('محمد علي');
 
     expect(screen.queryByText('محمد علي')).not.toBeInTheDocument();
     expect(screen.getByText(/تم حذف محمد علي/)).toBeInTheDocument();
@@ -185,23 +191,33 @@ describe('StudentsScreen — delete with undo', () => {
 
   it('restores the student if "تراجع" is clicked before the timer fires', async () => {
     renderScreen();
-    const row = screen.getByText('محمد علي').closest('.rounded-2xl') as HTMLElement;
-    await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));
+    await deleteStudent('محمد علي');
     await userEvent.click(screen.getByText('تراجع'));
 
     expect(screen.getByText('محمد علي')).toBeInTheDocument();
     expect(deleteStudentMock).not.toHaveBeenCalled();
   });
 
-  it('does not ask for confirmation twice, and respects a cancelled confirm()', async () => {
-    vi.stubGlobal(
-      'confirm',
-      vi.fn(() => false),
-    );
+  // The browser's confirm() is unstyled, blocks the page and reads as a system
+  // error on a phone — every other destructive action here uses the app's own.
+  it("asks in the app's own dialog, naming the sessions that will be orphaned", async () => {
     renderScreen();
     const row = screen.getByText('زيد احمد').closest('.rounded-2xl') as HTMLElement;
     await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));
-    expect(screen.getByText('زيد احمد')).toBeInTheDocument(); // still there — confirm() was declined
+
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    expect(screen.getByText('حذف زيد احمد؟')).toBeInTheDocument();
+    expect(screen.getByText(/له 2 جلسة مسجلة/)).toBeInTheDocument();
+  });
+
+  it('keeps the student when the confirmation is declined', async () => {
+    renderScreen();
+    const row = screen.getByText('زيد احمد').closest('.rounded-2xl') as HTMLElement;
+    await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));
+    await userEvent.click(screen.getByRole('button', { name: 'إلغاء' }));
+
+    expect(screen.getByText('زيد احمد')).toBeInTheDocument();
+    expect(deleteStudentMock).not.toHaveBeenCalled();
   });
 });
 
@@ -333,5 +349,22 @@ describe('StudentModal — discarding unsaved work', () => {
     await userEvent.type(screen.getByPlaceholderText('اسم المدرسة'), 'مدرسة جديدة');
     await userEvent.click(screen.getByRole('button', { name: 'إلغاء' }));
     expect(screen.getByText('بيانات لسه متحفظتش')).toBeInTheDocument();
+  });
+});
+
+describe('StudentsScreen — ordering', () => {
+  // Firestore hands documents back in document-id order and the ids are
+  // opaque, so the roster used to arrive shuffled.
+  it('lists students alphabetically regardless of the order they arrive in', () => {
+    studentsForHook = [
+      { id: 's_9', name: 'ياسين محمود' },
+      { id: 's_8', name: 'ابراهيم سمير' },
+      { id: 's_7', name: 'خالد ماهر' },
+    ];
+    renderScreen();
+    const names = screen
+      .getAllByText(/^(ياسين محمود|ابراهيم سمير|خالد ماهر)$/)
+      .map((el) => el.textContent);
+    expect(names).toEqual(['ابراهيم سمير', 'خالد ماهر', 'ياسين محمود']);
   });
 });

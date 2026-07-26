@@ -42,6 +42,21 @@ export function toArabicDigits(input: string | number): string {
   return String(input).replace(/[0-9]/g, (d) => AR_DIGITS[Number(d)]);
 }
 
+/**
+ * Convert Arabic-Indic (٠-٩) and Extended/Persian (۰-۹) digits to ASCII.
+ *
+ * Anything that has to be read as a NUMBER rather than shown to a reader needs
+ * this first: a phone number typed on an Arabic keyboard is stored in Arabic
+ * numerals, and code that strips "anything that isn't [0-9]" quietly deletes
+ * the whole thing.
+ */
+export function toWesternDigits(input: string | number): string {
+  return String(input).replace(/[\u0660-\u0669\u06F0-\u06F9]/g, (d) => {
+    const code = d.charCodeAt(0);
+    return String(code >= 0x06f0 ? code - 0x06f0 : code - 0x0660);
+  });
+}
+
 /** Group thousands with the Arabic separator and render Arabic-Indic digits. */
 export function formatArabicNumber(n: number): string {
   const grouped = Math.round(n)

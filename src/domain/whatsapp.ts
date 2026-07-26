@@ -3,6 +3,7 @@ import { CHILD_STATS_BASE_URL } from '../config';
 import { hasScore, scoreName, scoreToHalfStars } from './scoring';
 import { extractAssignedSuras } from './record';
 import { joinSuraNames, ayahRange } from './suras';
+import { toWesternDigits } from './text';
 
 /**
  * Plain-text star string (not JSX) for a 0-100 SCORE — WhatsApp fonts render
@@ -145,7 +146,10 @@ export function buildWhatsAppMessage(
 /** Normalizes an Egyptian mobile number into wa.me's expected international
  * format (leading 0 -> 2, country code prefix), or '' if unusable. */
 export function normalizeWhatsAppPhone(raw: string | undefined): string {
-  let phone = (raw || '').replace(/[^0-9]/g, '');
+  // Arabic-Indic digits FIRST: stripping non-[0-9] before converting them
+  // erased a number typed on an Arabic keyboard down to an empty string, and
+  // the send button then did nothing without saying why.
+  let phone = toWesternDigits(raw || '').replace(/[^0-9]/g, '');
   if (!phone) return '';
   if (phone.startsWith('0')) phone = '2' + phone;
   return phone;

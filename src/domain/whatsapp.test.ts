@@ -155,3 +155,17 @@ describe('buildWhatsAppMessage — tajweed without ayah numbers', () => {
     expect(msg).not.toContain('(');
   });
 });
+
+describe('normalizeWhatsAppPhone', () => {
+  it('accepts a number typed in Arabic-Indic digits', () => {
+    // Stripping non-[0-9] before converting used to erase the whole number,
+    // and the send button then silently did nothing.
+    expect(normalizeWhatsAppPhone('٠١٠١٢٣٤٥٦٧٨')).toBe('201012345678');
+  });
+
+  it('still handles ASCII input and separators', () => {
+    expect(normalizeWhatsAppPhone('010 1234 5678')).toBe('201012345678');
+    expect(normalizeWhatsAppPhone('')).toBe('');
+    expect(normalizeWhatsAppPhone(undefined)).toBe('');
+  });
+});

@@ -4,7 +4,7 @@ import { useAllRecords } from '../../hooks/useAllRecords';
 import { useUndoableDelete } from '../../hooks/useUndoableDelete';
 import { deleteStudent as deleteStudentDoc, updateStudent } from '../../data/students.repo';
 import { normAr, esc, toArabicDigits } from '../../domain/text';
-import { getStudentName, recordsForStudent } from '../../domain/students';
+import { getStudentName, recordsForStudent, sortStudentsByName } from '../../domain/students';
 import {
   getAttendanceRanking,
   ATTENDANCE_BADGE_THRESHOLD,
@@ -14,6 +14,7 @@ import { genParentToken } from '../../domain/ids';
 import { useToast } from '../../ui/ToastProvider';
 import { MOSQUE_ID, HALAQA_ID } from '../../config';
 import { StudentModal } from './StudentModal';
+import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { FloatingAddButton } from '../../ui/FloatingAddButton';
 import type { Student } from '../../types';
 
@@ -42,6 +43,7 @@ export function StudentsScreen() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const { pendingIds: pendingDeleteIds, requestDelete } = useUndoableDelete();
+  const [pendingDeleteStudent, setPendingDeleteStudent] = useState<Student | null>(null);
 
   const topRanks = useMemo(() => {
     const map: Record<string, number> = {};
@@ -58,7 +60,7 @@ export function StudentsScreen() {
       const nq = normAr(q);
       list = list.filter((s) => normAr(getStudentName(s)).includes(nq));
     }
-    return list;
+    return sortStudentsByName(list);
   }, [students, pendingDeleteIds, query]);
 
   function openAddModal() {
@@ -91,12 +93,17 @@ export function StudentsScreen() {
     }
   }
 
+  /** Confirmation is the app's own dialog, not the browser's: `confirm()` is
+   * unstyled, blocks the whole page and reads as a system error on a phone —
+   * the same reason ConfirmDialog exists for every other destructive action. */
   function handleDelete(s: Student) {
-    const linkedCount = recordsForStudent(s, records).length;
-    const warning = linkedCount
-      ? `حذف \"${getStudentName(s)}\"؟\n\nله ${linkedCount} جلسة مسجلة — هتفضل موجودة في السجل والإحصائيات باسمه الحالي لكن بدون إمكانية ربطها بملفه بعد الحذف.`
-      : `حذف \"${getStudentName(s)}\"؟`;
-    if (!confirm(warning)) return;
+    setPendingDeleteStudent(s);
+  }
+
+  function confirmDelete() {
+    const s = pendingDeleteStudent;
+    if (!s) return;
+    setPendingDeleteStudent(null);
     requestDelete(s.id, `🗑 تم حذف ${getStudentName(s)}`, (id) =>
       deleteStudentDoc(MOSQUE_ID, HALAQA_ID, id),
     );
@@ -219,6 +226,22 @@ export function StudentsScreen() {
       </div>
 
       <FloatingAddButton label="إضافة طالب جديد" onClick={openAddModal} />
+
+      {pendingDeleteStudent && (
+        <ConfirmDialog
+          title={`حذف ${getStudentName(pendingDeleteStudent)}؟`}
+          message={
+            recordsForStudent(pendingDeleteStudent, records).length
+              ? `له ${recordsForStudent(pendingDeleteStudent, records).length} جلسة مسجلة. الجلسات هتفضل في السجل والإحصائيات باسمه الحالي، لكن مش هتقدر تربطها بملفه تاني بعد الحذف.`
+              : 'مفيش جلسات مسجلة له.'
+          }
+          confirmLabel="احذف الطالب"
+          cancelLabel="إلغاء"
+          destructive
+          onConfirm={confirmDelete}
+          onCancel={() => setPendingDeleteStudent(null)}
+        />
+      )}
 
       {modalOpen && (
         <StudentModal
