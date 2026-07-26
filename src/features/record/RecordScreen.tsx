@@ -7,7 +7,14 @@ import { normAr } from '../../domain/text';
 import { getStudentName, findStudentRecordOnDate } from '../../domain/students';
 import { localDateStr, genId, hijriLong, hijriShort, gregorianLong } from '../../domain';
 import { scoreToStars, scoreName, parseScoreField, isScoreEntryComplete, type ScoreFieldState } from '../../domain/scoring';
-import { extractAssignedSuras, validateAyahRange, isRowComplete, cleanAssignmentRow, cleanTajweed } from '../../domain/record';
+import {
+  extractAssignedSuras,
+  validateAyahRange,
+  isRowComplete,
+  cleanAssignmentRow,
+  cleanTajweed,
+  rowsSignature,
+} from '../../domain/record';
 import { computeNextLoh, computeNextMadi } from '../../domain/nextTask';
 import { suraLabel } from '../../domain/suras';
 import { buildWhatsAppMessage, normalizeWhatsAppPhone } from '../../domain/whatsapp';
@@ -137,9 +144,22 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     confirmLabel: string;
     destructive?: boolean;
     onConfirm: () => void;
+    /** Defaults to just dismissing. Set when cancelling has to undo something
+     * the dialog's trigger already changed (e.g. restore the student picker). */
+    onCancel?: () => void;
   } | null>(null);
   // Guards the edit-prefill effect so it fires once per distinct record id.
   const consumedEditIdRef = useRef<string | null>(null);
+  // Who the fields on screen currently describe. Not the same as
+  // `selectedStudent`, which the picker nulls the moment the teacher starts
+  // typing a new name — by the time an option is clicked it is already gone.
+  const formOwnerRef = useRef<Student | null>(null);
+  // Signature of the rows as the APP last wrote them (blank, autofilled, or
+  // loaded for edit). Anything differing from this is the teacher's own work.
+  const pristineRowsRef = useRef<{ loh: string; madi: string }>({
+    loh: rowsSignature([emptyRow()]),
+    madi: rowsSignature([emptyRow()]),
+  });
 
   const studentMatches = useMemo(() => {
     const q = studentQuery.trim();
@@ -177,29 +197,20 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   const lohTier = tierBadge(lohScoreState);
   const madiTier = tierBadge(madiScoreState);
 
-  function selectStudent(s: Student) {
-    setSelectedStudent(s);
-    setStudentQuery(getStudentName(s));
-    setDropdownOpen(false);
-    setPrevLohScore('');
-    setPrevMadiScore('');
-    setLohMistakes([]);
-    setMadiMistakes([]);
-    // The tajweed section belongs to one student's session only. Nothing
-    // auto-fills it (the last-session autofill covers اللوح/الماضي only), so
-    // anything sitting here was typed for whoever was picked before — leaving
-    // it in place would quietly attach their tajweed to this student.
-    setTajweedEnabled(false);
-    setTajweed(emptyRow());
-    setTajweedStars(0);
-    setTajweedNote('');
+  /** Everything on the form that describes ONE student's session. The date is
+   * deliberately excluded — it is shared across a recording run. */
+  /** Blur schedules the dropdown to close 120ms later (so a tap on an option
+   * still registers). Coming straight back into the field has to cancel that
+   * pending close, or the list shuts under the teacher's finger a moment after
+   * they reopen it. */
+  function cancelStudentBlurClose() {
+    if (studentBlurTimer.current) {
+      clearTimeout(studentBlurTimer.current);
+      studentBlurTimer.current = null;
+    }
   }
 
-  function resetForm() {
-    setSelectedStudent(null);
-    setStudentQuery('');
-    setEditingId(null);
-    setEditingRecordData(null);
+  function clearSessionFields() {
     setPrevLohScore('');
     setPrevMadiScore('');
     setLohMistakes([]);
@@ -211,6 +222,83 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     setTajweedStars(0);
     setTajweedNote('');
     setNote('');
+    pristineRowsRef.current = { loh: rowsSignature([emptyRow()]), madi: rowsSignature([emptyRow()]) };
+  }
+
+  /** True when the form holds something the teacher entered themselves, as
+   * opposed to a blank form or the autofill's own suggestion. Only this is
+   * worth interrupting them over. */
+  function hasUnsavedEntry(): boolean {
+    if (prevLohScore || prevMadiScore) return true;
+    if (lohMistakes.length || madiMistakes.length) return true;
+    if (note.trim()) return true;
+    if (tajweedEnabled) return true;
+    if (rowsSignature(lohRows) !== pristineRowsRef.current.loh) return true;
+    if (rowsSignature(madiRows) !== pristineRowsRef.current.madi) return true;
+    return false;
+  }
+
+  function applyStudentSwitch(s: Student) {
+    setSelectedStudent(s);
+    setStudentQuery(getStudentName(s));
+    setDropdownOpen(false);
+    clearSessionFields();
+    formOwnerRef.current = s;
+  }
+
+  function selectStudent(s: Student) {
+    // Edit mode is a different action: the fields belong to a SAVED record and
+    // picking another name re-assigns that record, so nothing is wiped. Left
+    // exactly as it behaved before — whether the evaluation scores still mean
+    // anything against a different student's previous assignment is an open
+    // product question, not something to settle silently here.
+    if (editingId) {
+      setSelectedStudent(s);
+      setStudentQuery(getStudentName(s));
+      setDropdownOpen(false);
+      setPrevLohScore('');
+      setPrevMadiScore('');
+      setLohMistakes([]);
+      setMadiMistakes([]);
+      formOwnerRef.current = s;
+      return;
+    }
+
+    // The form follows the student: every session field resets, and the
+    // autofill then refills اللوح/الماضي from THIS student's own last session.
+    // Carrying the previous student's assignment over was never a feature —
+    // it only survived when the new student had no previous session (or an
+    // incomplete one), i.e. exactly where the mistake is hardest to spot.
+    const owner = formOwnerRef.current;
+    if (owner && owner.id !== s.id && hasUnsavedEntry()) {
+      // Typing in the picker already cleared selectedStudent; put the form's
+      // real owner back so nothing appears to have changed behind the dialog.
+      setSelectedStudent(owner);
+      setStudentQuery(getStudentName(owner));
+      setDropdownOpen(false);
+      setConfirmDialog({
+        title: 'بيانات لسه متحفظتش',
+        message: `فيه بيانات مدخلة لـ ${getStudentName(owner)} لسه متحفظتش. لو كمّلت مع ${getStudentName(s)} هتتمسح.`,
+        confirmLabel: 'ابدأ من جديد',
+        destructive: true,
+        onConfirm: () => {
+          setConfirmDialog(null);
+          applyStudentSwitch(s);
+        },
+      });
+      return;
+    }
+
+    applyStudentSwitch(s);
+  }
+
+  function resetForm() {
+    setSelectedStudent(null);
+    setStudentQuery('');
+    setEditingId(null);
+    setEditingRecordData(null);
+    clearSessionFields();
+    formOwnerRef.current = null;
     // Allow the same record to be re-opened for edit later (e.g. cancel then
     // tap ✏️ again on the same session).
     consumedEditIdRef.current = null;
@@ -247,9 +335,15 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     setMadiMistakes(rebuildMistakeHistory(r.madi?.mistakes));
 
     const lohArr = (r.newLoh ?? []).filter((l) => l?.sura);
-    setLohRows(lohArr.length ? lohArr.map((l) => ({ ...l })) : [emptyRow()]);
+    const lohLoaded = lohArr.length ? lohArr.map((l) => ({ ...l })) : [emptyRow()];
+    setLohRows(lohLoaded);
     const madiArr = (r.newMadi ?? []).filter((m) => m?.sura);
-    setMadiRows(madiArr.length ? madiArr.map((m) => ({ ...m })) : [emptyRow()]);
+    const madiLoaded = madiArr.length ? madiArr.map((m) => ({ ...m })) : [emptyRow()];
+    setMadiRows(madiLoaded);
+    // What was loaded from the record is the baseline; only edits on top of it
+    // count as the teacher's unsaved work.
+    formOwnerRef.current = student;
+    pristineRowsRef.current = { loh: rowsSignature(lohLoaded), madi: rowsSignature(madiLoaded) };
 
     if (r.tajweed?.sura) {
       setTajweedEnabled(true);
@@ -315,6 +409,13 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
 
     if (nextLoh) setLohRows([{ ...nextLoh }]);
     if (nextMadi) setMadiRows([{ ...nextMadi }]);
+    // The suggestion is the app's own writing, not the teacher's — baseline it
+    // so switching students right after an autofill doesn't look like unsaved
+    // work and pop a confirmation on every single pick.
+    pristineRowsRef.current = {
+      loh: nextLoh ? rowsSignature([nextLoh]) : pristineRowsRef.current.loh,
+      madi: nextMadi ? rowsSignature([nextMadi]) : pristineRowsRef.current.madi,
+    };
     showToast('📝 تعبئة تلقائية بناءً على آخر جلسة — عدّلها زيّ ما تحب');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStudent?.id, prevSession, editingId]);
@@ -605,11 +706,15 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
             placeholder="ابحث أو اختر اسم الطالب…"
             value={studentQuery}
             onInput={(e) => {
+              cancelStudentBlurClose();
               setStudentQuery((e.target as HTMLInputElement).value);
               setDropdownOpen(true);
               if (selectedStudent) setSelectedStudent(null);
             }}
-            onFocus={() => setDropdownOpen(true)}
+            onFocus={() => {
+              cancelStudentBlurClose();
+              setDropdownOpen(true);
+            }}
             onBlur={() => {
               studentBlurTimer.current = setTimeout(() => setDropdownOpen(false), 120);
             }}
@@ -945,7 +1050,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
           confirmLabel={confirmDialog.confirmLabel}
           destructive={confirmDialog.destructive}
           onConfirm={confirmDialog.onConfirm}
-          onCancel={() => setConfirmDialog(null)}
+          onCancel={confirmDialog.onCancel ?? (() => setConfirmDialog(null))}
         />
       )}
     </div>

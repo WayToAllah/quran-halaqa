@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { findPreviousSession, extractAssignedSuras, validateAyahRange, isRowComplete, cleanAssignmentRow, cleanTajweed } from './record';
+import { findPreviousSession, extractAssignedSuras, validateAyahRange, isRowComplete, cleanAssignmentRow, cleanTajweed, rowsSignature } from './record';
 import type { SessionRecord, Student } from '../types';
 
 const zaid: Student = { id: 's_1', name: 'زيد احمد' };
@@ -167,5 +167,29 @@ describe('cleanTajweed', () => {
     const out = cleanTajweed({ sura: 'الناس', toSura: 'الفلق', range: true }, 0, '');
     expect(out).not.toHaveProperty('toSura');
     expect(out).not.toHaveProperty('range');
+  });
+});
+
+describe('rowsSignature', () => {
+  it('is stable across key order and missing optional fields', () => {
+    expect(rowsSignature([{ from: '1', sura: 'البقرة', to: '10' }])).toBe(
+      rowsSignature([{ sura: 'البقرة', from: '1', to: '10' }]),
+    );
+    expect(rowsSignature([{ sura: 'الفاتحة' }])).toBe(
+      rowsSignature([{ sura: 'الفاتحة', from: '', to: '' }]),
+    );
+  });
+
+  it('changes when the teacher edits any field', () => {
+    const base = rowsSignature([{ sura: 'البقرة', from: '1', to: '10' }]);
+    expect(rowsSignature([{ sura: 'البقرة', from: '1', to: '11' }])).not.toBe(base);
+    expect(rowsSignature([{ sura: 'آل عمران', from: '1', to: '10' }])).not.toBe(base);
+    expect(rowsSignature([{ sura: 'البقرة', from: '1', to: '10' }, { sura: 'النساء' }])).not.toBe(base);
+  });
+
+  it('distinguishes a whole-sura range from an ordinary row on the same sura', () => {
+    expect(rowsSignature([{ sura: 'الناس', toSura: 'الفلق', range: true }])).not.toBe(
+      rowsSignature([{ sura: 'الناس' }]),
+    );
   });
 });

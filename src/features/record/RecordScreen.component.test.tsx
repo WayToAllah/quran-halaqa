@@ -48,6 +48,15 @@ function renderScreen(props: { editRecord?: SessionRecord | null; onEditConsumed
   );
 }
 
+/** Picks a DIFFERENT student while one is already selected: the picker input
+ * still holds the previous name, so it has to be cleared before searching. */
+async function switchStudentTo(name: string) {
+  const input = screen.getByPlaceholderText('ابحث أو اختر اسم الطالب…');
+  await userEvent.clear(input);
+  await userEvent.type(input, name);
+  await userEvent.click(await screen.findByRole('button', { name }));
+}
+
 async function selectStudent(name: string) {
   const input = screen.getByPlaceholderText('ابحث أو اختر اسم الطالب…');
   await userEvent.click(input);
@@ -415,18 +424,75 @@ describe('RecordScreen — tajweed toggle', () => {
     await userEvent.type(noteInput, 'إخفاء');
     expect(screen.getByText('سورة التجويد')).toBeInTheDocument();
 
-    // Switching students: the picker input still holds the first name, so
-    // clear it before searching for the second.
-    const studentInput = screen.getByPlaceholderText('ابحث أو اختر اسم الطالب…');
-    await userEvent.clear(studentInput);
-    await userEvent.type(studentInput, 'محمد علي');
-    await userEvent.click(await screen.findByRole('button', { name: 'محمد علي' }));
+    await switchStudentTo('محمد علي');
+    await userEvent.click(await screen.findByRole('button', { name: 'ابدأ من جديد' }));
 
     // Toggle back off, fields gone with it.
     expect(screen.queryByText('سورة التجويد')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('switch'));
     expect(screen.getByPlaceholderText('اختيارية')).toHaveValue('');
     expect(screen.queryByText('الناس')).not.toBeInTheDocument();
+  });
+});
+
+describe('RecordScreen — switching students', () => {
+  // The old behaviour only leaked when the NEW student had no previous session
+  // (or an incomplete one) — the autofill overwrote the rows otherwise. That is
+  // exactly the case where the wrong assignment is hardest to notice: a student
+  // with no history to contradict it.
+  it('does not carry the previous student\'s assignment onto a student with no history', async () => {
+    previousSessionForS1 = {
+      id: 'r_prev',
+      studentId: 's_1',
+      date: '2026-07-01',
+      newLoh: [{ sura: 'البقرة', from: '1', to: '10' }],
+    };
+    renderScreen();
+    await selectStudent('زيد احمد'); // autofills اللوح from his own last session
+    await waitFor(() => expect(screen.getAllByPlaceholderText('اكتب اسم السورة…')[0]).toHaveValue('البقرة'));
+
+    // محمد علي has no previous session, so nothing refills the row for him.
+    await switchStudentTo('محمد علي');
+
+    // Untouched autofill is the app's own suggestion, not the teacher's work —
+    // no confirmation should interrupt the switch.
+    expect(screen.queryByText('بيانات لسه متحفظتش')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByPlaceholderText('اكتب اسم السورة…')[0]).toHaveValue(''));
+  });
+
+  it('warns before discarding work the teacher typed, and keeps it on cancel', async () => {
+    renderScreen();
+    await selectStudent('زيد احمد');
+    await userEvent.type(screen.getByPlaceholderText('أي ملاحظة عن أداء الطالب اليوم…'), 'ممتاز النهارده');
+
+    await switchStudentTo('محمد علي');
+    expect(await screen.findByText('بيانات لسه متحفظتش')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'إلغاء' }));
+
+    // Still زيد, still his note.
+    expect(screen.getByPlaceholderText('ابحث أو اختر اسم الطالب…')).toHaveValue('زيد احمد');
+    expect(screen.getByPlaceholderText('أي ملاحظة عن أداء الطالب اليوم…')).toHaveValue('ممتاز النهارده');
+  });
+
+  it('discards the previous student\'s note once the switch is confirmed', async () => {
+    renderScreen();
+    await selectStudent('زيد احمد');
+    await userEvent.type(screen.getByPlaceholderText('أي ملاحظة عن أداء الطالب اليوم…'), 'ممتاز النهارده');
+
+    await switchStudentTo('محمد علي');
+    await userEvent.click(await screen.findByRole('button', { name: 'ابدأ من جديد' }));
+
+    expect(screen.getByPlaceholderText('ابحث أو اختر اسم الطالب…')).toHaveValue('محمد علي');
+    expect(screen.getByPlaceholderText('أي ملاحظة عن أداء الطالب اليوم…')).toHaveValue('');
+  });
+
+  it('does not interrupt when the form is still untouched', async () => {
+    renderScreen();
+    await selectStudent('زيد احمد');
+    await switchStudentTo('محمد علي');
+    expect(screen.queryByText('بيانات لسه متحفظتش')).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('ابحث أو اختر اسم الطالب…')).toHaveValue('محمد علي');
   });
 });
 

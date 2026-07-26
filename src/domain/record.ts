@@ -74,6 +74,21 @@ export function cleanAssignmentRow(row: SuraAssignment): SuraAssignment {
 }
 
 /**
+ * Order-stable signature of a set of assignment rows.
+ *
+ * Used to tell the teacher's OWN typing apart from what the app itself put in
+ * the fields (a blank row, or the last-session autofill suggestion): compare
+ * the current rows against the signature taken when the app last wrote them.
+ * Plain JSON.stringify is not enough — rows built by different code paths can
+ * carry the same values under a different key order.
+ */
+export function rowsSignature(rows: SuraAssignment[]): string {
+  return JSON.stringify(
+    rows.map((r) => [r.sura ?? '', r.from ?? '', r.to ?? '', r.toSura ?? '', r.range ? 1 : 0]),
+  );
+}
+
+/**
  * Normalizes the tajweed section into the exact shape persisted to the DB:
  * `{sura, from, to, stars, note}` with string (never `undefined`) ayah fields.
  *
