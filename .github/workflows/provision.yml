@@ -1,0 +1,54 @@
+name: Provision mosques & halaqat
+
+on:
+  workflow_dispatch:
+    inputs:
+      config_json:
+        description: 'Provisioning config (JSON). See provision.example.json'
+        required: true
+      dry_run:
+        description: 'Dry run (no writes)? true or false'
+        required: true
+        default: 'true'
+      deploy_rules:
+        description: 'Also deploy firestore.rules first? true or false'
+        required: true
+        default: 'false'
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+
+      - name: Write service account credentials
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: printf '%s' "$SERVICE_ACCOUNT_JSON" > /tmp/service-account.json
+
+      - name: Deploy Firestore rules
+        if: ${{ github.event.inputs.deploy_rules == 'true' }}
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/service-account.json
+        run: npx firebase deploy --only firestore:rules --project quran-app-abe52 --non-interactive
+
+      - name: Write provisioning config
+        env:
+          CONFIG_JSON: ${{ github.event.inputs.config_json }}
+        run: printf '%s' "$CONFIG_JSON" > /tmp/provision.json
+
+      - name: Provision
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/service-account.json
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          ARGS="--config /tmp/provision.json"
+          if [ "$DRY_RUN" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          npx tsx scripts/provision-mosque.ts $ARGS
