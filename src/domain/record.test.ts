@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { findPreviousSession, extractAssignedSuras, validateAyahRange, isRowComplete, cleanAssignmentRow } from './record';
+import { findPreviousSession, extractAssignedSuras, validateAyahRange, isRowComplete, cleanAssignmentRow, cleanTajweed } from './record';
 import type { SessionRecord, Student } from '../types';
 
 const zaid: Student = { id: 's_1', name: 'زيد احمد' };
@@ -141,5 +141,31 @@ describe('cleanAssignmentRow', () => {
   it('strips range/toSura when the row is not a valid range', () => {
     // range:true but no toSura → treated as an ordinary per-sura row.
     expect(cleanAssignmentRow({ sura: 'الملك', range: true })).toEqual({ sura: 'الملك' });
+  });
+});
+
+describe('cleanTajweed', () => {
+  it('keeps a plain sura + ayah range as-is', () => {
+    expect(cleanTajweed({ sura: 'البقرة', from: '1', to: '5' }, 4, ' إدغام ')).toEqual({
+      sura: 'البقرة',
+      from: '1',
+      to: '5',
+      stars: 4,
+      note: 'إدغام',
+    });
+  });
+
+  it('never emits undefined when the range toggle removed the ayah fields', () => {
+    // Firestore rejects an undefined field value outright, which used to make
+    // the entire save fail with a generic error.
+    const out = cleanTajweed({ sura: 'الناس', toSura: 'الفلق', range: true }, 3, '');
+    expect(out).toEqual({ sura: 'الناس', from: '', to: '', stars: 3, note: '' });
+    expect(Object.values(out).some((v) => v === undefined)).toBe(false);
+  });
+
+  it('does not persist toSura/range — tajweed is always a specific passage', () => {
+    const out = cleanTajweed({ sura: 'الناس', toSura: 'الفلق', range: true }, 0, '');
+    expect(out).not.toHaveProperty('toSura');
+    expect(out).not.toHaveProperty('range');
   });
 });

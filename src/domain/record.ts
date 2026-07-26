@@ -1,4 +1,4 @@
-import type { SessionRecord, Student, SuraAssignment } from '../types';
+import type { SessionRecord, Student, SuraAssignment, TajweedEval } from '../types';
 import { byNewest } from './dates';
 import { recordsForStudent } from './students';
 import { findSuraByName } from './suras';
@@ -71,6 +71,29 @@ export function cleanAssignmentRow(row: SuraAssignment): SuraAssignment {
   if (row.from) out.from = row.from;
   if (row.to) out.to = row.to;
   return out;
+}
+
+/**
+ * Normalizes the tajweed section into the exact shape persisted to the DB:
+ * `{sura, from, to, stars, note}` with string (never `undefined`) ayah fields.
+ *
+ * This guard matters because the row's "🔗 نطاق سور" toggle *deletes* the
+ * `from`/`to` keys, and Firestore rejects an `undefined` field value outright —
+ * so building `rec.tajweed` straight off the row made the whole save throw and
+ * the teacher only saw a generic "فشل الحفظ". Same job cleanAssignmentRow does
+ * for loh/madi rows, adapted to tajweed's own {stars, note} shape.
+ *
+ * Note: `toSura`/`range` are intentionally NOT persisted — TajweedEval has no
+ * such fields; tajweed is always a specific passage.
+ */
+export function cleanTajweed(row: SuraAssignment, stars: number, note: string): TajweedEval {
+  return {
+    sura: row.sura,
+    from: row.from ?? '',
+    to: row.to ?? '',
+    stars,
+    note: (note ?? '').trim(),
+  };
 }
 
 /**

@@ -7,7 +7,7 @@ import { normAr } from '../../domain/text';
 import { getStudentName, findStudentRecordOnDate } from '../../domain/students';
 import { localDateStr, genId, hijriLong, hijriShort, gregorianLong } from '../../domain';
 import { scoreToStars, scoreName, parseScoreField, isScoreEntryComplete, type ScoreFieldState } from '../../domain/scoring';
-import { extractAssignedSuras, validateAyahRange, isRowComplete, cleanAssignmentRow } from '../../domain/record';
+import { extractAssignedSuras, validateAyahRange, isRowComplete, cleanAssignmentRow, cleanTajweed } from '../../domain/record';
 import { computeNextLoh, computeNextMadi } from '../../domain/nextTask';
 import { buildWhatsAppMessage, normalizeWhatsAppPhone } from '../../domain/whatsapp';
 import { SuraRow } from './SuraRow';
@@ -391,7 +391,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     if (lohTally) rec.loh!.mistakes = lohTally;
     if (madiTally) rec.madi!.mistakes = madiTally;
     if (tajweedEnabled && tajweed.sura) {
-      rec.tajweed = { sura: tajweed.sura, from: tajweed.from, to: tajweed.to, stars: tajweedStars, note: tajweedNote.trim() };
+      rec.tajweed = cleanTajweed(tajweed, tajweedStars, tajweedNote);
     }
 
     const hasContent =

@@ -355,6 +355,31 @@ describe('RecordScreen — tajweed toggle', () => {
     await userEvent.click(toggle);
     expect(screen.getByText('سورة التجويد')).toBeInTheDocument();
   });
+
+  // Regression: the tajweed row's "🔗 نطاق سور" checkbox deletes the row's
+  // from/to keys, and the saved record used to carry them straight through as
+  // `undefined` — which Firestore refuses, failing the ENTIRE save with only a
+  // generic "فشل الحفظ" toast.
+  it('saves a tajweed row that went through range mode without any undefined field', async () => {
+    renderScreen();
+    await selectStudent('زيد احمد');
+    await userEvent.click(screen.getByRole('switch'));
+
+    // The tajweed row is the last one on screen (after اللوح and الماضي).
+    const rangeBoxes = screen.getAllByRole('checkbox');
+    await userEvent.click(rangeBoxes[rangeBoxes.length - 1]);
+
+    const suraInputs = screen.getAllByPlaceholderText('اكتب اسم السورة…');
+    await userEvent.type(suraInputs[suraInputs.length - 1], 'الناس');
+    await userEvent.click(await screen.findByRole('button', { name: /\d+\. الناس/ }));
+
+    await saveAndConfirm();
+
+    await waitFor(() => expect(saveRecordMock).toHaveBeenCalled());
+    const saved = saveRecordMock.mock.calls[0][2] as SessionRecord;
+    expect(saved.tajweed).toEqual({ sura: 'الناس', from: '', to: '', stars: 0, note: '' });
+    expect(JSON.stringify(saved)).not.toContain('undefined');
+  });
 });
 
 describe('RecordScreen — edit mode', () => {
