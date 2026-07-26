@@ -27,8 +27,10 @@ const saveStudentMock = vi.fn().mockResolvedValue(undefined);
 const updateStudentMock = vi.fn().mockResolvedValue(undefined);
 const deleteStudentMock = vi.fn().mockResolvedValue(undefined);
 
+// Controllable so a test can render the empty roster.
+let studentsForHook: Student[] = students;
 vi.mock('../../hooks/useStudents', () => ({
-  useStudents: () => ({ students, loaded: true }),
+  useStudents: () => ({ students: studentsForHook, loaded: true }),
 }));
 vi.mock('../../hooks/useAllRecords', () => ({
   useAllRecords: () => ({ records, loaded: true }),
@@ -53,6 +55,7 @@ beforeEach(() => {
     'confirm',
     vi.fn(() => true),
   );
+  studentsForHook = students;
   Object.defineProperty(navigator, 'clipboard', {
     value: { writeText: vi.fn().mockResolvedValue(undefined) },
     configurable: true,
@@ -101,7 +104,7 @@ describe('StudentsScreen — search', () => {
 describe('StudentsScreen — add student', () => {
   it('opens the modal via the FAB and saves a new student', async () => {
     renderScreen();
-    await userEvent.click(screen.getByRole('button', { name: '+ إضافة طالب جديد' }));
+    await userEvent.click(screen.getByRole('button', { name: 'إضافة طالب جديد' }));
     expect(screen.getByText('إضافة طالب جديد')).toBeInTheDocument();
 
     const nameInput = screen.getByPlaceholderText('اسم الطالب');
@@ -116,7 +119,7 @@ describe('StudentsScreen — add student', () => {
 
   it('saves an optional join date, and defaults to empty when left blank', async () => {
     renderScreen();
-    await userEvent.click(screen.getByRole('button', { name: '+ إضافة طالب جديد' }));
+    await userEvent.click(screen.getByRole('button', { name: 'إضافة طالب جديد' }));
     await userEvent.type(screen.getByPlaceholderText('اسم الطالب'), 'طالب بتاريخ انضمام');
 
     const dateInput = screen.getByLabelText(/تاريخ الانضمام/) as HTMLInputElement;
@@ -136,7 +139,7 @@ describe('StudentsScreen — add student', () => {
 
   it('rejects an empty name without calling saveStudent', async () => {
     renderScreen();
-    await userEvent.click(screen.getByRole('button', { name: '+ إضافة طالب جديد' }));
+    await userEvent.click(screen.getByRole('button', { name: 'إضافة طالب جديد' }));
     await userEvent.click(screen.getByRole('button', { name: 'حفظ' }));
     expect(screen.getByText('الاسم مطلوب')).toBeInTheDocument();
     expect(saveStudentMock).not.toHaveBeenCalled();
@@ -144,7 +147,7 @@ describe('StudentsScreen — add student', () => {
 
   it('rejects a duplicate name (excluding the student being edited)', async () => {
     renderScreen();
-    await userEvent.click(screen.getByRole('button', { name: '+ إضافة طالب جديد' }));
+    await userEvent.click(screen.getByRole('button', { name: 'إضافة طالب جديد' }));
     await userEvent.type(screen.getByPlaceholderText('اسم الطالب'), 'زيد احمد');
     await userEvent.click(screen.getByRole('button', { name: 'حفظ' }));
     expect(screen.getByText('الاسم موجود بالفعل')).toBeInTheDocument();
@@ -222,5 +225,33 @@ describe('StudentsScreen — copy link', () => {
     await waitFor(() => expect(updateStudentMock).toHaveBeenCalledTimes(1));
     const patch = updateStudentMock.mock.calls[0][3];
     expect(patch.parentToken).toBeTruthy();
+  });
+});
+
+describe('StudentsScreen — the add control', () => {
+  // The roster runs to ~50 rows and the add control used to sit after the last
+  // one, so adding a student meant scrolling past everybody first.
+  it('stays available when the list is scrolled past or filtered to nothing', async () => {
+    renderScreen();
+    await userEvent.type(screen.getByPlaceholderText('ابحث بالاسم…'), 'لا أحد بهذا الاسم');
+    expect(screen.getByText(/لا يوجد نتائج/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'إضافة طالب جديد' })).toBeInTheDocument();
+  });
+
+  it('opens an empty form, not the last student that was edited', async () => {
+    renderScreen();
+    await userEvent.click(screen.getAllByRole('button', { name: 'تعديل' })[0]);
+    await userEvent.click(screen.getByRole('button', { name: 'إلغاء' }));
+    await userEvent.click(screen.getByRole('button', { name: 'إضافة طالب جديد' }));
+    expect(screen.getByText('إضافة طالب جديد')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('اسم الطالب')).toHaveValue('');
+  });
+
+  it('invites the first student in on an empty roster', async () => {
+    studentsForHook = [];
+    renderScreen();
+    expect(screen.getByText('لا يوجد طلاب بعد')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '+ إضافة أول طالب' }));
+    expect(screen.getByText('إضافة طالب جديد')).toBeInTheDocument();
   });
 });

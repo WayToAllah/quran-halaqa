@@ -14,6 +14,7 @@ import { genParentToken } from '../../domain/ids';
 import { useToast } from '../../ui/ToastProvider';
 import { MOSQUE_ID, HALAQA_ID } from '../../config';
 import { StudentModal } from './StudentModal';
+import { FloatingAddButton } from '../../ui/FloatingAddButton';
 import type { Student } from '../../types';
 
 import { CHILD_STATS_BASE_URL } from '../../config';
@@ -141,8 +142,19 @@ export function StudentsScreen() {
       )}
 
       {studentsLoaded && visibleStudents.length === 0 && (
-        <div class="text-center text-sm text-taupe py-8">
-          {query ? `لا يوجد نتائج لـ "${esc(query)}"` : 'لا يوجد طلاب بعد'}
+        <div class="text-center py-8">
+          <div class="text-sm text-taupe">
+            {query ? `لا يوجد نتائج لـ "${esc(query)}"` : 'لا يوجد طلاب بعد'}
+          </div>
+          {!query && (
+            <button
+              type="button"
+              class="mt-4 px-5 py-3 rounded-2xl border-[1.5px] border-dashed border-mustard bg-[#FFFCF3] text-[#8A6A15] text-sm font-bold"
+              onClick={openAddModal}
+            >
+              + إضافة أول طالب
+            </button>
+          )}
         </div>
       )}
 
@@ -206,13 +218,7 @@ export function StudentsScreen() {
         })}
       </div>
 
-      <button
-        type="button"
-        class="w-full py-3.5 rounded-2xl border-[1.5px] border-dashed border-mustard bg-[#FFFCF3] text-[#8A6A15] text-sm font-bold"
-        onClick={openAddModal}
-      >
-        + إضافة طالب جديد
-      </button>
+      <FloatingAddButton label="إضافة طالب جديد" onClick={openAddModal} />
 
       {modalOpen && (
         <StudentModal
