@@ -9,10 +9,15 @@ interface Props {
   onChange: (v: SuraAssignment) => void;
   onRemove?: () => void;
   label: string;
+  /** Whether the "🔗 نطاق سور" (whole-sura range) mode is offered. Off for the
+   * tajweed row: tajweed is always a specific passage, and TajweedEval has no
+   * toSura/range fields to store one — so offering the toggle there meant the
+   * teacher could enter a range that could never be saved. */
+  allowRange?: boolean;
 }
 
-export function SuraRow({ value, onChange, onRemove, label }: Props) {
-  const isRange = !!value.range;
+export function SuraRow({ value, onChange, onRemove, label, allowRange = true }: Props) {
+  const isRange = allowRange && !!value.range;
   const errors = isRange
     ? {}
     : validateAyahRange(value.sura || '', value.from || '', value.to || '');
@@ -39,15 +44,17 @@ export function SuraRow({ value, onChange, onRemove, label }: Props) {
       <div class="flex items-center justify-between mb-3">
         <span class="text-xs font-semibold text-taupe">{label}</span>
         <div class="flex items-center gap-2">
-          <label class="flex items-center gap-1.5 text-[12px] font-semibold text-taupe cursor-pointer select-none">
-            <input
-              type="checkbox"
-              class="w-[15px] h-[15px] accent-[#0F3D2E] cursor-pointer m-0"
-              checked={isRange}
-              onChange={toggleRange}
-            />
-            🔗 نطاق سور
-          </label>
+          {allowRange && (
+            <label class="flex items-center gap-1.5 text-[12px] font-semibold text-taupe cursor-pointer select-none">
+              <input
+                type="checkbox"
+                class="w-[15px] h-[15px] accent-[#0F3D2E] cursor-pointer m-0"
+                checked={isRange}
+                onChange={toggleRange}
+              />
+              🔗 نطاق سور
+            </label>
+          )}
           {onRemove && (
             <button
               type="button"

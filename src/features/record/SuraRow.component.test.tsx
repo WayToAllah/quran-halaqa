@@ -115,3 +115,33 @@ describe('SuraRow — whole-sura range mode', () => {
     expect(call).toMatchObject({ sura: 'الملك' });
   });
 });
+
+describe('SuraRow — allowRange', () => {
+  it('offers the whole-sura range toggle by default', () => {
+    renderRow();
+    expect(screen.getByRole('checkbox')).toBeInTheDocument();
+  });
+
+  it('hides the range toggle when allowRange is false', () => {
+    render(<SuraRow value={{ sura: '', from: '', to: '' }} onChange={vi.fn()} label="سورة التجويد" allowRange={false} />);
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.queryByText('🔗 نطاق سور')).not.toBeInTheDocument();
+  });
+
+  it('renders ayah inputs (not a second sura picker) when allowRange is false, even for a legacy range value', () => {
+    // Defensive: a record written before the toggle was removed could still
+    // carry range:true. The row must fall back to ordinary per-sura editing
+    // instead of showing an "إلى سورة" picker whose value can never be saved.
+    render(
+      <SuraRow
+        value={{ sura: 'الناس', toSura: 'الفلق', range: true }}
+        onChange={vi.fn()}
+        label="سورة التجويد"
+        allowRange={false}
+      />,
+    );
+    expect(screen.queryByPlaceholderText('اكتب سورة النهاية…')).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('من آية')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('إلى آية')).toBeInTheDocument();
+  });
+});

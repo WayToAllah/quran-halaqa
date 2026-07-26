@@ -831,7 +831,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
         </label>
         {tajweedEnabled && (
           <div class="space-y-3 pt-1">
-            <SuraRow label="سورة التجويد" value={tajweed} onChange={setTajweed} />
+            <SuraRow label="سورة التجويد" value={tajweed} onChange={setTajweed} allowRange={false} />
             <div>
               <label class="text-xs text-taupe block mb-1">التقييم</label>
               <StarPicker value={tajweedStars} onChange={setTajweedStars} />
