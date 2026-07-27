@@ -12,7 +12,10 @@ import {
   firstInitial,
   rankBadgeText,
   CHART_WINDOW,
+  formatSessionDate,
+  formatShortDate,
 } from './parentView';
+import { MOCK_PUBLIC_STATS } from './mockPublicStats';
 
 function baseStats(overrides: Partial<PublicStats> = {}): PublicStats {
   return {
@@ -242,7 +245,7 @@ describe('evaluation ↔ assignment separation (parent page)', () => {
     // …and the task object has no score/evaluation field at all.
     expect(task).not.toHaveProperty('lohScore');
     expect(task).not.toHaveProperty('score');
-    expect(Object.keys(task).sort()).toEqual(['date', 'loh', 'madi'].sort());
+    expect(Object.keys(task).sort()).toEqual(['date', 'dateLabel', 'loh', 'madi'].sort());
   });
 
   it('a session keeps its evaluation score separate from its assignment text', () => {
@@ -304,5 +307,52 @@ describe('evaluation ↔ assignment separation (parent page)', () => {
     expect(task.loh).not.toContain('آل عمران'); // not the thing that was graded
     // And the session still reports the grade separately.
     expect(buildSessions(stats)[0].loh).toBe(88);
+  });
+});
+
+describe('parent-facing dates', () => {
+  // The stored value is a bare ISO string and it used to be printed to the
+  // parent verbatim — Latin digits in a page whose every other number is
+  // Arabic-Indic.
+  it('never hands the raw ISO string to the view', () => {
+    const when = formatSessionDate('2026-07-20');
+    expect(when.gregorian).not.toContain('2026-07-20');
+    expect(when.gregorian).not.toMatch(/[0-9]/); // Arabic-Indic only
+    expect(when.hijri).not.toMatch(/[0-9]/);
+  });
+
+  it('spells out the weekday, which is what a fixed-day halaqa reads by', () => {
+    // 2026-07-20 is a Monday.
+    expect(formatSessionDate('2026-07-20').gregorian).toContain('الاثنين');
+  });
+
+  it('gives the task label both calendars on one line', () => {
+    const label = formatShortDate('2026-07-20');
+    expect(label).toContain('—');
+    expect(label).not.toMatch(/[0-9]/);
+  });
+
+  it('survives an empty date instead of printing "Invalid Date"', () => {
+    expect(formatSessionDate('')).toEqual({ hijri: '', gregorian: '' });
+    expect(formatShortDate('')).toBe('');
+  });
+
+  it('carries both calendars through to each session in the timeline', () => {
+    const sessions = buildSessions({
+      ...MOCK_PUBLIC_STATS,
+      recentSessions: [
+        {
+          date: '2026-07-20',
+          loh: { score: 90 },
+          madi: null,
+          newLoh: [],
+          newMadi: [],
+          tajweed: null,
+          note: '',
+        },
+      ],
+    });
+    expect(sessions[0].dateHijri).not.toBe('');
+    expect(sessions[0].dateGregorian).toContain('يوليو');
   });
 });

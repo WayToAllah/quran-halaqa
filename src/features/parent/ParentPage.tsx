@@ -210,7 +210,7 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
                 المهمة الحالية
               </div>
               <span style="font-size:11px;color:var(--text-hint);font-weight:500">
-                آخر جلسة: {sessions[0]?.date ?? task.date}
+                آخر جلسة: {task.dateLabel || task.date}
               </span>
             </div>
             <div style="background:var(--accent-tint);border:1px dashed oklch(58% 0.13 55 / 0.4);border-radius:var(--radius-sm);padding:16px 17px">
@@ -371,7 +371,20 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
               >
                 <div style="position:absolute;width:10px;height:10px;right:-6px;top:19px;border-radius:50%;background:var(--ink);border:2px solid var(--surface)"></div>
                 <div style="margin-bottom:9px">
-                  <div style="font-size:12.5px;color:var(--ink);font-weight:700">{s.date}</div>
+                  {s.dateHijri ? (
+                    <>
+                      <div style="font-size:12.5px;color:var(--ink);font-weight:700">
+                        {s.dateHijri}
+                      </div>
+                      <div style="font-size:11px;color:var(--text-hint);margin-top:2px">
+                        {s.dateGregorian}
+                      </div>
+                    </>
+                  ) : (
+                    <div style="font-size:12.5px;color:var(--ink);font-weight:700">
+                      {s.dateGregorian || s.date}
+                    </div>
+                  )}
                 </div>
 
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">

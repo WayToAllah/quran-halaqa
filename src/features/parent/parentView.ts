@@ -1,5 +1,7 @@
 import type { PublicStats } from '../../types';
 import { joinSuraNames } from '../../domain/suras';
+import { gregorianStr, gregorianLong } from '../../domain/dates';
+import { hijriShort } from '../../domain/hijri';
 import { toArabicDigits, formatArabicNumber } from '../../domain/text';
 
 /**
@@ -199,12 +201,43 @@ export function buildStats(stats: PublicStats): StatCell[] {
   ];
 }
 
+// ---- Dates ---------------------------------------------------------------
+
+/**
+ * A session date for the timeline, in both calendars.
+ *
+ * The stored value is a bare 'YYYY-MM-DD' and it used to be printed straight
+ * to the parent — a Latin-digit ISO string in a page whose every other number
+ * is Arabic-Indic. Hijri leads and Gregorian sits underneath, the same way the
+ * admin log shows a session, and the weekday is spelled out because a halaqa
+ * runs on fixed days and "الجمعة" tells a parent more than the day number.
+ *
+ * `hijri` is '' when the runtime has no islamic-umalqura calendar; callers
+ * fall back to the Gregorian line alone, matching the live app.
+ */
+export function formatSessionDate(date: string): { hijri: string; gregorian: string } {
+  if (!date) return { hijri: '', gregorian: '' };
+  return {
+    hijri: hijriShort(date),
+    gregorian: gregorianStr(date, { weekday: 'long', day: 'numeric', month: 'long' }),
+  };
+}
+
+/** One-line form for the "آخر جلسة" label: "٥ صفر — ٢٠ يوليو". Same shape the
+ * record screen's date card uses. */
+export function formatShortDate(date: string): string {
+  if (!date) return '';
+  return [hijriShort(date), gregorianLong(date)].filter(Boolean).join(' — ');
+}
+
 // ---- Current task + sessions ---------------------------------------------
 
 export interface TaskView {
   loh: string | null;
   madi: string | null;
   date: string;
+  /** Ready to print: Hijri — Gregorian, both in Arabic numerals. */
+  dateLabel: string;
 }
 
 export function buildCurrentTask(stats: PublicStats): TaskView | null {
@@ -213,11 +246,15 @@ export function buildCurrentTask(stats: PublicStats): TaskView | null {
   const loh = t.newLoh.length ? joinSuraNames(t.newLoh) : null;
   const madi = t.newMadi.length ? joinSuraNames(t.newMadi) : null;
   if (!loh && !madi) return null;
-  return { loh, madi, date: t.date };
+  return { loh, madi, date: t.date, dateLabel: formatShortDate(t.date) };
 }
 
 export interface SessionView {
   date: string;
+  /** Hijri line (may be '' when the calendar is unavailable). */
+  dateHijri: string;
+  /** Gregorian line with the weekday spelled out, in Arabic numerals. */
+  dateGregorian: string;
   loh: number | null;
   madi: number | null;
   lohLabel: string;
@@ -233,18 +270,23 @@ export interface SessionView {
 export const SESSIONS_WINDOW = 5;
 
 export function buildSessions(stats: PublicStats): SessionView[] {
-  return stats.recentSessions.slice(0, SESSIONS_WINDOW).map((s) => ({
-    date: s.date,
-    loh: s.loh ? s.loh.score : null,
-    madi: s.madi ? s.madi.score : null,
-    lohLabel: s.loh ? toArabicDigits(s.loh.score) : '—',
-    madiLabel: s.madi ? toArabicDigits(s.madi.score) : '—',
-    lohPct: (s.loh ? s.loh.score : 0) + '%',
-    madiPct: (s.madi ? s.madi.score : 0) + '%',
-    newLoh: s.newLoh.length ? joinSuraNames(s.newLoh) : null,
-    newMadi: s.newMadi.length ? joinSuraNames(s.newMadi) : null,
-    note: s.note,
-  }));
+  return stats.recentSessions.slice(0, SESSIONS_WINDOW).map((s) => {
+    const when = formatSessionDate(s.date);
+    return {
+      date: s.date,
+      dateHijri: when.hijri,
+      dateGregorian: when.gregorian,
+      loh: s.loh ? s.loh.score : null,
+      madi: s.madi ? s.madi.score : null,
+      lohLabel: s.loh ? toArabicDigits(s.loh.score) : '—',
+      madiLabel: s.madi ? toArabicDigits(s.madi.score) : '—',
+      lohPct: (s.loh ? s.loh.score : 0) + '%',
+      madiPct: (s.madi ? s.madi.score : 0) + '%',
+      newLoh: s.newLoh.length ? joinSuraNames(s.newLoh) : null,
+      newMadi: s.newMadi.length ? joinSuraNames(s.newMadi) : null,
+      note: s.note,
+    };
+  });
 }
 
 // ---- Header --------------------------------------------------------------

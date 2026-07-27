@@ -89,3 +89,20 @@ describe('ParentPage', () => {
     expect(screen.getAllByText(/الكهف/).length).toBeGreaterThan(0);
   });
 });
+
+describe('ParentPage — dates', () => {
+  it('shows the session date in both calendars, never as an ISO string', async () => {
+    render(<ParentPage previewStats={MOCK_PUBLIC_STATS} />);
+    const iso = MOCK_PUBLIC_STATS.recentSessions[0].date;
+    expect(screen.queryByText(iso)).not.toBeInTheDocument();
+    expect(
+      screen.getAllByText(/الأحد|الاثنين|الثلاثاء|الأربعاء|الخميس|الجمعة|السبت/).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('labels the current task with a formatted date, not the stored one', () => {
+    render(<ParentPage previewStats={MOCK_PUBLIC_STATS} />);
+    const label = screen.getByText(/آخر جلسة:/);
+    expect(label.textContent).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+  });
+});
