@@ -311,7 +311,7 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
                   pctTop(lohLabelY)
                 }
               >
-                {chart.lohLast.value}٪
+                {chart.lohLast.label}٪
               </div>
             )}
             {chart.madiLast && (
@@ -323,7 +323,7 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
                   pctTop(madiLabelY)
                 }
               >
-                {chart.madiLast.value}٪
+                {chart.madiLast.label}٪
               </div>
             )}
           </div>

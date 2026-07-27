@@ -356,3 +356,50 @@ describe('parent-facing dates', () => {
     expect(sessions[0].dateGregorian).toContain('يوليو');
   });
 });
+
+describe('Arabic-Indic numerals throughout the parent page', () => {
+  const withAssignment = (list: { sura: string; from?: string; to?: string }[]) => ({
+    ...MOCK_PUBLIC_STATS,
+    currentTask: { date: '2026-07-20', newLoh: list, newMadi: [] },
+  });
+
+  it('renders ayah numbers in the task in Arabic-Indic digits', () => {
+    const task = buildCurrentTask(withAssignment([{ sura: 'البقرة', from: '280', to: '286' }]));
+    expect(task!.loh).toBe('البقرة (٢٨٠–٢٨٦)');
+    expect(task!.loh).not.toMatch(/[0-9]/);
+  });
+
+  it('renders ayah numbers in the session timeline in Arabic-Indic digits', () => {
+    const sessions = buildSessions({
+      ...MOCK_PUBLIC_STATS,
+      recentSessions: [
+        {
+          date: '2026-07-20',
+          loh: { score: 90 },
+          madi: null,
+          newLoh: [{ sura: 'آل عمران', from: '1', to: '15' }],
+          newMadi: [],
+          tajweed: null,
+          note: '',
+        },
+      ],
+    });
+    expect(sessions[0].newLoh).toBe('آل عمران (١–١٥)');
+  });
+
+  it('labels the chart end points in Arabic-Indic digits', () => {
+    const chart = buildChart([
+      { date: '2026-07-18', loh: 88, madi: 80 },
+      { date: '2026-07-20', loh: 92, madi: 90 },
+    ]);
+    expect(chart.lohLast!.label).toBe('٩٢');
+    expect(chart.madiLast!.label).toBe('٩٠');
+    // The numeric value stays a number — geometry still needs it.
+    expect(chart.lohLast!.value).toBe(92);
+  });
+
+  it('leaves joinSuraNames itself alone — the admin log and WhatsApp share it', async () => {
+    const { joinSuraNames } = await import('../../domain/suras');
+    expect(joinSuraNames([{ sura: 'البقرة', from: '280', to: '286' }])).toBe('البقرة (280–286)');
+  });
+});

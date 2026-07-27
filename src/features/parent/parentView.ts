@@ -1,4 +1,4 @@
-import type { PublicStats } from '../../types';
+import type { PublicStats, SuraAssignment } from '../../types';
 import { joinSuraNames } from '../../domain/suras';
 import { gregorianStr, gregorianLong } from '../../domain/dates';
 import { hijriShort } from '../../domain/hijri';
@@ -122,9 +122,11 @@ export interface ChartView {
   lohPath: string;
   madiPath: string;
   /** Last non-null point of each series, for the end dot + label (null if the
-   * series has no data at all). */
-  lohLast: { x: number; y: number; value: number } | null;
-  madiLast: { x: number; y: number; value: number } | null;
+   * series has no data at all). `label` is the value already in Arabic-Indic
+   * digits — printing `value` straight produced "92٪", a Latin number wearing
+   * an Arabic percent sign, right above a stat grid that reads "٩٢٪". */
+  lohLast: { x: number; y: number; value: number; label: string } | null;
+  madiLast: { x: number; y: number; value: number; label: string } | null;
   viewBox: string;
 }
 
@@ -137,7 +139,7 @@ export function buildChart(history: PublicStats['scoreHistory']): ChartView {
   const lastNonNull = (vals: Array<number | null>) => {
     for (let i = vals.length - 1; i >= 0; i--) {
       const v = vals[i];
-      if (v != null) return { x: chartX(i, n), y: chartY(v), value: v };
+      if (v != null) return { x: chartX(i, n), y: chartY(v), value: v, label: toArabicDigits(v) };
     }
     return null;
   };
@@ -204,6 +206,18 @@ export function buildStats(stats: PublicStats): StatCell[] {
 // ---- Dates ---------------------------------------------------------------
 
 /**
+ * Sura + ayah range for parent eyes: "البقرة (٢٨٠–٢٨٦)".
+ *
+ * The conversion happens HERE and not inside joinSuraNames, which the admin
+ * log and the WhatsApp message also use — changing it there would rewrite
+ * their numerals too. This page is the only place that has committed to
+ * Arabic-Indic throughout.
+ */
+function suraLabelForParent(list: SuraAssignment[]): string {
+  return toArabicDigits(joinSuraNames(list));
+}
+
+/**
  * A session date for the timeline, in both calendars.
  *
  * The stored value is a bare 'YYYY-MM-DD' and it used to be printed straight
@@ -243,8 +257,8 @@ export interface TaskView {
 export function buildCurrentTask(stats: PublicStats): TaskView | null {
   const t = stats.currentTask;
   if (!t) return null;
-  const loh = t.newLoh.length ? joinSuraNames(t.newLoh) : null;
-  const madi = t.newMadi.length ? joinSuraNames(t.newMadi) : null;
+  const loh = t.newLoh.length ? suraLabelForParent(t.newLoh) : null;
+  const madi = t.newMadi.length ? suraLabelForParent(t.newMadi) : null;
   if (!loh && !madi) return null;
   return { loh, madi, date: t.date, dateLabel: formatShortDate(t.date) };
 }
@@ -282,8 +296,8 @@ export function buildSessions(stats: PublicStats): SessionView[] {
       madiLabel: s.madi ? toArabicDigits(s.madi.score) : '—',
       lohPct: (s.loh ? s.loh.score : 0) + '%',
       madiPct: (s.madi ? s.madi.score : 0) + '%',
-      newLoh: s.newLoh.length ? joinSuraNames(s.newLoh) : null,
-      newMadi: s.newMadi.length ? joinSuraNames(s.newMadi) : null,
+      newLoh: s.newLoh.length ? suraLabelForParent(s.newLoh) : null,
+      newMadi: s.newMadi.length ? suraLabelForParent(s.newMadi) : null,
       note: s.note,
     };
   });
