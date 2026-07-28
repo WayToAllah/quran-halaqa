@@ -608,7 +608,70 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
 
   return (
     <div class="p-[18px] pb-[150px] space-y-3" dir="rtl">
-      <div class="text-[19px] font-extrabold text-ink-dark mb-1">تسجيل جلسة</div>
+      <div class="flex items-center gap-2">
+        <div class="relative shrink-0 flex items-center gap-1 max-w-[128px]">
+          <svg
+            viewBox="0 0 24 24"
+            width="13"
+            height="13"
+            fill="none"
+            stroke="#0F3D2E"
+            stroke-width="1.8"
+            class="shrink-0"
+          >
+            <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
+            <path d="M3.5 9.5h17M8 3v3.5M16 3v3.5" />
+          </svg>
+          {/* Same invisible-overlay pattern as before: tapping the chip opens
+              the native date sheet, but the visible text is always our own
+              Hijri/Gregorian formatting. */}
+          <input
+            type="date"
+            aria-label="تاريخ الجلسة"
+            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            value={date}
+            onInput={(e) => setDate((e.target as HTMLInputElement).value)}
+          />
+          <span class="pointer-events-none text-[11px] font-bold text-[#0F3D2E] truncate">
+            {dateDisplay || 'اختر التاريخ'}
+          </span>
+        </div>
+
+        <div class="flex flex-1 bg-[#F1ECDD] rounded-lg p-0.5">
+          <button
+            type="button"
+            class="flex-1 py-1.5 rounded-[7px] text-[12px] font-bold transition-colors"
+            style={
+              mode === 'individual'
+                ? {
+                    background: '#FFFFFF',
+                    color: '#0F3D2E',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                  }
+                : { background: 'transparent', color: '#8A8372' }
+            }
+            onClick={() => setMode('individual')}
+          >
+            تسجيل فردي
+          </button>
+          <button
+            type="button"
+            class="flex-1 py-1.5 rounded-[7px] text-[12px] font-bold transition-colors"
+            style={
+              mode === 'group'
+                ? {
+                    background: '#FFFFFF',
+                    color: '#0F3D2E',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                  }
+                : { background: 'transparent', color: '#8A8372' }
+            }
+            onClick={() => setMode('group')}
+          >
+            حضور جماعي
+          </button>
+        </div>
+      </div>
 
       {editingId && (
         <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center justify-between gap-2">
@@ -618,63 +681,6 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
           </button>
         </div>
       )}
-
-      <div class="bg-white border border-hairline rounded-2xl p-2.5 flex items-center gap-2.5">
-        <svg
-          viewBox="0 0 24 24"
-          width="16"
-          height="16"
-          fill="none"
-          stroke="#0F3D2E"
-          stroke-width="1.8"
-          class="shrink-0"
-        >
-          <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
-          <path d="M3.5 9.5h17M8 3v3.5M16 3v3.5" />
-        </svg>
-        <div class="relative flex-1 min-w-0 h-5">
-          {/* Native picker as an invisible full-area overlay — tapping anywhere
-              opens the date sheet — so the visible text is always our own
-              Hijri/Gregorian formatting, never the browser's numeric rendering. */}
-          <input
-            type="date"
-            aria-label="تاريخ الجلسة"
-            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            value={date}
-            onInput={(e) => setDate((e.target as HTMLInputElement).value)}
-          />
-          <div class="pointer-events-none text-[13px] font-bold text-[#0F3D2E] leading-5 truncate">
-            {dateDisplay || 'اختر التاريخ'}
-          </div>
-        </div>
-      </div>
-
-      <div class="flex bg-[#F1ECDD] rounded-xl p-1">
-        <button
-          type="button"
-          class="flex-1 py-2.5 rounded-[9px] text-[13px] font-bold transition-colors"
-          style={
-            mode === 'individual'
-              ? { background: '#FFFFFF', color: '#0F3D2E', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }
-              : { background: 'transparent', color: '#8A8372' }
-          }
-          onClick={() => setMode('individual')}
-        >
-          تسجيل فردي
-        </button>
-        <button
-          type="button"
-          class="flex-1 py-2.5 rounded-[9px] text-[13px] font-bold transition-colors"
-          style={
-            mode === 'group'
-              ? { background: '#FFFFFF', color: '#0F3D2E', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }
-              : { background: 'transparent', color: '#8A8372' }
-          }
-          onClick={() => setMode('group')}
-        >
-          حضور جماعي
-        </button>
-      </div>
 
       {mode === 'group' && (
         <div class={cardCls}>
