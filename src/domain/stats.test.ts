@@ -234,3 +234,67 @@ describe('buildStudentPublicStats', () => {
     expect(result.recentSessions[0].loh).toEqual({ score: 97, mistakes: { full: 2, tajweed: 2 } });
   });
 });
+
+describe('buildStudentPublicStats attendance window (parent-facing)', () => {
+  // Halaqa ran 5 days; this student only joined on the 3rd of them.
+  const halaqaDatesDesc = ['2026-07-05', '2026-07-04', '2026-07-03', '2026-07-02', '2026-07-01'];
+  const lateJoiner: SessionRecord[] = [
+    { id: 'r1', studentId: 's_1', date: '2026-07-03', loh: { score: 90 } },
+    { id: 'r2', studentId: 's_1', date: '2026-07-04', loh: { score: 90 } },
+    { id: 'r3', studentId: 's_1', date: '2026-07-05', loh: { score: 90 } },
+  ];
+
+  it('measures attendance against days since the student joined, not the whole halaqa', () => {
+    const result = buildStudentPublicStats(zaid, lateJoiner, 5, null, halaqaDatesDesc);
+    // 3 of the 3 days he was enrolled for — NOT 3/5 = 60%.
+    expect(result.enrolledHalaqaDays).toBe(3);
+    expect(result.uniqueDays).toBe(3);
+    expect(result.attendPct).toBe(100);
+  });
+
+  it('still publishes the halaqa-wide day count, which rank is based on', () => {
+    const result = buildStudentPublicStats(zaid, lateJoiner, 5, 4, halaqaDatesDesc);
+    expect(result.totalHalaqaDays).toBe(5);
+    expect(result.rank).toBe(4);
+  });
+
+  it('still counts absences that fall inside the enrollment window', () => {
+    const withGap: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-02', loh: { score: 90 } },
+      { id: 'r2', studentId: 's_1', date: '2026-07-05', loh: { score: 90 } },
+    ];
+    const result = buildStudentPublicStats(zaid, withGap, 5, null, halaqaDatesDesc);
+    // Enrolled from 07-02 → 4 halaqa days; attended 2 → 50%.
+    expect(result.enrolledHalaqaDays).toBe(4);
+    expect(result.attendPct).toBe(50);
+  });
+
+  it('is unchanged for a student present since the very first halaqa day', () => {
+    const fromDayOne: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-01', loh: { score: 90 } },
+      { id: 'r2', studentId: 's_1', date: '2026-07-02', loh: { score: 90 } },
+    ];
+    const result = buildStudentPublicStats(zaid, fromDayOne, 5, null, halaqaDatesDesc);
+    expect(result.enrolledHalaqaDays).toBe(5);
+    expect(result.attendPct).toBe(40); // 2/5, exactly as before
+  });
+
+  it('reports 0% for a student with no records at all', () => {
+    const result = buildStudentPublicStats(zaid, [], 5, null, halaqaDatesDesc);
+    expect(result.enrolledHalaqaDays).toBe(0);
+    expect(result.attendPct).toBe(0);
+  });
+
+  it('omits months that ended before the student joined', () => {
+    const juneAndJuly = ['2026-07-02', '2026-07-01', '2026-06-20', '2026-06-13'];
+    const result = buildStudentPublicStats(
+      zaid,
+      [{ id: 'r1', studentId: 's_1', date: '2026-07-01', loh: { score: 90 } }],
+      4,
+      null,
+      juneAndJuly,
+    );
+    expect(Object.keys(result.monthlyStats)).toEqual(['2026-07']);
+    expect(result.monthlyStats['2026-07'].attendPct).toBe(50); // 1 of 2 July days
+  });
+});

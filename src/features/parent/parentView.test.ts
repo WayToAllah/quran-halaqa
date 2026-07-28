@@ -22,6 +22,7 @@ function baseStats(overrides: Partial<PublicStats> = {}): PublicStats {
     name: 'زيد أحمد',
     updatedAt: 1_700_000_000_000,
     totalHalaqaDays: 26,
+    enrolledHalaqaDays: 26,
     uniqueDays: 23,
     attendPct: 88,
     rank: 2,

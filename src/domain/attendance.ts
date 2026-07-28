@@ -45,6 +45,50 @@ export function computeAttendanceStreak(
   return streak;
 }
 
+/**
+ * The student's own start date: the earliest date on any of their records
+ * (a plain attendance mark counts — it means the student was in the halaqa
+ * that day). Returns null when the student has no dated record at all.
+ *
+ * Dates are 'YYYY-MM-DD', so lexicographic `<` is chronological.
+ */
+export function firstRecordDate(studentRecords: SessionRecord[]): string | null {
+  let earliest: string | null = null;
+  for (const r of studentRecords) {
+    const d = r.date;
+    if (!d) continue;
+    if (earliest === null || d < earliest) earliest = d;
+  }
+  return earliest;
+}
+
+/**
+ * The halaqa days that a given student was actually enrolled for: every halaqa
+ * date from their first recorded day onward. A student who joined in July must
+ * not be measured against June days he was never expected to attend.
+ *
+ * This is the denominator for the PARENT-facing attendance % only. The admin
+ * ranking (getAttendanceRanking) deliberately keeps the halaqa-wide
+ * denominator so every student on the leaderboard is measured on the same
+ * scale — see PROJECT_CONTEXT.md §5.
+ *
+ * `halaqaDates` is expected to already have EXCLUDED_HALAQA_DATES removed
+ * (i.e. the output of sortedHalaqaDatesDesc); order is preserved.
+ */
+export function enrolledHalaqaDates(
+  studentRecords: SessionRecord[],
+  halaqaDates: string[],
+): string[] {
+  const first = firstRecordDate(studentRecords);
+  if (first === null) return [];
+  const seen = new Set<string>();
+  return halaqaDates.filter((d) => {
+    if (d < first || seen.has(d)) return false;
+    seen.add(d);
+    return true;
+  });
+}
+
 export interface AttendanceRankEntry {
   /** Stable student id — the correct key for any rank lookup (names can
    * collide or change; see studentMatch() in students.ts for the principle). */

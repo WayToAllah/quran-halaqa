@@ -7,6 +7,7 @@ export const MOCK_PUBLIC_STATS: PublicStats = {
   name: 'زيد أحمد',
   updatedAt: Date.now(),
   totalHalaqaDays: 26,
+  enrolledHalaqaDays: 26,
   uniqueDays: 23,
   attendPct: 88,
   rank: 2,

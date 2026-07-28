@@ -3,7 +3,7 @@ import { byNewest } from './dates';
 import { hasScore } from './scoring';
 import { itemAyat } from './suras';
 import { getStudentName, recordsForStudent } from './students';
-import { computeAttendanceStreak } from './attendance';
+import { computeAttendanceStreak, enrolledHalaqaDates } from './attendance';
 
 export const AYAT_MILESTONES: ReadonlyArray<{
   key: string;
@@ -122,8 +122,15 @@ export function buildStudentPublicStats(
   });
 
   const uniqueDays = new Set(allRecs.map((r) => r.date)).size;
+  // Parent-facing denominator: halaqa days since THIS student's first recorded
+  // day, not since the halaqa's first day. A student who joined mid-year was
+  // never absent from the days before he enrolled. `totalHalaqaDays` is still
+  // published (halaqa-wide, and the basis of `rank`) so the two numbers stay
+  // distinguishable — see enrolledHalaqaDates() for why they differ.
+  const enrolledDates = enrolledHalaqaDates(allRecs, halaqaDatesDesc);
+  const enrolledDays = enrolledDates.length;
   const attendPct =
-    totalHalaqaDays > 0 ? Math.min(100, Math.round((uniqueDays / totalHalaqaDays) * 100)) : 0;
+    enrolledDays > 0 ? Math.min(100, Math.round((uniqueDays / enrolledDays) * 100)) : 0;
 
   const latest = realRecs[0];
   const currentTask = latest
@@ -164,12 +171,15 @@ export function buildStudentPublicStats(
   // Per-month pre-aggregation for the page's month filter. Every month that
   // appears in the student's records OR in the halaqa calendar gets an entry.
   const monthlyStats: PublicStats['monthlyStats'] = {};
+  // Same enrollment window as attendPct above: months entirely before the
+  // student joined are not his months, so they never appear here (they would
+  // otherwise each show a flat 0%).
   const allMonths = new Set<string>([
     ...allRecs.map((r) => r.date?.slice(0, 7)).filter((m): m is string => !!m),
-    ...halaqaDatesDesc.map((d) => d.slice(0, 7)),
+    ...enrolledDates.map((d) => d.slice(0, 7)),
   ]);
   allMonths.forEach((month) => {
-    const monthHalaqaDays = halaqaDatesDesc.filter((d) => d.slice(0, 7) === month).length;
+    const monthHalaqaDays = enrolledDates.filter((d) => d.slice(0, 7) === month).length;
     const monthAllRecs = allRecs.filter((r) => r.date?.slice(0, 7) === month);
     const monthRealRecs = realRecs.filter((r) => r.date?.slice(0, 7) === month);
     const monthUniqueDays = new Set(monthAllRecs.map((r) => r.date)).size;
@@ -213,6 +223,7 @@ export function buildStudentPublicStats(
     name,
     updatedAt: Date.now(),
     totalHalaqaDays,
+    enrolledHalaqaDays: enrolledDays,
     uniqueDays,
     attendPct,
     rank,

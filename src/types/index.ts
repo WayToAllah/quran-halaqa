@@ -121,8 +121,14 @@ export interface Badge {
 export interface PublicStats {
   name: string;
   updatedAt: number;
+  /** Halaqa-wide day count. Basis of `rank`, NOT of `attendPct`. */
   totalHalaqaDays: number;
+  /** Halaqa days since this student's first recorded day — the denominator of
+   * `attendPct`. Documents published before this field existed simply carry a
+   * stale attendPct until their next republish. */
+  enrolledHalaqaDays: number;
   uniqueDays: number;
+  /** uniqueDays ÷ enrolledHalaqaDays, capped at 100. */
   attendPct: number;
   rank: number | null;
   sessionsCount: number;

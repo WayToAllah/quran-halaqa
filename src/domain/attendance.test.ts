@@ -3,6 +3,8 @@ import {
   ATTENDANCE_BADGE_THRESHOLD,
   EXCLUDED_HALAQA_DATES,
   computeAttendanceStreak,
+  enrolledHalaqaDates,
+  firstRecordDate,
   getAttendanceRanking,
   rankBadgeEmoji,
   sortedHalaqaDatesDesc,
@@ -102,5 +104,70 @@ describe('rankBadgeEmoji', () => {
   it('returns the plain number for rank 4+', () => {
     expect(rankBadgeEmoji(4)).toBe('4');
     expect(rankBadgeEmoji(10)).toBe('10');
+  });
+});
+
+describe('firstRecordDate', () => {
+  it('returns the earliest date regardless of input order', () => {
+    const recs: SessionRecord[] = [
+      { id: 'r2', date: '2026-07-05' },
+      { id: 'r1', date: '2026-06-20' },
+      { id: 'r3', date: '2026-07-01' },
+    ];
+    expect(firstRecordDate(recs)).toBe('2026-06-20');
+  });
+
+  it('counts an attendance-only mark as a start date', () => {
+    const recs: SessionRecord[] = [
+      { id: 'att_1', date: '2026-06-10', attendance_only: true },
+      { id: 'r1', date: '2026-07-01' },
+    ];
+    expect(firstRecordDate(recs)).toBe('2026-06-10');
+  });
+
+  it('ignores blank dates, and returns null when there is nothing dated', () => {
+    expect(
+      firstRecordDate([
+        { id: 'r1', date: '' },
+        { id: 'r2', date: '2026-07-01' },
+      ]),
+    ).toBe('2026-07-01');
+    expect(firstRecordDate([])).toBeNull();
+    expect(firstRecordDate([{ id: 'r1', date: '' }])).toBeNull();
+  });
+});
+
+describe('enrolledHalaqaDates', () => {
+  const halaqaDatesDesc = ['2026-07-05', '2026-07-03', '2026-07-01', '2026-06-28', '2026-06-25'];
+
+  it('keeps only halaqa days from the student first recorded day onward', () => {
+    const recs: SessionRecord[] = [{ id: 'r1', date: '2026-07-01' }];
+    expect(enrolledHalaqaDates(recs, halaqaDatesDesc)).toEqual([
+      '2026-07-05',
+      '2026-07-03',
+      '2026-07-01',
+    ]);
+  });
+
+  it('includes the whole calendar for a student present since the first day', () => {
+    const recs: SessionRecord[] = [{ id: 'r1', date: '2026-06-25' }];
+    expect(enrolledHalaqaDates(recs, halaqaDatesDesc)).toEqual(halaqaDatesDesc);
+  });
+
+  it('returns an empty window for a student with no dated records', () => {
+    expect(enrolledHalaqaDates([], halaqaDatesDesc)).toEqual([]);
+  });
+
+  it('still counts later days when the student joined on an excluded date', () => {
+    // The excluded day is absent from halaqaDates, but joining on it must not
+    // wipe out the window that follows it.
+    const recs: SessionRecord[] = [{ id: 'r1', date: EXCLUDED_HALAQA_DATES[0] }];
+    expect(enrolledHalaqaDates(recs, halaqaDatesDesc)).toEqual(halaqaDatesDesc);
+  });
+
+  it('de-duplicates repeated dates in the input calendar', () => {
+    const recs: SessionRecord[] = [{ id: 'r1', date: '2026-07-01' }];
+    const dup = ['2026-07-03', '2026-07-03', '2026-07-01'];
+    expect(enrolledHalaqaDates(recs, dup)).toEqual(['2026-07-03', '2026-07-01']);
   });
 });
