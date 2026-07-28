@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/preact';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/preact';
 import userEvent from '@testing-library/user-event';
 import { ToastProvider } from '../../ui/ToastProvider';
 import { RecordScreen } from './RecordScreen';
@@ -618,14 +618,16 @@ describe('RecordScreen — edit mode', () => {
   });
 });
 
-describe('RecordScreen — group attendance tab', () => {
-  async function openGroupTab() {
+describe('RecordScreen — group attendance sheet', () => {
+  /** Group attendance is no longer a tab that replaces the form — it's a
+   * bottom sheet opened over it, so the individual form stays put underneath. */
+  async function openGroupSheet() {
     renderScreen();
-    await userEvent.click(screen.getByRole('button', { name: 'حضور جماعي' }));
+    await userEvent.click(screen.getByRole('button', { name: /حضور جماعي/ }));
   }
 
   it('lists all students once the day-check completes', async () => {
-    await openGroupTab();
+    await openGroupSheet();
     await waitFor(() => expect(screen.getByText('زيد احمد')).toBeInTheDocument());
     expect(screen.getByText('محمد علي')).toBeInTheDocument();
   });
@@ -634,15 +636,18 @@ describe('RecordScreen — group attendance tab', () => {
     getRecordsByDateMock.mockResolvedValueOnce([
       { id: 'r1', studentId: 's_1', date: localDateStr() },
     ]);
-    await openGroupTab();
+    await openGroupSheet();
     await waitFor(() => expect(screen.getByText('مسجّل بالفعل')).toBeInTheDocument());
+    // Scoped to the sheet: the individual form now stays mounted underneath and
+    // has checkboxes of its own, so an unscoped query would count those too.
+    const sheet = within(screen.getByRole('dialog', { name: 'تسجيل حضور جماعي' }));
     // only the eligible student (محمد) gets a checkbox
-    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
-    expect(screen.getByRole('checkbox', { name: 'محمد علي' })).toBeInTheDocument();
+    expect(sheet.getAllByRole('checkbox')).toHaveLength(1);
+    expect(sheet.getByRole('checkbox', { name: 'محمد علي' })).toBeInTheDocument();
   });
 
   it('re-fetches day coverage when the shared date changes', async () => {
-    await openGroupTab();
+    await openGroupSheet();
     await waitFor(() => expect(getRecordsByDateMock).toHaveBeenCalled());
     const callsBefore = getRecordsByDateMock.mock.calls.length;
     const dateInputs = document.querySelectorAll('input[type="date"]');
@@ -654,7 +659,7 @@ describe('RecordScreen — group attendance tab', () => {
   });
 
   it('selects/deselects all eligible students via the toggle', async () => {
-    await openGroupTab();
+    await openGroupSheet();
     await waitFor(() => expect(screen.getByText('زيد احمد')).toBeInTheDocument());
     await userEvent.click(screen.getByRole('button', { name: 'تحديد الكل / إلغاء' }));
     expect(screen.getByText('2 محدد')).toBeInTheDocument();
@@ -663,18 +668,21 @@ describe('RecordScreen — group attendance tab', () => {
   });
 
   it('rejects saving with nothing checked', async () => {
-    await openGroupTab();
+    await openGroupSheet();
     await waitFor(() => expect(screen.getByText('زيد احمد')).toBeInTheDocument());
     await userEvent.click(screen.getByRole('button', { name: /حفظ الحضور/ }));
     expect(await screen.findByText('اختر طالباً واحداً على الأقل')).toBeInTheDocument();
     expect(saveRecordMock).not.toHaveBeenCalled();
+    // The sheet must NOT close on a rejected save, or the teacher silently
+    // loses the checklist they were part-way through.
+    expect(screen.getByRole('dialog', { name: 'تسجيل حضور جماعي' })).toBeInTheDocument();
   });
 
   it('saves attendance-only records only for checked, eligible students', async () => {
     getRecordsByDateMock.mockResolvedValueOnce([
       { id: 'r1', studentId: 's_1', date: localDateStr() },
     ]); // زيد already covered
-    await openGroupTab();
+    await openGroupSheet();
     await waitFor(() => expect(screen.getByText('محمد علي')).toBeInTheDocument());
     await userEvent.click(screen.getByRole('button', { name: 'تحديد الكل / إلغاء' })); // selects only eligible (محمد)
 
@@ -683,26 +691,29 @@ describe('RecordScreen — group attendance tab', () => {
     const savedRecord = saveRecordMock.mock.calls[0][2];
     expect(savedRecord.studentId).toBe('s_2');
     expect(savedRecord.attendance_only).toBe(true);
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'تسجيل حضور جماعي' })).not.toBeInTheDocument(),
+    );
   });
 
-  it('switching to the individual tab does not lose group-mode state, and vice versa', async () => {
-    await openGroupTab();
+  it('dismissing the sheet does not lose the checklist selection', async () => {
+    await openGroupSheet();
     await waitFor(() => expect(screen.getByText('زيد احمد')).toBeInTheDocument());
     await userEvent.click(screen.getByRole('button', { name: 'تحديد الكل / إلغاء' }));
     expect(screen.getByText('2 محدد')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'تسجيل فردي' }));
-    expect(screen.getByPlaceholderText('ابحث أو اختر اسم الطالب…')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'إلغاء' }));
+    expect(screen.queryByRole('dialog', { name: 'تسجيل حضور جماعي' })).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'حضور جماعي' }));
+    await userEvent.click(screen.getByRole('button', { name: /حضور جماعي/ }));
     expect(screen.getByText('2 محدد')).toBeInTheDocument(); // selection preserved
   });
 
-  it('entering edit mode forces the individual tab even if group was active', async () => {
-    await openGroupTab();
-    expect(screen.getByText(/حضور اليوم/)).toBeInTheDocument();
-    // Re-render with an edit record is exercised by the edit-mode suite above;
-    // here we just confirm group mode itself never shows record-editing UI.
+  it('leaves the individual form mounted underneath instead of replacing it', async () => {
+    await openGroupSheet();
+    await waitFor(() => expect(screen.getByText('زيد احمد')).toBeInTheDocument());
+    // The old two-tab layout swapped the form out entirely; the sheet must not.
+    expect(screen.getByPlaceholderText('ابحث أو اختر اسم الطالب…')).toBeInTheDocument();
     expect(screen.queryByText(/تعديل جلسة محفوظة/)).not.toBeInTheDocument();
   });
 });
