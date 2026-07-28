@@ -4,7 +4,6 @@ import {
   isScoreEntryComplete,
   parseScoreField,
   scoreName,
-  scoreToHalfStars,
   scoreToStars,
 } from './scoring';
 
@@ -13,17 +12,19 @@ describe('scoreName', () => {
     expect(scoreName(0)).toBe('إعادة');
   });
 
+  // Bands are 90/80/70/60 (was 85/75/65/50) — every boundary and the value
+  // one below it is pinned so an off-by-one in a `>=` can't slip through.
   it.each([
     [0, 'إعادة'],
     [1, 'إعادة'],
-    [49, 'إعادة'],
-    [50, 'مقبول'],
-    [64, 'مقبول'],
-    [65, 'جيد'],
-    [74, 'جيد'],
-    [75, 'جيد جداً'],
-    [84, 'جيد جداً'],
-    [85, 'ممتاز'],
+    [59, 'إعادة'],
+    [60, 'مقبول'],
+    [69, 'مقبول'],
+    [70, 'جيد'],
+    [79, 'جيد'],
+    [80, 'جيد جداً'],
+    [89, 'جيد جداً'],
+    [90, 'ممتاز'],
     [100, 'ممتاز'],
   ])('scoreName(%i) === %s', (input, expected) => {
     expect(scoreName(input)).toBe(expected);
@@ -37,29 +38,47 @@ describe('scoreName', () => {
   });
 });
 
-describe('scoreToHalfStars', () => {
+describe('scoreToStars', () => {
+  // Stars are derived from the SAME bands as scoreName, so every boundary is
+  // pinned here too — this is the invariant that keeps the label, the parent
+  // page and the WhatsApp message from disagreeing about the same session.
   it.each([
     [0, 0],
-    [10, 0.5],
-    [20, 1],
-    [50, 2.5],
+    [59, 0],
+    [60, 2],
+    [69, 2],
+    [70, 3],
+    [79, 3],
+    [80, 4],
+    [89, 4],
+    [90, 5],
     [100, 5],
-  ])('scoreToHalfStars(%i) === %s', (input, expected) => {
-    expect(scoreToHalfStars(input)).toBe(expected);
+  ])('scoreToStars(%i) === %i', (input, expected) => {
+    expect(scoreToStars(input)).toBe(expected);
   });
 
-  it('clamps out-of-range input', () => {
-    expect(scoreToHalfStars(150)).toBe(5);
-    expect(scoreToHalfStars(-20)).toBe(0);
+  it('never awards exactly one star — there is no 1-star grade', () => {
+    for (let s = 0; s <= 100; s++) expect(scoreToStars(s)).not.toBe(1);
   });
-});
 
-describe('scoreToStars', () => {
-  it('floors the half-star value to a whole star count', () => {
-    expect(scoreToStars(84)).toBe(4); // half-stars = round(8.4)*0.5 = 4 -> floor 4
-    expect(scoreToStars(85)).toBe(4); // half-stars = round(8.5)*0.5 = 4.5 -> floor 4
-    expect(scoreToStars(90)).toBe(4); // half-stars = round(9)*0.5 = 4.5 -> floor 4
-    expect(scoreToStars(100)).toBe(5); // half-stars = 5 -> floor 5
+  it('agrees with scoreName across the whole range', () => {
+    const expectedStars: Record<string, number> = {
+      ممتاز: 5,
+      'جيد جداً': 4,
+      جيد: 3,
+      مقبول: 2,
+      إعادة: 0,
+    };
+    for (let s = 0; s <= 100; s++) {
+      expect(scoreToStars(s)).toBe(expectedStars[scoreName(s)]);
+    }
+  });
+
+  it('returns 0 stars for unset/invalid input rather than guessing', () => {
+    expect(scoreToStars('')).toBe(0);
+    expect(scoreToStars(null)).toBe(0);
+    expect(scoreToStars(undefined)).toBe(0);
+    expect(scoreToStars('abc')).toBe(0);
   });
 });
 

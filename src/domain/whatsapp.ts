@@ -1,25 +1,45 @@
 import type { SessionRecord } from '../types';
 import { CHILD_STATS_BASE_URL } from '../config';
-import { hasScore, scoreName, scoreToHalfStars } from './scoring';
+import { hasScore, scoreName, scoreToStars } from './scoring';
 import { extractAssignedSuras } from './record';
 import { joinSuraNames, ayahRange } from './suras';
 import { toWesternDigits } from './text';
 
 /**
- * Plain-text star string (not JSX) for a 0-100 SCORE — WhatsApp fonts render
- * the half-star glyph inconsistently across phones, so this rounds to the
- * nearest whole star for message text, unlike the UI's half-star StarRating.
+ * Plain-text star row for WhatsApp, FILLED STARS ONLY.
+ *
+ * Uses the colour emoji star ⭐ (U+2B50) rather than the plain text glyph ★
+ * (U+2605). ⭐ has no hollow counterpart, so there is nothing to pad the row
+ * out to five with: pairing it with ☆ puts a flat monochrome outline beside a
+ * colour emoji at a different advance width, and the row reads as broken.
+ * Showing only what was earned is unambiguous anyway, since the grade label
+ * always sits next to it on the same line.
+ *
+ * A consequence worth knowing: إعادة scores 0 stars, so that line carries the
+ * label and no stars at all.
  */
+const STAR_EMOJI = '\u2b50';
+
 function starsTextFromScore(score: number): string {
-  const full = Math.round(scoreToHalfStars(score));
-  return '★'.repeat(full) + '☆'.repeat(Math.max(0, 5 - full));
+  return STAR_EMOJI.repeat(scoreToStars(score));
 }
 
-/** Plain-text star string for an already-known 0-5 star COUNT (tajweed's
- * fallback display when no numeric score was given) — no score conversion. */
+/** Same row for an already-known 0-5 star COUNT (tajweed's fallback display
+ * when no numeric score was given) — no score conversion. */
 function starsTextFromCount(count: number): string {
   const full = Math.max(0, Math.min(5, Math.round(count)));
-  return '★'.repeat(full) + '☆'.repeat(5 - full);
+  return STAR_EMOJI.repeat(full);
+}
+
+/**
+ * The "95/100 ⭐⭐⭐⭐⭐ ممتاز" fragment, assembled in ONE place so the spacing
+ * can't rot. It has to be built by joining non-empty parts rather than by
+ * concatenating with literal spaces: an إعادة score draws no stars at all, and
+ * the naive `score + '/100 ' + stars + ' ' + label` left a double space
+ * sitting in the middle of the line the parent reads.
+ */
+function scoreFragment(score: number): string {
+  return [`${score}/100`, starsTextFromScore(score), scoreName(score)].filter(Boolean).join(' ');
 }
 
 /**
@@ -62,45 +82,17 @@ export function buildWhatsAppMessage(
     msg += '📖 *ما تم تسميعه اليوم*' + nl;
     if (todayLoh.length) {
       msg += '• اللوح: ' + joinSuraNames(todayLoh);
-      if (hasScore(rec.loh))
-        msg +=
-          '  ←  ' +
-          rec.loh!.score +
-          '/100 ' +
-          starsTextFromScore(rec.loh!.score!) +
-          ' ' +
-          scoreName(rec.loh!.score);
+      if (hasScore(rec.loh)) msg += '  ←  ' + scoreFragment(rec.loh!.score!);
       msg += nl;
     } else if (hasScore(rec.loh)) {
-      msg +=
-        '• اللوح: ' +
-        rec.loh!.score +
-        '/100 ' +
-        starsTextFromScore(rec.loh!.score!) +
-        ' ' +
-        scoreName(rec.loh!.score) +
-        nl;
+      msg += '• اللوح: ' + scoreFragment(rec.loh!.score!) + nl;
     }
     if (todayMadi.length) {
       msg += '• الماضي: ' + joinSuraNames(todayMadi);
-      if (hasScore(rec.madi))
-        msg +=
-          '  ←  ' +
-          rec.madi!.score +
-          '/100 ' +
-          starsTextFromScore(rec.madi!.score!) +
-          ' ' +
-          scoreName(rec.madi!.score);
+      if (hasScore(rec.madi)) msg += '  ←  ' + scoreFragment(rec.madi!.score!);
       msg += nl;
     } else if (hasScore(rec.madi)) {
-      msg +=
-        '• الماضي: ' +
-        rec.madi!.score +
-        '/100 ' +
-        starsTextFromScore(rec.madi!.score!) +
-        ' ' +
-        scoreName(rec.madi!.score) +
-        nl;
+      msg += '• الماضي: ' + scoreFragment(rec.madi!.score!) + nl;
     }
     msg += nl;
   }
@@ -111,12 +103,7 @@ export function buildWhatsAppMessage(
     // the hand-built version printed a bare "(–)" to the parent instead.
     msg += '• ' + rec.tajweed.sura + ayahRange(rec.tajweed.from, rec.tajweed.to);
     msg += rec.tajweed.score
-      ? '  ←  ' +
-        rec.tajweed.score +
-        '/100 ' +
-        starsTextFromScore(rec.tajweed.score) +
-        ' ' +
-        scoreName(rec.tajweed.score)
+      ? '  ←  ' + scoreFragment(rec.tajweed.score)
       : '  ' + starsTextFromCount(rec.tajweed.stars ?? 0);
     msg += nl;
     if (rec.tajweed.note) msg += '• ملاحظة: ' + rec.tajweed.note + nl;

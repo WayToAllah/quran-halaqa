@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { scoreName } from './scoring';
 import {
   ATTENDANCE_STREAK_THRESHOLD,
   EXCELLENCE_SCORE_THRESHOLD,
@@ -9,6 +10,16 @@ import {
 import type { SessionRecord, Student } from '../types';
 
 const zaid: Student = { id: 's_1', name: 'زيد احمد' };
+
+describe('EXCELLENCE_SCORE_THRESHOLD', () => {
+  it('sits at the top grade band so the badge always means ممتاز', () => {
+    // Pinned by value on purpose: the other tests reference the constant
+    // symbolically, so they would follow it silently wherever it moved.
+    expect(EXCELLENCE_SCORE_THRESHOLD).toBe(90);
+    expect(scoreName(EXCELLENCE_SCORE_THRESHOLD)).toBe('ممتاز');
+    expect(scoreName(EXCELLENCE_SCORE_THRESHOLD - 1)).not.toBe('ممتاز');
+  });
+});
 
 describe('buildStudentBadges', () => {
   it('awards perfectAttendance at exactly 100%', () => {

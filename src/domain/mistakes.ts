@@ -63,11 +63,15 @@ export function rebuildMistakeHistory(mistakes: MistakeTally | null | undefined)
   return h;
 }
 
-/** Color for the live score readout — same thresholds as mistakeScoreColor(). */
+/**
+ * Colour for the live score readout. The cut-offs MUST match scoreName() /
+ * scoreToStars() in scoring.ts — if they drift, the readout turns "ممتاز
+ * green" on a score the rest of the app calls جيد جداً.
+ */
 export function mistakeScoreColor(s: number): string {
-  if (s >= 85) return '#15613a';
-  if (s >= 75) return '#3a8a5c';
-  if (s >= 65) return '#b8720a';
-  if (s >= 50) return '#c98a1f';
+  if (s >= 90) return '#15613a';
+  if (s >= 80) return '#3a8a5c';
+  if (s >= 70) return '#b8720a';
+  if (s >= 60) return '#c98a1f';
   return '#c0392b';
 }

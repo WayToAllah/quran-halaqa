@@ -1,18 +1,23 @@
-import { scoreToHalfStars } from '../domain/scoring';
+import { scoreToStars } from '../domain/scoring';
 
-/** Renders a 5-star rating with half-star precision, driven by a 0-100 score. */
+/**
+ * Renders a 5-star rating driven by a 0-100 score.
+ *
+ * Whole stars only. The previous version drew half-star precision by
+ * overlaying a clipped copy of the star row at a percentage width; with stars
+ * now derived from the grade band (scoreToStars) there are no half values left
+ * to draw, so the clipping trick is gone.
+ *
+ * Filled stars use the brand mustard token rather than Tailwind's amber-500,
+ * which was never part of the palette and read visibly orange next to the
+ * mustard used everywhere else.
+ */
 export function StarRating({ score }: { score: number }) {
-  const half = scoreToHalfStars(score);
-  const fillPct = (half / 5) * 100;
+  const filled = scoreToStars(score);
   return (
-    <span class="relative inline-block text-sm leading-none tracking-widest" dir="ltr">
-      <span class="text-neutral-300">★★★★★</span>
-      <span
-        class="absolute top-0 left-0 overflow-hidden whitespace-nowrap text-amber-500"
-        style={{ width: `${fillPct}%` }}
-      >
-        ★★★★★
-      </span>
+    <span class="text-sm leading-none tracking-widest" dir="ltr">
+      <span class="text-mustard">{'\u2605'.repeat(filled)}</span>
+      <span class="text-hairline">{'\u2605'.repeat(5 - filled)}</span>
     </span>
   );
 }
@@ -22,8 +27,8 @@ export function PlainStars({ count }: { count: number }) {
   const filled = Math.max(0, Math.min(5, Math.round(count)));
   return (
     <span dir="ltr">
-      {'★'.repeat(filled)}
-      {'☆'.repeat(5 - filled)}
+      {'\u2605'.repeat(filled)}
+      {'\u2606'.repeat(5 - filled)}
     </span>
   );
 }

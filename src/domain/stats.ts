@@ -19,8 +19,9 @@ export const AYAT_MILESTONES: ReadonlyArray<{
 /** Consecutive halaqa days attended to earn the "استمرارية" badge. */
 export const ATTENDANCE_STREAK_THRESHOLD = 12;
 
-/** avg(loh, madi) >= this earns the "التميّز" badge. */
-export const EXCELLENCE_SCORE_THRESHOLD = 85;
+/** avg(loh, madi) >= this earns the "التميّز" badge. Tracks the top grade
+ * band in scoring.ts (ممتاز) so the badge always means "excellent". */
+export const EXCELLENCE_SCORE_THRESHOLD = 90;
 
 /**
  * "Improving": average of the most recent 3 scored sessions is higher than

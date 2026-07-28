@@ -7,6 +7,7 @@ import {
   mistakeScoreColor,
   type MistakeKind,
 } from './mistakes';
+import { scoreName } from './scoring';
 
 describe('liveMistakeScore', () => {
   it('starts at 100 with no mistakes', () => {
@@ -98,12 +99,26 @@ describe('rebuildMistakeHistory', () => {
 });
 
 describe('mistakeScoreColor', () => {
+  // Boundaries pinned at both sides so the colour can never drift out of step
+  // with scoreName()'s 90/80/70/60 bands.
   it('maps score bands to the live thresholds', () => {
     expect(mistakeScoreColor(100)).toBe('#15613a');
-    expect(mistakeScoreColor(85)).toBe('#15613a');
+    expect(mistakeScoreColor(90)).toBe('#15613a');
+    expect(mistakeScoreColor(89)).toBe('#3a8a5c');
     expect(mistakeScoreColor(80)).toBe('#3a8a5c');
+    expect(mistakeScoreColor(79)).toBe('#b8720a');
     expect(mistakeScoreColor(70)).toBe('#b8720a');
-    expect(mistakeScoreColor(55)).toBe('#c98a1f');
-    expect(mistakeScoreColor(40)).toBe('#c0392b');
+    expect(mistakeScoreColor(69)).toBe('#c98a1f');
+    expect(mistakeScoreColor(60)).toBe('#c98a1f');
+    expect(mistakeScoreColor(59)).toBe('#c0392b');
+    expect(mistakeScoreColor(0)).toBe('#c0392b');
+  });
+
+  it('changes colour at exactly the same points scoreName changes label', () => {
+    for (let n = 1; n <= 100; n++) {
+      const labelChanged = scoreName(n) !== scoreName(n - 1);
+      const colourChanged = mistakeScoreColor(n) !== mistakeScoreColor(n - 1);
+      expect(colourChanged).toBe(labelChanged);
+    }
   });
 });

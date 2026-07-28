@@ -85,7 +85,56 @@ describe('buildWhatsAppMessage', () => {
       tajweed: { sura: 'النساء', from: '1', to: '3', stars: 3 },
     };
     const msg = buildWhatsAppMessage(rec, null);
-    expect(msg).toContain('★★★☆☆');
+    expect(msg).toContain('⭐⭐⭐');
+    // Filled stars only — no hollow padding, and nothing left over from the
+    // old ★/☆ pair (⭐ has no hollow counterpart to pad with).
+    expect(msg).not.toContain('☆');
+    expect(msg).not.toContain('★');
+  });
+
+  it.each([
+    [90, 5],
+    [85, 4],
+    [75, 3],
+    [65, 2],
+  ])('draws %i as %i filled stars, matching its grade band', (score, expected) => {
+    const rec: SessionRecord = {
+      id: 'r1',
+      studentId: 's_1',
+      student: 'زيد احمد',
+      date: '2026-07-03',
+      loh: { score, stars: 0 },
+    };
+    const msg = buildWhatsAppMessage(rec, null);
+    expect(msg).toContain('⭐'.repeat(expected));
+    expect(msg).not.toContain('⭐'.repeat(expected + 1));
+  });
+
+  it('leaves no stray gap on the line when a score earns no stars', () => {
+    const rec: SessionRecord = {
+      id: 'r1',
+      studentId: 's_1',
+      student: 'زيد احمد',
+      date: '2026-07-03',
+      loh: { score: 55, stars: 0 },
+    };
+    const line = buildWhatsAppMessage(rec, null)
+      .split('\n')
+      .find((l) => l.includes('55/100'));
+    expect(line).toBe('• اللوح: 55/100 إعادة');
+  });
+
+  it('draws no stars at all for an إعادة score', () => {
+    const rec: SessionRecord = {
+      id: 'r1',
+      studentId: 's_1',
+      student: 'زيد احمد',
+      date: '2026-07-03',
+      loh: { score: 55, stars: 0 },
+    };
+    const msg = buildWhatsAppMessage(rec, null);
+    expect(msg).toContain('إعادة');
+    expect(msg).not.toContain('⭐');
   });
 
   it('includes the note when present', () => {

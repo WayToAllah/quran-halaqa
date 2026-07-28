@@ -10,18 +10,41 @@ export function hasScore(o: ScoreEval | null | undefined): o is ScoreEval & { sc
   return !!o && o.score != null;
 }
 
-/** Every 10 points = half a star; 0–5 stars in 0.5 steps. */
-export function scoreToHalfStars(score: number | string | null | undefined): number {
-  const s = Math.min(100, Math.max(0, parseInt(String(score)) || 0));
-  return Math.round(s / 10) * 0.5;
-}
-
+/**
+ * Score → whole stars, derived from the SAME bands as scoreName().
+ *
+ * Replaces the old continuous formula (`round(score/10) * 0.5`, 0–5 in half
+ * steps), which had no relationship to the grade bands and so routinely
+ * disagreed with the label sitting next to it — 90 read "ممتاز" but drew 4.5
+ * stars, and the WhatsApp message (which rounded to whole stars) drew 5 for
+ * the same session the parent page drew 4.5 for. Tying stars to the band
+ * makes label, page and message agree by construction.
+ *
+ * "إعادة" deliberately gets 0 stars rather than 1: a failing session showing
+ * a star reads as partial credit, and there is no 1-star grade in the scale.
+ */
 export function scoreToStars(score: number | string | null | undefined): number {
-  return Math.floor(scoreToHalfStars(score));
+  const s = parseInt(String(score));
+  if (isNaN(s)) return 0;
+  if (s >= 90) return 5;
+  if (s >= 80) return 4;
+  if (s >= 70) return 3;
+  if (s >= 60) return 2;
+  return 0;
 }
 
 /**
  * Score → Arabic performance label.
+ *
+ * Bands (2026-07-27): 90+ ممتاز · 80+ جيد جداً · 70+ جيد · 60+ مقبول · else
+ * إعادة. Previously 85/75/65/50. These same cut-offs are mirrored by
+ * scoreToStars() above and by scoreColor() in mistakes.ts — the three must
+ * move together or a session can show one band's label with another band's
+ * stars or colour.
+ *
+ * The label is COMPUTED, never stored, so changing these bands re-describes
+ * every historical record on sight. That is intended: the halaqa has one
+ * grading scale, not one per era.
  *
  * Production bug fix (2026-07-06): the original lived as
  *   `if (isNaN(s) || s === 0) return '';`
@@ -34,10 +57,10 @@ export function scoreToStars(score: number | string | null | undefined): number 
 export function scoreName(score: number | string | null | undefined): string {
   const s = parseInt(String(score));
   if (isNaN(s)) return '';
-  if (s >= 85) return 'ممتاز';
-  if (s >= 75) return 'جيد جداً';
-  if (s >= 65) return 'جيد';
-  if (s >= 50) return 'مقبول';
+  if (s >= 90) return 'ممتاز';
+  if (s >= 80) return 'جيد جداً';
+  if (s >= 70) return 'جيد';
+  if (s >= 60) return 'مقبول';
   return 'إعادة';
 }
 
