@@ -27,7 +27,7 @@ export const MOCK_PUBLIC_STATS: PublicStats = {
   recentSessions: [
     {
       date: '2026-07-09',
-      loh: { score: 92 },
+      loh: { score: 92, mistakes: { full: 2, tajweed: 1 } },
       madi: { score: 90 },
       newLoh: [{ sura: 'آل عمران', from: '1', to: '15' }],
       newMadi: [{ sura: 'البقرة', from: '280', to: '286' }],

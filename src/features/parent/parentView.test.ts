@@ -404,3 +404,99 @@ describe('Arabic-Indic numerals throughout the parent page', () => {
     expect(joinSuraNames([{ sura: 'البقرة', from: '280', to: '286' }])).toBe('البقرة (280–286)');
   });
 });
+
+describe('buildSessions — evaluation vs new homework', () => {
+  /** Two consecutive sessions. The BQ assignment is given on the 7th and
+   * graded on the 9th; the آل عمران assignment is given on the 9th and has
+   * not been recited yet. */
+  function twoSessions(): PublicStats {
+    return baseStats({
+      recentSessions: [
+        {
+          date: '2026-07-09',
+          loh: { score: 92, mistakes: { full: 2, tajweed: 1 } },
+          madi: { score: 90 },
+          newLoh: [{ sura: 'آل عمران', from: '1', to: '15' }],
+          newMadi: [{ sura: 'البقرة', from: '280', to: '286' }],
+          tajweed: null,
+          note: '',
+        },
+        {
+          date: '2026-07-07',
+          loh: { score: 80 },
+          madi: { score: 85 },
+          newLoh: [{ sura: 'البقرة', from: '1', to: '10' }],
+          newMadi: [{ sura: 'الفاتحة', from: '1', to: '7' }],
+          tajweed: null,
+          note: '',
+        },
+      ],
+    });
+  }
+
+  it("credits today's score to the sura assigned LAST session, not this one", () => {
+    const s = buildSessions(twoSessions())[0];
+    // The 92 grades البقرة (assigned on the 7th)...
+    expect(s.recitedLoh).toContain('البقرة');
+    expect(s.recitedLoh).not.toContain('آل عمران');
+    // ...while آل عمران is homework he hasn't recited yet.
+    expect(s.newLoh).toContain('آل عمران');
+    expect(s.newLoh).not.toContain('البقرة');
+  });
+
+  it('does the same for the madi side', () => {
+    const s = buildSessions(twoSessions())[0];
+    expect(s.recitedMadi).toContain('الفاتحة');
+    expect(s.newMadi).toContain('البقرة');
+  });
+
+  it('has nothing recited for the first session a student ever had', () => {
+    // Oldest row: no earlier session exists, so nothing had been assigned yet.
+    const s = buildSessions(twoSessions())[1];
+    expect(s.recitedLoh).toBeNull();
+    expect(s.recitedMadi).toBeNull();
+    expect(s.newLoh).toContain('البقرة');
+  });
+
+  it('finds a predecessor for the oldest row on screen, beyond the window', () => {
+    // 6 published sessions, 5 shown — the 5th still resolves its predecessor.
+    const names = ['واحد', 'اتنين', 'تلاتة', 'اربعة', 'خمسة', 'ستة'];
+    const recentSessions = Array.from({ length: 6 }, (_, i) => ({
+      date: `2026-07-0${6 - i}`,
+      loh: { score: 90 },
+      madi: null,
+      newLoh: [{ sura: names[5 - i], from: '1', to: '5' }],
+      newMadi: [],
+      tajweed: null,
+      note: '',
+    }));
+    const rows = buildSessions(baseStats({ recentSessions }));
+    expect(rows).toHaveLength(5);
+    expect(rows[4].recitedLoh).toContain('واحد');
+  });
+
+  it('formats a mistake tally, and distinguishes none-recorded from zero', () => {
+    const rows = buildSessions(twoSessions());
+    expect(rows[0].lohMistakes).toBe('٢ خطأ · ١ خطأ تجويدي');
+    // madi on the same session carries no tally at all
+    expect(rows[0].madiMistakes).toBeNull();
+  });
+
+  it('says "بدون أخطاء" for an explicitly zero tally', () => {
+    const stats = baseStats({
+      recentSessions: [
+        {
+          date: '2026-07-09',
+          loh: { score: 100, mistakes: { full: 0, tajweed: 0 } },
+          madi: null,
+          newLoh: [],
+          newMadi: [],
+          tajweed: null,
+          note: '',
+        },
+      ],
+    });
+    expect(buildSessions(stats)[0].lohMistakes).toBe('بدون أخطاء');
+    expect(buildSessions(stats)[0].madiMistakes).toBeNull();
+  });
+});

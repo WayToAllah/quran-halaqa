@@ -1,4 +1,4 @@
-import type { PublicStats, SuraAssignment } from '../../types';
+import type { MistakeTally, PublicStats, SuraAssignment } from '../../types';
 import { joinSuraNames } from '../../domain/suras';
 import { gregorianStr, gregorianLong } from '../../domain/dates';
 import { hijriShort } from '../../domain/hijri';
@@ -275,6 +275,16 @@ export interface SessionView {
   madiLabel: string;
   lohPct: string;
   madiPct: string;
+  /** What today's loh score actually grades: the sura(s) assigned in the
+   * PREVIOUS session. null when this was the student's first session (nothing
+   * had been assigned yet) or the predecessor is outside the published window. */
+  recitedLoh: string | null;
+  recitedMadi: string | null;
+  /** '٢ خطأ · ١ خطأ تجويدي' — omitted entirely when the teacher recorded no
+   * tally, which is different from recording a tally of zero. */
+  lohMistakes: string | null;
+  madiMistakes: string | null;
+  /** Assigned THIS session, to be recited next time. */
   newLoh: string | null;
   newMadi: string | null;
   note: string;
@@ -283,9 +293,23 @@ export interface SessionView {
 /** How many recent sessions the timeline shows. */
 export const SESSIONS_WINDOW = 5;
 
+function mistakeLine(m: MistakeTally | undefined): string | null {
+  if (!m) return null;
+  const parts: string[] = [];
+  if (m.full) parts.push(toArabicDigits(m.full) + ' خطأ');
+  if (m.tajweed) parts.push(toArabicDigits(m.tajweed) + ' خطأ تجويدي');
+  return parts.length ? parts.join(' · ') : 'بدون أخطاء';
+}
+
 export function buildSessions(stats: PublicStats): SessionView[] {
-  return stats.recentSessions.slice(0, SESSIONS_WINDOW).map((s) => {
+  const all = stats.recentSessions;
+  return all.slice(0, SESSIONS_WINDOW).map((s, i) => {
     const when = formatSessionDate(s.date);
+    // recentSessions is newest-first and excludes attendance-only days, so the
+    // next element is the previous real session — exactly what the admin app
+    // grades against (findPreviousSession). Indexing into the full array, not
+    // the sliced one, so the oldest row on screen still finds its predecessor.
+    const prev = all[i + 1];
     return {
       date: s.date,
       dateHijri: when.hijri,
@@ -296,6 +320,10 @@ export function buildSessions(stats: PublicStats): SessionView[] {
       madiLabel: s.madi ? toArabicDigits(s.madi.score) : '—',
       lohPct: (s.loh ? s.loh.score : 0) + '%',
       madiPct: (s.madi ? s.madi.score : 0) + '%',
+      recitedLoh: prev && prev.newLoh.length ? suraLabelForParent(prev.newLoh) : null,
+      recitedMadi: prev && prev.newMadi.length ? suraLabelForParent(prev.newMadi) : null,
+      lohMistakes: s.loh ? mistakeLine(s.loh.mistakes) : null,
+      madiMistakes: s.madi ? mistakeLine(s.madi.mistakes) : null,
       newLoh: s.newLoh.length ? suraLabelForParent(s.newLoh) : null,
       newMadi: s.newMadi.length ? suraLabelForParent(s.newMadi) : null,
       note: s.note,

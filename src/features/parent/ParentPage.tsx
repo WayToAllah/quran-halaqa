@@ -387,49 +387,98 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
                   )}
                 </div>
 
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-                  <span style="font-size:12px;color:var(--text-muted);width:44px;flex-shrink:0">
-                    اللوح
-                  </span>
-                  {s.newLoh && (
-                    <span style="font-size:12.5px;color:var(--text);font-weight:500;max-width:108px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0">
-                      {s.newLoh}
-                    </span>
-                  )}
-                  <div style="flex:1;height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden">
-                    <div
-                      style={
-                        'height:100%;border-radius:3px;background:var(--ink);transition:width 0.6s ease;width:' +
-                        s.lohPct
-                      }
-                    ></div>
-                  </div>
-                  <span style="font-size:12.5px;font-weight:700;color:var(--ink);width:32px;text-align:left">
-                    {s.lohLabel}
-                  </span>
-                </div>
+                {/* Two clearly separated groups. These belong to DIFFERENT
+                    weeks: the score grades what was assigned last session,
+                    while the homework below is for next time. Rendering the
+                    new sura on the same line as the score read as "he scored
+                    90 on البقرة" when he hadn't recited البقرة yet. */}
+                {(s.loh !== null || s.madi !== null) && (
+                  <div style="margin-bottom:10px">
+                    <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:7px">
+                      📊 تقييم التسميع
+                    </div>
 
-                <div style="display:flex;align-items:center;gap:10px">
-                  <span style="font-size:12px;color:var(--text-muted);width:44px;flex-shrink:0">
-                    الماضي
-                  </span>
-                  {s.newMadi && (
-                    <span style="font-size:12.5px;color:var(--text);font-weight:500;max-width:108px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0">
-                      {s.newMadi}
-                    </span>
-                  )}
-                  <div style="flex:1;height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden">
-                    <div
-                      style={
-                        'height:100%;border-radius:3px;background:var(--accent);transition:width 0.6s ease;width:' +
-                        s.madiPct
-                      }
-                    ></div>
+                    {s.loh !== null && (
+                      <div style="margin-bottom:8px">
+                        <div style="display:flex;align-items:center;gap:10px">
+                          <span style="font-size:12px;color:var(--text-muted);width:44px;flex-shrink:0">
+                            اللوح
+                          </span>
+                          {s.recitedLoh && (
+                            <span style="font-size:12.5px;color:var(--text);font-weight:500;max-width:108px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0">
+                              {s.recitedLoh}
+                            </span>
+                          )}
+                          <div style="flex:1;height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden">
+                            <div
+                              style={
+                                'height:100%;border-radius:3px;background:var(--ink);transition:width 0.6s ease;width:' +
+                                s.lohPct
+                              }
+                            ></div>
+                          </div>
+                          <span style="font-size:12.5px;font-weight:700;color:var(--ink);width:32px;text-align:left">
+                            {s.lohLabel}
+                          </span>
+                        </div>
+                        {s.lohMistakes && (
+                          <div style="font-size:11px;color:var(--text-hint);margin-top:3px;padding-right:54px">
+                            ↳ {s.lohMistakes}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {s.madi !== null && (
+                      <div>
+                        <div style="display:flex;align-items:center;gap:10px">
+                          <span style="font-size:12px;color:var(--text-muted);width:44px;flex-shrink:0">
+                            الماضي
+                          </span>
+                          {s.recitedMadi && (
+                            <span style="font-size:12.5px;color:var(--text);font-weight:500;max-width:108px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0">
+                              {s.recitedMadi}
+                            </span>
+                          )}
+                          <div style="flex:1;height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden">
+                            <div
+                              style={
+                                'height:100%;border-radius:3px;background:var(--accent);transition:width 0.6s ease;width:' +
+                                s.madiPct
+                              }
+                            ></div>
+                          </div>
+                          <span style="font-size:12.5px;font-weight:700;color:var(--accent);width:32px;text-align:left">
+                            {s.madiLabel}
+                          </span>
+                        </div>
+                        {s.madiMistakes && (
+                          <div style="font-size:11px;color:var(--text-hint);margin-top:3px;padding-right:54px">
+                            ↳ {s.madiMistakes}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <span style="font-size:12.5px;font-weight:700;color:var(--accent);width:32px;text-align:left">
-                    {s.madiLabel}
-                  </span>
-                </div>
+                )}
+
+                {(s.newLoh || s.newMadi) && (
+                  <div style="padding:9px 11px;border-radius:9px;background:var(--surface-2)">
+                    <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:5px">
+                      ✏️ الواجب الجديد للمرة الجاية
+                    </div>
+                    {s.newLoh && (
+                      <div style="font-size:12.5px;color:var(--text);margin-bottom:2px">
+                        <span style="color:var(--text-muted)">اللوح:</span> {s.newLoh}
+                      </div>
+                    )}
+                    {s.newMadi && (
+                      <div style="font-size:12.5px;color:var(--text)">
+                        <span style="color:var(--text-muted)">الماضي:</span> {s.newMadi}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {s.note && (
                   <div style="font-size:13px;color:var(--text-muted);font-style:italic;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border-strong)">
