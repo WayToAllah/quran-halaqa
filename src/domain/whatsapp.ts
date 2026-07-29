@@ -32,14 +32,38 @@ function starsTextFromCount(count: number): string {
 }
 
 /**
- * The "95/100 ⭐⭐⭐⭐⭐ ممتاز" fragment, assembled in ONE place so the spacing
- * can't rot. It has to be built by joining non-empty parts rather than by
- * concatenating with literal spaces: an إعادة score draws no stars at all, and
- * the naive `score + '/100 ' + stars + ' ' + label` left a double space
- * sitting in the middle of the line the parent reads.
+ * The evaluation is split across two lines for the parent: the numeric score
+ * stays beside the sura it belongs to, and the stars + grade label drop onto
+ * their own indented line beneath it. Long sura lists used to push the stars
+ * off the end of a wrapped line on a phone, which is exactly the part the
+ * parent looks for first.
  */
-function scoreFragment(score: number): string {
-  return [`${score}/100`, starsTextFromScore(score), scoreName(score)].filter(Boolean).join(' ');
+const GRADE_INDENT = '   ';
+
+function scoreText(score: number): string {
+  return `${score}/100`;
+}
+
+/**
+ * The indented "⭐⭐⭐⭐ ممتاز" row. Built by joining non-empty parts rather
+ * than concatenating with literal spaces: an إعادة score draws no stars at
+ * all, and the naive `stars + ' ' + label` left a stray gap on the line the
+ * parent reads. Returns '' when there is nothing to draw at all.
+ */
+function gradeRow(...parts: string[]): string {
+  const row = parts.filter(Boolean).join(' ');
+  return row ? GRADE_INDENT + row : '';
+}
+
+/** Grade row for a numeric score: stars + label. */
+function gradeRowFromScore(score: number): string {
+  return gradeRow(starsTextFromScore(score), scoreName(score));
+}
+
+/** The grade row plus its newline, or '' — so an empty row never leaves a
+ * blank line sitting in the middle of the message. */
+function gradeLine(row: string): string {
+  return row ? row + '\n' : '';
 }
 
 /**
@@ -82,17 +106,21 @@ export function buildWhatsAppMessage(
     msg += '📖 *ما تم تسميعه اليوم*' + nl;
     if (todayLoh.length) {
       msg += '• اللوح: ' + joinSuraNames(todayLoh);
-      if (hasScore(rec.loh)) msg += '  ←  ' + scoreFragment(rec.loh!.score!);
+      if (hasScore(rec.loh)) msg += '  ←  ' + scoreText(rec.loh!.score!);
       msg += nl;
+      if (hasScore(rec.loh)) msg += gradeLine(gradeRowFromScore(rec.loh!.score!));
     } else if (hasScore(rec.loh)) {
-      msg += '• اللوح: ' + scoreFragment(rec.loh!.score!) + nl;
+      msg += '• اللوح: ' + scoreText(rec.loh!.score!) + nl;
+      msg += gradeLine(gradeRowFromScore(rec.loh!.score!));
     }
     if (todayMadi.length) {
       msg += '• الماضي: ' + joinSuraNames(todayMadi);
-      if (hasScore(rec.madi)) msg += '  ←  ' + scoreFragment(rec.madi!.score!);
+      if (hasScore(rec.madi)) msg += '  ←  ' + scoreText(rec.madi!.score!);
       msg += nl;
+      if (hasScore(rec.madi)) msg += gradeLine(gradeRowFromScore(rec.madi!.score!));
     } else if (hasScore(rec.madi)) {
-      msg += '• الماضي: ' + scoreFragment(rec.madi!.score!) + nl;
+      msg += '• الماضي: ' + scoreText(rec.madi!.score!) + nl;
+      msg += gradeLine(gradeRowFromScore(rec.madi!.score!));
     }
     msg += nl;
   }
@@ -102,10 +130,13 @@ export function buildWhatsAppMessage(
     // ayahRange() omits the parentheses entirely when no ayat were entered —
     // the hand-built version printed a bare "(–)" to the parent instead.
     msg += '• ' + rec.tajweed.sura + ayahRange(rec.tajweed.from, rec.tajweed.to);
-    msg += rec.tajweed.score
-      ? '  ←  ' + scoreFragment(rec.tajweed.score)
-      : '  ' + starsTextFromCount(rec.tajweed.stars ?? 0);
+    if (rec.tajweed.score) msg += '  ←  ' + scoreText(rec.tajweed.score);
     msg += nl;
+    msg += gradeLine(
+      rec.tajweed.score
+        ? gradeRowFromScore(rec.tajweed.score)
+        : gradeRow(starsTextFromCount(rec.tajweed.stars ?? 0)),
+    );
     if (rec.tajweed.note) msg += '• ملاحظة: ' + rec.tajweed.note + nl;
     msg += nl;
   }

@@ -110,7 +110,7 @@ describe('buildWhatsAppMessage', () => {
     expect(msg).not.toContain('⭐'.repeat(expected + 1));
   });
 
-  it('leaves no stray gap on the line when a score earns no stars', () => {
+  it('leaves no stray gap on the grade row when a score earns no stars', () => {
     const rec: SessionRecord = {
       id: 'r1',
       studentId: 's_1',
@@ -118,10 +118,75 @@ describe('buildWhatsAppMessage', () => {
       date: '2026-07-03',
       loh: { score: 55, stars: 0 },
     };
-    const line = buildWhatsAppMessage(rec, null)
-      .split('\n')
-      .find((l) => l.includes('55/100'));
-    expect(line).toBe('• اللوح: 55/100 إعادة');
+    const lines = buildWhatsAppMessage(rec, null).split('\n');
+    const i = lines.findIndex((l) => l.includes('55/100'));
+    expect(lines[i]).toBe('• اللوح: 55/100');
+    expect(lines[i + 1]).toBe('   إعادة');
+  });
+
+  it('puts the stars and grade label on their own line under the score', () => {
+    const rec: SessionRecord = {
+      id: 'r1',
+      studentId: 's_1',
+      student: 'زيد احمد',
+      date: '2026-07-03',
+      loh: { score: 90 },
+      madi: { score: 78 },
+    };
+    const lines = buildWhatsAppMessage(rec, prevSession).split('\n');
+
+    const lohIdx = lines.findIndex((l) => l.startsWith('• اللوح'));
+    expect(lines[lohIdx]).toBe('• اللوح: البقرة (1–10)  ←  90/100');
+    expect(lines[lohIdx + 1]).toBe('   ⭐⭐⭐⭐⭐ ممتاز');
+
+    const madiIdx = lines.findIndex((l) => l.startsWith('• الماضي'));
+    expect(lines[madiIdx]).toBe('• الماضي: 78/100');
+    expect(lines[madiIdx + 1]).toBe('   ⭐⭐⭐ جيد');
+  });
+
+  it('puts the tajweed stars on their own line too, scored or star-count only', () => {
+    const scored = buildWhatsAppMessage(
+      {
+        id: 'r1',
+        studentId: 's_1',
+        student: 'زيد احمد',
+        date: '2026-07-03',
+        tajweed: { sura: 'النساء', from: '1', to: '3', score: 85, stars: 4 },
+      },
+      null,
+    ).split('\n');
+    const sIdx = scored.findIndex((l) => l.includes('النساء'));
+    expect(scored[sIdx]).toBe('• النساء (1–3)  ←  85/100');
+    expect(scored[sIdx + 1]).toBe('   ⭐⭐⭐⭐ جيد جداً');
+
+    const unscored = buildWhatsAppMessage(
+      {
+        id: 'r2',
+        studentId: 's_1',
+        student: 'زيد احمد',
+        date: '2026-07-03',
+        tajweed: { sura: 'النساء', from: '1', to: '3', stars: 3 },
+      },
+      null,
+    ).split('\n');
+    const uIdx = unscored.findIndex((l) => l.includes('النساء'));
+    expect(unscored[uIdx]).toBe('• النساء (1–3)');
+    expect(unscored[uIdx + 1]).toBe('   ⭐⭐⭐');
+  });
+
+  it('never leaves an empty grade line behind when there is nothing to draw', () => {
+    const msg = buildWhatsAppMessage(
+      {
+        id: 'r1',
+        studentId: 's_1',
+        student: 'زيد احمد',
+        date: '2026-07-03',
+        tajweed: { sura: 'الناس', from: '', to: '', stars: 0 },
+      },
+      null,
+    );
+    expect(msg).not.toContain('\n   \n');
+    expect(msg).not.toMatch(/\n\n\n/);
   });
 
   it('draws no stars at all for an إعادة score', () => {
