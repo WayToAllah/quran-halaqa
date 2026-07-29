@@ -4,14 +4,12 @@ import { fetchPublicStatsRest } from '../../data/firestoreRest';
 import {
   getParentTheme,
   buildChart,
-  buildTrend,
   buildStats,
   buildCurrentTask,
   buildSessions,
   rankBadgeText,
   type ParentTheme,
   type ColorRole,
-  type TrendTone,
 } from './parentView';
 
 type LoadState =
@@ -53,12 +51,6 @@ function cssVars(t: ParentTheme): string {
 }
 
 const statColor: Record<ColorRole, string> = { ink: 'var(--ink)', accent: 'var(--accent)' };
-const trendColor: Record<TrendTone, string> = {
-  good: 'var(--good)',
-  warn: 'var(--warn)',
-  muted: 'var(--text-muted)',
-};
-
 function formatUpdatedAt(ms: number): string {
   try {
     return new Intl.DateTimeFormat('ar-EG-u-nu-arab', {
@@ -139,7 +131,6 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
 
   const stats = state.stats;
   const chart = buildChart(stats.scoreHistory);
-  const trend = buildTrend(stats.scoreHistory);
   const statCells = buildStats(stats);
   const task = buildCurrentTask(stats);
   const sessions = buildSessions(stats);
@@ -326,14 +317,6 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
                 {chart.madiLast.label}٪
               </div>
             )}
-          </div>
-          <div
-            style={
-              'text-align:center;font-size:13px;font-weight:700;margin-top:8px;color:' +
-              trendColor[trend.tone]
-            }
-          >
-            {trend.text}
           </div>
         </div>
 

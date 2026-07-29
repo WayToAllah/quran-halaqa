@@ -106,3 +106,16 @@ describe('ParentPage — dates', () => {
     expect(label.textContent).not.toMatch(/\d{4}-\d{2}-\d{2}/);
   });
 });
+
+describe('ParentPage — progress chart', () => {
+  it('draws the chart without a trend caption underneath it', () => {
+    render(<ParentPage previewStats={MOCK_PUBLIC_STATS} />);
+    // The chart itself and its legend stay.
+    expect(screen.getByText('تقدّم آخر الجلسات')).toBeInTheDocument();
+    // The verdict sentence that used to sit under the chart was removed on
+    // request — a parent gets the line and the numbers, not a judgement.
+    expect(screen.queryByText(/في تحسّن مستمر/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/محتاج تشجيع/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/مستقر/)).not.toBeInTheDocument();
+  });
+});
