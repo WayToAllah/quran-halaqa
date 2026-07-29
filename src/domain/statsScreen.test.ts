@@ -259,3 +259,61 @@ describe('computeStudentStatsRows / sortStudentStatsRows', () => {
     );
   });
 });
+
+describe('computeSummaryStats — إعادة does not count as recited', () => {
+  const recs: SessionRecord[] = [
+    {
+      id: 'r1',
+      studentId: 's_1',
+      date: '2026-07-01',
+      newLoh: [{ sura: 'البقرة', from: '1', to: '10' }],
+      newMadi: [{ sura: 'الفاتحة' }],
+    },
+    {
+      id: 'r2',
+      studentId: 's_1',
+      date: '2026-07-03',
+      loh: { score: 50 }, // fails البقرة ١–١٠
+      madi: { score: 90 }, // passes الفاتحة
+    },
+  ];
+
+  it('excludes the failed loh assignment but keeps the passed madi one', () => {
+    const s = computeSummaryStats(recs);
+    expect(s.lohAyat).toBe(0);
+    expect(s.madiAyat).toBe(7);
+    expect(s.totalAyat).toBe(7);
+  });
+
+  it('matches the parent page rather than disagreeing with it', () => {
+    // Same records, same rule → the admin total equals what a parent is shown.
+    expect(computeSummaryStats(recs).totalAyat).toBe(7);
+  });
+
+  it('still catches a failure that lands outside the filtered month', () => {
+    const july = recs.filter((r) => r.date!.startsWith('2026-07'));
+    const crossing: SessionRecord[] = [
+      {
+        id: 'j1',
+        studentId: 's_1',
+        date: '2026-07-31',
+        newLoh: [{ sura: 'البقرة', from: '1', to: '10' }],
+      },
+      { id: 'a1', studentId: 's_1', date: '2026-08-02', loh: { score: 40 } },
+    ];
+    const julyOnly = crossing.filter((r) => r.date!.startsWith('2026-07'));
+    // Without the unfiltered second argument the August grade is invisible…
+    expect(computeSummaryStats(julyOnly).lohAyat).toBe(10);
+    // …with it, the failure counts against July's number.
+    expect(computeSummaryStats(julyOnly, crossing).lohAyat).toBe(0);
+    expect(july.length).toBe(2);
+  });
+
+  it('drops tajweed graded إعادة', () => {
+    const t: SessionRecord[] = [
+      { id: 't1', studentId: 's_1', date: '2026-07-01', tajweed: { sura: 'الفاتحة', score: 30 } },
+      { id: 't2', studentId: 's_1', date: '2026-07-03', tajweed: { sura: 'الفاتحة', score: 85 } },
+    ];
+    expect(computeSummaryStats(t).totalAyat).toBe(7);
+  });
+});

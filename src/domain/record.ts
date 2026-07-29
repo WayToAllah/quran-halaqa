@@ -1,7 +1,62 @@
-import type { SessionRecord, Student, SuraAssignment, TajweedEval } from '../types';
+import type { ScoreEval, SessionRecord, Student, SuraAssignment, TajweedEval } from '../types';
 import { byNewest } from './dates';
+import { hasScore, scoreName } from './scoring';
 import { recordsForStudent } from './students';
 import { findSuraByName } from './suras';
+
+/**
+ * A grade was actually entered AND it lands in the إعادة band.
+ *
+ * Tested through scoreName() rather than a hard-coded cut-off so it follows
+ * the bands wherever they move next — they already went 85/75/65/50 →
+ * 90/80/70/60 on 2026-07-27, and a literal `< 60` here would have silently
+ * kept scoring by the old scale.
+ *
+ * hasScore() first: a genuine 0 IS إعادة, while an unscored side is simply
+ * not graded yet and must not be mistaken for a failure.
+ */
+export function isRepeatGrade(o: ScoreEval | null | undefined): boolean {
+  return hasScore(o) && scoreName(o.score) === 'إعادة';
+}
+
+/**
+ * Which sessions' assignments were later graded إعادة, keyed by record id.
+ *
+ * A session's newLoh/newMadi is recited and graded at the student's NEXT
+ * session, so the verdict on an assignment sits on a different record than
+ * the assignment itself — the same linkage findPreviousSession() walks, taken
+ * forwards instead of back. Records are grouped per student first: "the next
+ * session" only means anything inside one student's own history.
+ *
+ * `false` covers both "passed" and "not graded yet". Ungraded work is
+ * deliberately not treated as failed — the newest assignment simply hasn't
+ * been recited, and dropping it would make every total lag a session behind.
+ */
+export function assignmentsGradedRepeat(
+  records: SessionRecord[],
+): Map<string, { loh: boolean; madi: boolean }> {
+  const byStudent = new Map<string, SessionRecord[]>();
+  for (const r of records) {
+    if (r.attendance_only) continue;
+    const key = r.studentId || r.student || '';
+    const list = byStudent.get(key);
+    if (list) list.push(r);
+    else byStudent.set(key, [r]);
+  }
+
+  const out = new Map<string, { loh: boolean; madi: boolean }>();
+  for (const recs of byStudent.values()) {
+    const oldestFirst = [...recs].sort((a, b) => byNewest(b, a));
+    oldestFirst.forEach((r, i) => {
+      const grader = oldestFirst[i + 1];
+      out.set(r.id, {
+        loh: isRepeatGrade(grader?.loh),
+        madi: isRepeatGrade(grader?.madi),
+      });
+    });
+  }
+  return out;
+}
 
 /**
  * Finds the session whose newLoh/newMadi assignment the admin is about to

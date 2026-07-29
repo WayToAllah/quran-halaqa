@@ -75,7 +75,13 @@ export function StatsScreen() {
     return records.filter((r) => r.date?.slice(0, 7) === monthFilter);
   }, [records, monthFilter]);
 
-  const summary = useMemo(() => computeSummaryStats(filteredRecords), [filteredRecords]);
+  // Second argument is the UNFILTERED set: an assignment given at the end of
+  // the selected month is graded in the next one, and that verdict still has
+  // to count against it.
+  const summary = useMemo(
+    () => computeSummaryStats(filteredRecords, records),
+    [filteredRecords, records],
+  );
   // Recency is about real-world activity, not the selected month view, so this
   // always reads from the full (unfiltered) records regardless of monthFilter.
   const recentlyActive = useMemo(

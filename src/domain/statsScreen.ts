@@ -4,6 +4,7 @@ import { itemAyat } from './suras';
 import { getStudentName, recordsForStudent } from './students';
 import { EXCLUDED_HALAQA_DATES } from './attendance';
 import { localDateStr } from './dates';
+import { assignmentsGradedRepeat, isRepeatGrade } from './record';
 
 /** Ayat memorized across loh (new assignment, falling back to legacy shape),
  * madi (same), and tajweed for one record. Shared by the summary card and
@@ -49,7 +50,15 @@ export interface SummaryStats {
  * stats.ts's buildStudentPublicStats, which correctly returns `null` when
  * unscored since that's data meant for storage/comparison, not display.
  */
-export function computeSummaryStats(records: SessionRecord[]): SummaryStats {
+export function computeSummaryStats(
+  records: SessionRecord[],
+  /** Unfiltered history, used ONLY to work out which assignments were later
+   * graded إعادة. When `records` is month-filtered, the session that grades a
+   * month-end assignment falls outside it, so the verdict has to be looked up
+   * against the full set or that failure goes uncounted. Defaults to
+   * `records` for callers with nothing filtered out. */
+  allRecords: SessionRecord[] = records,
+): SummaryStats {
   const totalSessions = records.length;
   const activeStudents = new Set(records.map((r) => r.studentId || r.student)).size;
 
@@ -60,27 +69,40 @@ export function computeSummaryStats(records: SessionRecord[]): SummaryStats {
       ? Math.round((records.reduce((a, r) => a + (r.loh?.stars ?? 0), 0) / totalSessions) * 20)
       : 0;
 
+  // Work graded إعادة doesn't count as recited. The grade for an assignment
+  // sits on the student's NEXT session, so it's resolved through a per-record
+  // map built from the unfiltered history. Same rule as the parent page's
+  // "آية مُسمّعة" so the two screens can't disagree.
+  const repeatMap = assignmentsGradedRepeat(allRecords);
   let lohAyat = 0;
   let madiAyat = 0;
   records.forEach((r) => {
-    const lohArr = r.newLoh?.length
-      ? r.newLoh
-      : r.loh && (r.loh as unknown as { sura?: string }).sura
-        ? [r.loh as never]
-        : [];
-    lohArr.forEach((l) => {
-      if (l?.sura) lohAyat += itemAyat(l);
-    });
-    const madiArr = r.newMadi?.length
-      ? r.newMadi
-      : r.madi && (r.madi as unknown as { sura?: string }).sura
-        ? [r.madi as never]
-        : [];
-    madiArr.forEach((m) => {
-      if (m?.sura) madiAyat += itemAyat(m);
-    });
+    const failed = repeatMap.get(r.id);
+    if (!failed?.loh) {
+      const lohArr = r.newLoh?.length
+        ? r.newLoh
+        : r.loh && (r.loh as unknown as { sura?: string }).sura
+          ? [r.loh as never]
+          : [];
+      lohArr.forEach((l) => {
+        if (l?.sura) lohAyat += itemAyat(l);
+      });
+    }
+    if (!failed?.madi) {
+      const madiArr = r.newMadi?.length
+        ? r.newMadi
+        : r.madi && (r.madi as unknown as { sura?: string }).sura
+          ? [r.madi as never]
+          : [];
+      madiArr.forEach((m) => {
+        if (m?.sura) madiAyat += itemAyat(m);
+      });
+    }
   });
-  const tajweedAyat = records.reduce((a, r) => a + (r.tajweed?.sura ? itemAyat(r.tajweed) : 0), 0);
+  const tajweedAyat = records.reduce(
+    (a, r) => a + (r.tajweed?.sura && !isRepeatGrade(r.tajweed) ? itemAyat(r.tajweed) : 0),
+    0,
+  );
   const totalAyat = lohAyat + madiAyat + tajweedAyat;
 
   const totalHalaqaDays = new Set(

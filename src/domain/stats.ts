@@ -4,6 +4,7 @@ import { hasScore } from './scoring';
 import { itemAyat } from './suras';
 import { getStudentName, recordsForStudent } from './students';
 import { computeAttendanceStreak, enrolledHalaqaDates } from './attendance';
+import { assignmentsGradedRepeat, isRepeatGrade } from './record';
 
 export const AYAT_MILESTONES: ReadonlyArray<{
   key: string;
@@ -110,15 +111,27 @@ export function buildStudentPublicStats(
     ? Math.round(scoredMadiRecs.reduce((a, r) => a + r.madi!.score!, 0) / scoredMadiRecs.length)
     : null;
 
+  // "آية مُسمّعة" counts every recitation, so re-reciting a sura for مراجعة
+  // legitimately counts again — the de-duplicated "محفوظة" figure is a
+  // separate number, not yet built. What must NOT count is work graded
+  // إعادة: the boy stood up and did not pass it. The verdict lives on the
+  // NEXT session's record, hence the id map (tajweed carries its own score
+  // on the same record, so it needs no lookup).
+  const repeatMap = assignmentsGradedRepeat(realRecs);
   let totalAyat = 0;
   realRecs.forEach((r) => {
-    (r.newLoh ?? []).forEach((l) => {
-      if (l?.sura) totalAyat += itemAyat(l);
-    });
-    (r.newMadi ?? []).forEach((m) => {
-      if (m?.sura) totalAyat += itemAyat(m);
-    });
-    if (r.tajweed?.sura) totalAyat += itemAyat(r.tajweed);
+    const failed = repeatMap.get(r.id);
+    if (!failed?.loh) {
+      (r.newLoh ?? []).forEach((l) => {
+        if (l?.sura) totalAyat += itemAyat(l);
+      });
+    }
+    if (!failed?.madi) {
+      (r.newMadi ?? []).forEach((m) => {
+        if (m?.sura) totalAyat += itemAyat(m);
+      });
+    }
+    if (r.tajweed?.sura && !isRepeatGrade(r.tajweed)) totalAyat += itemAyat(r.tajweed);
   });
 
   const uniqueDays = new Set(allRecs.map((r) => r.date)).size;
@@ -193,13 +206,20 @@ export function buildStudentPublicStats(
       : null;
     let monthAyat = 0;
     monthRealRecs.forEach((r) => {
-      (r.newLoh ?? []).forEach((l) => {
-        if (l?.sura) monthAyat += itemAyat(l);
-      });
-      (r.newMadi ?? []).forEach((m) => {
-        if (m?.sura) monthAyat += itemAyat(m);
-      });
-      if (r.tajweed?.sura) monthAyat += itemAyat(r.tajweed);
+      // repeatMap comes from the full history on purpose: an assignment given
+      // on the last day of a month is graded in the next one.
+      const failed = repeatMap.get(r.id);
+      if (!failed?.loh) {
+        (r.newLoh ?? []).forEach((l) => {
+          if (l?.sura) monthAyat += itemAyat(l);
+        });
+      }
+      if (!failed?.madi) {
+        (r.newMadi ?? []).forEach((m) => {
+          if (m?.sura) monthAyat += itemAyat(m);
+        });
+      }
+      if (r.tajweed?.sura && !isRepeatGrade(r.tajweed)) monthAyat += itemAyat(r.tajweed);
     });
     monthlyStats[month] = {
       attendPct: monthAttendPct,

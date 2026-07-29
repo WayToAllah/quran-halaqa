@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
+  isRepeatGrade,
+  assignmentsGradedRepeat,
   findPreviousSession,
   extractAssignedSuras,
   validateAyahRange,
@@ -205,5 +207,84 @@ describe('rowsSignature', () => {
     expect(rowsSignature([{ sura: 'الناس', toSura: 'الفلق', range: true }])).not.toBe(
       rowsSignature([{ sura: 'الناس' }]),
     );
+  });
+});
+
+describe('isRepeatGrade', () => {
+  it('treats a genuine zero as إعادة, not as "unscored"', () => {
+    expect(isRepeatGrade({ score: 0 })).toBe(true);
+  });
+
+  it('follows the band boundary rather than a hard-coded number', () => {
+    expect(isRepeatGrade({ score: 59 })).toBe(true);
+    expect(isRepeatGrade({ score: 60 })).toBe(false); // مقبول
+    expect(isRepeatGrade({ score: 100 })).toBe(false);
+  });
+
+  it('is false for work that simply has not been graded', () => {
+    expect(isRepeatGrade(null)).toBe(false);
+    expect(isRepeatGrade(undefined)).toBe(false);
+    expect(isRepeatGrade({ score: null })).toBe(false);
+    expect(isRepeatGrade({})).toBe(false);
+  });
+});
+
+describe('assignmentsGradedRepeat', () => {
+  const recs: SessionRecord[] = [
+    { id: 'r1', studentId: 's_1', date: '2026-07-01', newLoh: [{ sura: 'البقرة' }] },
+    // grades r1's assignment as إعادة, and hands out its own
+    {
+      id: 'r2',
+      studentId: 's_1',
+      date: '2026-07-03',
+      loh: { score: 50 },
+      newLoh: [{ sura: 'البقرة' }],
+    },
+    // grades r2's assignment as a pass
+    {
+      id: 'r3',
+      studentId: 's_1',
+      date: '2026-07-05',
+      loh: { score: 90 },
+      newLoh: [{ sura: 'آل عمران' }],
+    },
+  ];
+
+  it("marks an assignment by the NEXT session's grade, not its own record", () => {
+    const map = assignmentsGradedRepeat(recs);
+    expect(map.get('r1')!.loh).toBe(true); // failed on 07-03
+    expect(map.get('r2')!.loh).toBe(false); // passed on 07-05
+  });
+
+  it('leaves the newest assignment unflagged — it has not been recited yet', () => {
+    expect(assignmentsGradedRepeat(recs).get('r3')!.loh).toBe(false);
+  });
+
+  it('grades loh and madi independently', () => {
+    const map = assignmentsGradedRepeat([
+      { id: 'a', studentId: 's_1', date: '2026-07-01' },
+      { id: 'b', studentId: 's_1', date: '2026-07-03', loh: { score: 40 }, madi: { score: 95 } },
+    ]);
+    expect(map.get('a')).toEqual({ loh: true, madi: false });
+  });
+
+  it('never lets one student\u2019s grade fall onto another student\u2019s assignment', () => {
+    const map = assignmentsGradedRepeat([
+      { id: 'z1', studentId: 's_1', date: '2026-07-01' },
+      { id: 'm1', studentId: 's_2', date: '2026-07-02', loh: { score: 10 } },
+      { id: 'z2', studentId: 's_1', date: '2026-07-03', loh: { score: 95 } },
+    ]);
+    // زيد passed on 07-03; محمد's failure on 07-02 must not touch him.
+    expect(map.get('z1')!.loh).toBe(false);
+  });
+
+  it('ignores attendance-only days when deciding what comes next', () => {
+    const map = assignmentsGradedRepeat([
+      { id: 'p1', studentId: 's_1', date: '2026-07-01' },
+      { id: 'att', studentId: 's_1', date: '2026-07-02', attendance_only: true },
+      { id: 'p2', studentId: 's_1', date: '2026-07-03', loh: { score: 20 } },
+    ]);
+    expect(map.get('p1')!.loh).toBe(true);
+    expect(map.has('att')).toBe(false);
   });
 });

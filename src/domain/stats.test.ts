@@ -298,3 +298,88 @@ describe('buildStudentPublicStats attendance window (parent-facing)', () => {
     expect(result.monthlyStats['2026-07'].attendPct).toBe(50); // 1 of 2 July days
   });
 });
+
+describe('buildStudentPublicStats — إعادة does not count as recited', () => {
+  const halaqaDates = ['2026-07-05', '2026-07-03', '2026-07-01'];
+
+  // البقرة ١–١٠ is assigned on the 1st, FAILED on the 3rd, re-assigned the
+  // same day, then passed on the 5th, which also hands out آل عمران ١–١٠.
+  const recs: SessionRecord[] = [
+    {
+      id: 'r1',
+      studentId: 's_1',
+      date: '2026-07-01',
+      newLoh: [{ sura: 'البقرة', from: '1', to: '10' }],
+    },
+    {
+      id: 'r2',
+      studentId: 's_1',
+      date: '2026-07-03',
+      loh: { score: 50 },
+      newLoh: [{ sura: 'البقرة', from: '1', to: '10' }],
+    },
+    {
+      id: 'r3',
+      studentId: 's_1',
+      date: '2026-07-05',
+      loh: { score: 90 },
+      newLoh: [{ sura: 'آل عمران', from: '1', to: '10' }],
+    },
+  ];
+
+  it('drops the ten ayat that were graded إعادة, keeping the re-recited pass', () => {
+    const result = buildStudentPublicStats(zaid, recs, 3, null, halaqaDates);
+    // r1 failed → 0. r2 passed → 10. r3 not graded yet → 10.
+    expect(result.totalAyat).toBe(20);
+  });
+
+  it('counts a مراجعة re-recitation again — repeats are not de-duplicated', () => {
+    // Same sura assigned twice, both passed. "مُسمّعة" counts each recitation.
+    const passed: SessionRecord[] = [
+      { id: 'a', studentId: 's_1', date: '2026-07-01', newLoh: [{ sura: 'الفاتحة' }] },
+      {
+        id: 'b',
+        studentId: 's_1',
+        date: '2026-07-03',
+        loh: { score: 95 },
+        newLoh: [{ sura: 'الفاتحة' }],
+      },
+      { id: 'c', studentId: 's_1', date: '2026-07-05', loh: { score: 95 } },
+    ];
+    expect(buildStudentPublicStats(zaid, passed, 3, null, halaqaDates).totalAyat).toBe(14);
+  });
+
+  it('drops tajweed graded إعادة, which carries its own score on the record', () => {
+    const withTajweed: SessionRecord[] = [
+      {
+        id: 't1',
+        studentId: 's_1',
+        date: '2026-07-01',
+        tajweed: { sura: 'الفاتحة', score: 30 },
+      },
+      {
+        id: 't2',
+        studentId: 's_1',
+        date: '2026-07-03',
+        tajweed: { sura: 'الفاتحة', score: 85 },
+      },
+    ];
+    expect(buildStudentPublicStats(zaid, withTajweed, 3, null, halaqaDates).totalAyat).toBe(7);
+  });
+
+  it('applies the same rule to the monthly figures, across a month boundary', () => {
+    // Assigned 31 July, failed 2 August — the July number must still drop it.
+    const crossing: SessionRecord[] = [
+      {
+        id: 'j1',
+        studentId: 's_1',
+        date: '2026-07-31',
+        newLoh: [{ sura: 'البقرة', from: '1', to: '10' }],
+      },
+      { id: 'a1', studentId: 's_1', date: '2026-08-02', loh: { score: 40 } },
+    ];
+    const result = buildStudentPublicStats(zaid, crossing, 2, null, ['2026-08-02', '2026-07-31']);
+    expect(result.monthlyStats['2026-07'].totalAyat).toBe(0);
+    expect(result.totalAyat).toBe(0);
+  });
+});
