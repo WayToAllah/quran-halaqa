@@ -10,6 +10,7 @@ import { RecordIcon, StudentsIcon, LogIcon, StatsIcon } from './ui/NavIcons';
 import { NiyyahBar } from './features/niyyat/NiyyahBar';
 import { NiyyatModal } from './features/niyyat/NiyyatModal';
 import { useNiyyat } from './hooks/useNiyyat';
+import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { MOSQUE_ID, HALAQA_ID } from './config';
 import type { SessionRecord } from './types';
 import type { JSX } from 'preact';
@@ -30,6 +31,7 @@ function AppShell() {
   const [editingRecord, setEditingRecord] = useState<SessionRecord | null>(null);
   const { niyyat, save: saveNiyyat } = useNiyyat(MOSQUE_ID, HALAQA_ID, auth.status === 'ready');
   const [niyyatOpen, setNiyyatOpen] = useState(false);
+  const online = useOnlineStatus();
 
   if (auth.status === 'loading' || auth.status === 'checking-membership') {
     return <LoginScreen auth={auth} />;
@@ -78,6 +80,18 @@ function AppShell() {
           🚪
         </button>
       </header>
+
+      {/* Sticky under the header so it stays visible while scrolling: a save
+          started offline is queued, not lost, but the teacher should know
+          before they start rather than after the write appears to stall. */}
+      {!online && (
+        <div
+          role="status"
+          class="sticky top-[69px] z-10 bg-[#8C2F1E] text-white text-[12px] font-semibold px-[18px] py-2 text-center"
+        >
+          📴 مفيش اتصال — اللي تسجّله هيتخزن على الجهاز ويترفع لوحده لما النت يرجع
+        </div>
+      )}
 
       {niyyatOpen && (
         <NiyyatModal niyyat={niyyat} onSave={saveNiyyat} onClose={() => setNiyyatOpen(false)} />

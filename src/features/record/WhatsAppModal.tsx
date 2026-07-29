@@ -44,7 +44,10 @@ export function WhatsAppModal({
   return (
     <div
       class="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center"
-      onClick={busy ? undefined : onBack}
+      // Dismissable even mid-save. The write is already in flight and closing
+      // the preview never cancels it, whereas locking the backdrop while a save
+      // hung offline left the teacher with no way out of the app at all.
+      onClick={onBack}
     >
       <div
         class="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl max-h-[90vh] flex flex-col"
@@ -98,9 +101,9 @@ export function WhatsAppModal({
             </button>
           )}
 
+          {/* Never disabled — see the backdrop comment above. */}
           <button
-            class="w-full py-2.5 rounded-xl text-taupe text-sm font-semibold disabled:opacity-60"
-            disabled={busy}
+            class="w-full py-2.5 rounded-xl text-taupe text-sm font-semibold"
             onClick={onBack}
           >
             ← رجوع للتعديل

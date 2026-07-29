@@ -24,6 +24,7 @@ import {
 import { computeNextLoh, computeNextMadi } from '../../domain/nextTask';
 import { suraLabel } from '../../domain/suras';
 import { buildWhatsAppMessage, normalizeWhatsAppPhone } from '../../domain/whatsapp';
+import { raceTimeout } from '../../domain/raceTimeout';
 import { SuraRow } from './SuraRow';
 import { FloatingSaveButton } from './FloatingSaveButton';
 import { useGroupAttendance } from '../../hooks/useGroupAttendance';
@@ -36,6 +37,13 @@ import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useToast } from '../../ui/ToastProvider';
 import { MOSQUE_ID, HALAQA_ID } from '../../config';
 import type { SuraAssignment, SessionRecord, Student } from '../../types';
+
+/**
+ * How long to wait for Firestore to acknowledge a session write before letting
+ * the teacher move on. Long enough that a normal save still reports a clean
+ * "تم الحفظ", short enough that a dead connection doesn't strand anyone.
+ */
+const SAVE_ACK_TIMEOUT_MS = 8000;
 
 /** Sura info line for the "ما سمعناه النهارده" evaluation card.
  *
@@ -580,8 +588,27 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     const { rec, message, phone, isEditing, studentId } = pendingSave;
     setSaving(true);
     try {
-      await saveRecord(MOSQUE_ID, HALAQA_ID, rec);
-      showToast(isEditing ? '✓ تم تحديث الجلسة' : '✓ تم الحفظ بنجاح');
+      // Firestore's setDoc() promise waits for a SERVER ack. Offline, the SDK
+      // queues the write and the promise never settles — awaiting it outright
+      // left the teacher stuck on "جاري الحفظ…" with no way out and no error.
+      // So: wait a bounded time, then carry on. The write is already in the
+      // SDK's queue and flushes by itself when the connection returns.
+      const write = saveRecord(MOSQUE_ID, HALAQA_ID, rec);
+      const outcome = await raceTimeout(write, SAVE_ACK_TIMEOUT_MS);
+      if (outcome.status === 'pending') {
+        // The deadline won, so this promise's eventual result is ours to
+        // handle — otherwise a late rejection escapes unhandled.
+        write.then(
+          () => showToast('✓ رجع النت واترفعت الجلسة'),
+          (err) => {
+            console.error('queued saveRecord failed:', err);
+            showToast('⚠️ جلسة كانت مستنية النت فشلت — راجع السجل', true);
+          },
+        );
+        showToast('📴 النت ضعيف — الجلسة اتسجلت على الجهاز وهترفع لوحدها', true);
+      } else {
+        showToast(isEditing ? '✓ تم تحديث الجلسة' : '✓ تم الحفظ بنجاح');
+      }
       // Refresh the parent-facing projection immediately (fire-and-forget; a
       // failure here must not block the save that already succeeded).
       void republishPublicStatsFor([studentId]);

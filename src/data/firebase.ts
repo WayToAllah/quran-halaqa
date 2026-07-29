@@ -1,5 +1,10 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  connectFirestoreEmulator,
+} from 'firebase/firestore';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
 
 // Same Firebase project as production (quran-app-abe52); this app talks to
@@ -16,7 +21,23 @@ const firebaseConfig = {
 };
 
 export const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+/**
+ * IndexedDB-backed cache, NOT the default in-memory one.
+ *
+ * A write made with no connection is queued by the SDK rather than failing. With
+ * the memory cache that queue lives only as long as the tab: force-quitting the
+ * app while a session was waiting to upload threw the session away silently, with
+ * nothing shown to the teacher. Persisting the queue means it survives a restart
+ * and flushes on its own when the connection comes back.
+ *
+ * The multi-tab manager is required because the halaqa is often open on a phone
+ * and a laptop at once; the single-tab manager makes the second tab fail to
+ * acquire the lease. If IndexedDB is unavailable (private browsing), the SDK
+ * warns and falls back to memory rather than throwing.
+ */
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+});
 export const auth = getAuth(app);
 
 // Point at the local Emulator Suite during development/tests, never in a

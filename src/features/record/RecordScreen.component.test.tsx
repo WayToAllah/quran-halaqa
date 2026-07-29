@@ -794,3 +794,75 @@ describe('RecordScreen — duplicate warning', () => {
     expect(await screen.findByText(/مسجّل بالفعل/)).toBeInTheDocument();
   });
 });
+
+describe('RecordScreen — a save that never gets a server ack', () => {
+  // Reproduces the field report: mid-session, the WhatsApp preview's commit
+  // button stuck on "جاري الحفظ…" and the teacher could not send, close the
+  // modal, or escape by restarting the app. Firestore's setDoc() waits for a
+  // SERVER acknowledgement, so with no connection the SDK queues the write and
+  // the promise simply never settles — no rejection, no error path, no way out.
+  it('unblocks the teacher after the deadline instead of hanging forever', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    // A write that is accepted locally and never acknowledged.
+    saveRecordMock.mockReturnValue(new Promise(() => {}));
+
+    try {
+      renderScreen();
+      const input = screen.getByPlaceholderText('ابحث أو اختر اسم الطالب…');
+      await user.click(input);
+      await user.type(input, 'زيد احمد');
+      await user.click(screen.getByRole('button', { name: 'زيد احمد' }));
+      await user.type(
+        screen.getByPlaceholderText('أي ملاحظة عن أداء الطالب اليوم…'),
+        'ملاحظة تجريبية',
+      );
+      await user.click(screen.getByRole('button', { name: /حفظ الجلسة|تحديث الجلسة/ }));
+      await user.click(
+        await screen.findByRole('button', {
+          name: /احفظ بدون إرسال|حدّث بدون إرسال|احفظ الجلسة|حدّث الجلسة/,
+        }),
+      );
+
+      // Still waiting on the server at this point — that part is unchanged.
+      expect(saveRecordMock).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(8000);
+
+      // The review modal is gone and the teacher is told the truth: the session
+      // is on the device and will upload itself.
+      await waitFor(() => expect(screen.queryByText('مراجعة قبل الحفظ')).not.toBeInTheDocument());
+      expect(screen.getByText(/اتسجلت على الجهاز/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+      saveRecordMock.mockResolvedValue(undefined);
+    }
+  });
+
+  it('lets the teacher back out of the preview while a save is still in flight', async () => {
+    saveRecordMock.mockReturnValue(new Promise(() => {}));
+    try {
+      renderScreen();
+      await selectStudent('زيد احمد');
+      await userEvent.type(
+        screen.getByPlaceholderText('أي ملاحظة عن أداء الطالب اليوم…'),
+        'ملاحظة تجريبية',
+      );
+      await userEvent.click(screen.getByRole('button', { name: /حفظ الجلسة|تحديث الجلسة/ }));
+      await userEvent.click(
+        await screen.findByRole('button', {
+          name: /احفظ بدون إرسال|حدّث بدون إرسال|احفظ الجلسة|حدّث الجلسة/,
+        }),
+      );
+
+      // The escape hatch: "رجوع للتعديل" must never be disabled, or a stalled
+      // write locks the whole app behind the modal.
+      const back = screen.getByRole('button', { name: /رجوع للتعديل/ });
+      expect(back).not.toBeDisabled();
+      await userEvent.click(back);
+      await waitFor(() => expect(screen.queryByText('مراجعة قبل الحفظ')).not.toBeInTheDocument());
+    } finally {
+      saveRecordMock.mockResolvedValue(undefined);
+    }
+  });
+});
