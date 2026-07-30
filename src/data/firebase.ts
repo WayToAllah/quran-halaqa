@@ -1,10 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import {
-  initializeFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager,
-  connectFirestoreEmulator,
-} from 'firebase/firestore';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
 
 // Same Firebase project as production (quran-app-abe52); this app talks to
@@ -21,23 +16,18 @@ const firebaseConfig = {
 };
 
 export const app = initializeApp(firebaseConfig);
-/**
- * IndexedDB-backed cache, NOT the default in-memory one.
- *
- * A write made with no connection is queued by the SDK rather than failing. With
- * the memory cache that queue lives only as long as the tab: force-quitting the
- * app while a session was waiting to upload threw the session away silently, with
- * nothing shown to the teacher. Persisting the queue means it survives a restart
- * and flushes on its own when the connection comes back.
- *
- * The multi-tab manager is required because the halaqa is often open on a phone
- * and a laptop at once; the single-tab manager makes the second tab fail to
- * acquire the lease. If IndexedDB is unavailable (private browsing), the SDK
- * warns and falls back to memory rather than throwing.
- */
-export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-});
+// NOTE: deliberately the DEFAULT in-memory cache.
+//
+// An IndexedDB-backed cache (persistentLocalCache) was tried and REVERTED: it
+// broke sign-in. useAuth treats any getMembership() failure as 'denied', and a
+// persistent client that cannot bring up IndexedDB — or that is offline with
+// the members doc uncached — rejects the read instead of falling back, so the
+// teacher was bounced back to the login screen after "جاري الدخول".
+//
+// Persisting the offline write queue is still worth having (a force-quit with
+// a queued session currently loses it), but it must not be reintroduced until
+// the auth path stops reading a Firestore doc failure as "not a member".
+export const db = getFirestore(app);
 export const auth = getAuth(app);
 
 // Point at the local Emulator Suite during development/tests, never in a
