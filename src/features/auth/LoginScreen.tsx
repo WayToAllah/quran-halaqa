@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks';
 import type { AuthState } from './useAuth';
+import { loginErrorMessage } from '../../domain/authErrors';
 
 interface Props {
   auth: AuthState;
@@ -19,7 +20,11 @@ export function LoginScreen({ auth }: Props) {
         ? 'جاري التحقق من الصلاحية…'
         : auth.status === 'denied'
           ? 'هذا الحساب غير مسجَّل كمشرف على هذه الحلقة.'
-          : 'سجّل الدخول لمتابعة الحلقة';
+          : auth.status === 'unreachable'
+            ? // Deliberately NOT phrased as a rejection: we never got an answer.
+              // Saying "غير مصرّح" here is what locked the teacher out before.
+              'مقدرناش نتأكد من صلاحيتك — الاتصال مش شغال. الجلسة لسه مفتوحة.'
+            : 'سجّل الدخول لمتابعة الحلقة';
 
   async function handleSubmit(e: Event) {
     e.preventDefault();
@@ -30,7 +35,7 @@ export function LoginScreen({ auth }: Props) {
       await auth.signIn(email, password);
     } catch (err) {
       console.error('login failed:', err);
-      setError('البريد أو كلمة السر غير صحيحة.');
+      setError(loginErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -62,6 +67,20 @@ export function LoginScreen({ auth }: Props) {
         <div class="text-4xl">📖</div>
         <h1 class="text-xl font-extrabold text-ink-dark">متابعة حفظ القرآن</h1>
         <p class="text-sm text-taupe">{statusText}</p>
+
+        {auth.status === 'unreachable' && (
+          <div class="space-y-2">
+            <button
+              class="w-full bg-forest text-parchment rounded-xl py-3 text-sm font-bold"
+              onClick={() => auth.retryMembership()}
+            >
+              حاول تاني
+            </button>
+            <button class="text-xs text-taupe underline" onClick={() => auth.signOutUser()}>
+              تسجيل خروج
+            </button>
+          </div>
+        )}
 
         {auth.status === 'denied' && (
           <button class="text-xs text-taupe underline" onClick={() => auth.signOutUser()}>

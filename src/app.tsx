@@ -36,7 +36,10 @@ function AppShell() {
   if (auth.status === 'loading' || auth.status === 'checking-membership') {
     return <LoginScreen auth={auth} />;
   }
-  if (auth.status === 'signed-out' || auth.status === 'denied') {
+  // 'unreachable' MUST be listed here. Anything not caught above falls through
+  // to the shell, so a missing case would render the admin app to someone whose
+  // membership was never confirmed.
+  if (auth.status === 'signed-out' || auth.status === 'denied' || auth.status === 'unreachable') {
     return <LoginScreen auth={auth} />;
   }
 
@@ -84,12 +87,14 @@ function AppShell() {
       {/* Sticky under the header so it stays visible while scrolling: a save
           started offline is queued, not lost, but the teacher should know
           before they start rather than after the write appears to stall. */}
-      {!online && (
+      {(!online || auth.offlineSession) && (
         <div
           role="status"
           class="sticky top-[69px] z-10 bg-[#8C2F1E] text-white text-[12px] font-semibold px-[18px] py-2 text-center"
         >
-          📴 مفيش اتصال — اللي تسجّله هيتخزن على الجهاز ويترفع لوحده لما النت يرجع
+          {online
+            ? '📴 شغّال من نسخة الجهاز — البيانات ممكن تكون قديمة'
+            : '📴 مفيش اتصال — اللي تسجّله هيتخزن على الجهاز ويترفع لوحده لما النت يرجع'}
         </div>
       )}
 
