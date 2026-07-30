@@ -1,5 +1,11 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  connectFirestoreEmulator,
+} from 'firebase/firestore';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
 
 // Same Firebase project as production (quran-app-abe52); this app talks to
@@ -16,18 +22,44 @@ const firebaseConfig = {
 };
 
 export const app = initializeApp(firebaseConfig);
-// NOTE: deliberately the DEFAULT in-memory cache.
-//
-// An IndexedDB-backed cache (persistentLocalCache) was tried and REVERTED: it
-// broke sign-in. useAuth treats any getMembership() failure as 'denied', and a
-// persistent client that cannot bring up IndexedDB — or that is offline with
-// the members doc uncached — rejects the read instead of falling back, so the
-// teacher was bounced back to the login screen after "جاري الدخول".
-//
-// Persisting the offline write queue is still worth having (a force-quit with
-// a queued session currently loses it), but it must not be reintroduced until
-// the auth path stops reading a Firestore doc failure as "not a member".
-export const db = getFirestore(app);
+/**
+ * IndexedDB-backed cache when the browser can support one, otherwise the
+ * default in-memory cache.
+ *
+ * Why it matters: reads are served from the local copy when there is no
+ * connection, so the student picker, the log and the previous-session lookup
+ * still work offline instead of coming back empty. It also persists the OFFLINE
+ * WRITE QUEUE, so force-quitting the app with a session waiting to upload no
+ * longer discards it.
+ *
+ * This was tried once before and reverted, because it broke sign-in: the
+ * membership read rejected instead of falling back and useAuth read ANY failure
+ * there as "not a member", bouncing the teacher back to the login screen. That
+ * root cause is fixed (see classifyMembershipError + useAuth) — a read that
+ * cannot complete is now 'unreachable', never a rejection — which is what makes
+ * it safe to enable again.
+ *
+ * The guard below only covers environments with NO IndexedDB at all (some
+ * privacy modes). A store that exists but fails later can't be detected here,
+ * since `db` has to be constructed synchronously; in that case the SDK warns
+ * and reads fail, which the auth path now survives rather than locking out.
+ *
+ * Multi-tab manager: the halaqa is often open on a phone and a laptop at once,
+ * and the single-tab manager makes the second one fail to acquire the lease.
+ */
+const canPersist = (() => {
+  try {
+    return typeof indexedDB !== 'undefined' && indexedDB !== null;
+  } catch {
+    return false;
+  }
+})();
+
+export const db = canPersist
+  ? initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    })
+  : getFirestore(app);
 export const auth = getAuth(app);
 
 // Point at the local Emulator Suite during development/tests, never in a
