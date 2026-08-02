@@ -126,6 +126,15 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   );
   const [prevLohScore, setPrevLohScore] = useState('');
   const [prevMadiScore, setPrevMadiScore] = useState('');
+  // Lets the teacher correct what a PAST session's assignment actually
+  // covered — e.g. the child was assigned ayahs 1-10 but only really had 1-2
+  // memorized. `null` means "use the stored value unedited"; editing swaps in
+  // a working copy that gets persisted back onto evalSource (a DIFFERENT
+  // record than the one being saved today) when the session is saved.
+  const [lohRangeEditOpen, setLohRangeEditOpen] = useState(false);
+  const [madiRangeEditOpen, setMadiRangeEditOpen] = useState(false);
+  const [editedPrevLoh, setEditedPrevLoh] = useState<SuraAssignment[] | null>(null);
+  const [editedPrevMadi, setEditedPrevMadi] = useState<SuraAssignment[] | null>(null);
   // Mistake-counter history per evaluation. Preserved so reopening the counter
   // shows the same taps; committed to the record's loh/madi.mistakes on save.
   const [lohMistakes, setLohMistakes] = useState<MistakeKind[]>([]);
@@ -152,6 +161,9 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     phone: string;
     isEditing: boolean;
     studentId: string;
+    /** Corrected version of the previous session's assignment, when the
+     * teacher edited it in the evaluation card — saved alongside `rec`. */
+    prevUpdate: SessionRecord | null;
   } | null>(null);
   // Replaces the browser's native confirm() for the two yes/no checks in the
   // save flow (duplicate session, empty session) with a modal matching the
@@ -208,9 +220,17 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   // itself, so the evaluation fields still render.
   const evalSource = editingId ? (prevSession ?? editingRecordData) : prevSession;
   const prevLohList = evalSource ? extractAssignedSuras(evalSource.newLoh, evalSource.loh) : [];
-  const prevLohInfo = fmtSuraInfo(prevLohList);
   const prevMadiList = evalSource ? extractAssignedSuras(evalSource.newMadi, evalSource.madi) : [];
-  const prevMadiInfo = fmtSuraInfo(prevMadiList);
+  // Only offer the range-correction UI when evalSource is a genuinely
+  // different, already-saved record — when it falls back to editingRecordData
+  // (editing a student's very first session, no prior session exists) it IS
+  // the record we're already saving, and its assignment is edited directly
+  // in "اللوح الجديد"/"الماضي الجديد" below instead.
+  const evalSourceIsSeparateRecord = !!evalSource && evalSource.id !== editingId;
+  const effectivePrevLoh = editedPrevLoh ?? prevLohList;
+  const effectivePrevMadi = editedPrevMadi ?? prevMadiList;
+  const prevLohInfo = fmtSuraInfo(effectivePrevLoh);
+  const prevMadiInfo = fmtSuraInfo(effectivePrevMadi);
   // Only grade what was actually assigned. A score box under a dash invites a
   // mark for an assignment that was never given — the madi half already knew
   // this; the loh half rendered unconditionally. The `!== ''` arm keeps an
@@ -219,6 +239,16 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   // still stored on the record.
   const showLohEval = prevLohList.length > 0 || prevLohScore !== '';
   const showMadiEval = prevMadiList.length > 0 || prevMadiScore !== '';
+
+  // A different evalSource (new student picked, editingId changed, etc.)
+  // invalidates any in-progress range correction — stale edits must never
+  // leak onto the wrong session.
+  useEffect(() => {
+    setLohRangeEditOpen(false);
+    setMadiRangeEditOpen(false);
+    setEditedPrevLoh(null);
+    setEditedPrevMadi(null);
+  }, [evalSource?.id]);
 
   const lohScoreState = parseScoreField(prevLohScore);
   const madiScoreState = parseScoreField(prevMadiScore);
@@ -569,6 +599,22 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     previewSave(rec, isEditing);
   }
 
+  /** The corrected version of evalSource to persist alongside today's record,
+   * or null when there's nothing to correct (no edits, or evalSource isn't a
+   * separate record). Only the assignment fields change — everything else
+   * about that past session (its own scores, note, date...) is untouched. */
+  function buildPrevSessionUpdate(): SessionRecord | null {
+    if (!evalSource || !evalSourceIsSeparateRecord) return null;
+    if (!editedPrevLoh && !editedPrevMadi) return null;
+    const newLoh = (editedPrevLoh ?? prevLohList).filter(isRowComplete).map(cleanAssignmentRow);
+    const newMadi = (editedPrevMadi ?? prevMadiList).filter(isRowComplete).map(cleanAssignmentRow);
+    const unchanged =
+      rowsSignature(newLoh) === rowsSignature(prevLohList.map(cleanAssignmentRow)) &&
+      rowsSignature(newMadi) === rowsSignature(prevMadiList.map(cleanAssignmentRow));
+    if (unchanged) return null;
+    return { ...evalSource, newLoh, newMadi };
+  }
+
   // Preview-before-save: show the WhatsApp summary as the confirmation step so
   // the teacher reviews exactly what the parent will see BEFORE anything is
   // written. Nothing is saved here — the actual save happens only when they
@@ -576,16 +622,21 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   // summary doubles as the teacher's own review of the session.
   function previewSave(rec: SessionRecord, isEditing: boolean) {
     if (!selectedStudent) return;
-    const message = buildWhatsAppMessage(rec, prevSession, selectedStudent.parentToken);
+    const prevUpdate = buildPrevSessionUpdate();
+    // The WhatsApp preview must reflect the CORRECTED assignment, not the
+    // originally-stored one, so what the teacher reviews matches what's
+    // about to be saved.
+    const messageSource = prevUpdate ?? prevSession;
+    const message = buildWhatsAppMessage(rec, messageSource, selectedStudent.parentToken);
     const phone = normalizeWhatsAppPhone(selectedStudent.phonePrimary);
-    setPendingSave({ rec, message, phone, isEditing, studentId: selectedStudent.id });
+    setPendingSave({ rec, message, phone, isEditing, studentId: selectedStudent.id, prevUpdate });
   }
 
   // Commits the reviewed session. Called from the confirm modal; `send` decides
   // whether to open WhatsApp afterward. Only here does anything hit Firestore.
   async function commitPendingSave(send: boolean) {
     if (!pendingSave || saving) return;
-    const { rec, message, phone, isEditing, studentId } = pendingSave;
+    const { rec, message, phone, isEditing, studentId, prevUpdate } = pendingSave;
     setSaving(true);
     try {
       // Firestore's setDoc() promise waits for a SERVER ack. Offline, the SDK
@@ -593,7 +644,15 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
       // left the teacher stuck on "جاري الحفظ…" with no way out and no error.
       // So: wait a bounded time, then carry on. The write is already in the
       // SDK's queue and flushes by itself when the connection returns.
-      const write = saveRecord(MOSQUE_ID, HALAQA_ID, rec);
+      // The corrected previous session (if any) rides along with today's
+      // write — both are simple id-keyed upserts, so firing them together
+      // costs no extra round trip worth waiting on separately.
+      const write: Promise<void> = prevUpdate
+        ? Promise.all([
+            saveRecord(MOSQUE_ID, HALAQA_ID, rec),
+            saveRecord(MOSQUE_ID, HALAQA_ID, prevUpdate),
+          ]).then(() => undefined)
+        : saveRecord(MOSQUE_ID, HALAQA_ID, rec);
       const outcome = await raceTimeout(write, SAVE_ACK_TIMEOUT_MS);
       if (outcome.status === 'pending') {
         // The deadline won, so this promise's eventual result is ours to
@@ -611,7 +670,14 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
       }
       // Refresh the parent-facing projection immediately (fire-and-forget; a
       // failure here must not block the save that already succeeded).
-      void republishPublicStatsFor([studentId]);
+      // prevUpdate.studentId is normally the same student, but selectStudent()
+      // in edit mode allows re-assigning a record to someone else — cover
+      // both ids so a corrected assignment never leaves a stale parent view.
+      const affectedIds = new Set([
+        studentId,
+        ...(prevUpdate?.studentId ? [prevUpdate.studentId] : []),
+      ]);
+      void republishPublicStatsFor([...affectedIds]);
       // The "مسجّل بالفعل" warning reads the day's coverage snapshot, which is
       // otherwise only taken when the date changes — without this refresh the
       // student just saved could be picked again straight away with no warning.
@@ -627,6 +693,85 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     } finally {
       setSaving(false);
     }
+  }
+
+  /** Renders "اللوح"/"الماضي" inside the evaluation card: plain text normally,
+   * or per-item من/إلى inputs once the teacher taps ✏️ to correct what was
+   * actually memorized. Whole-sura-range items ("🔗 نطاق سور") are shown but
+   * not editable here — correcting those needs sura boundaries, not ayah
+   * numbers, and stays a Log-screen edit for now. */
+  function renderPrevRangeSection(
+    label: string,
+    list: SuraAssignment[],
+    info: string,
+    open: boolean,
+    setOpen: (v: boolean) => void,
+    edited: SuraAssignment[] | null,
+    setEdited: (v: SuraAssignment[] | null) => void,
+  ) {
+    const editable = evalSourceIsSeparateRecord && list.some((it) => !it.range);
+    return (
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <div class="text-xs font-semibold text-[#5B5646]">{label}</div>
+          {editable && (
+            <button
+              type="button"
+              class="text-[11px] font-semibold text-forest"
+              onClick={() => {
+                if (!open) setEdited(list.map((it) => ({ ...it })));
+                setOpen(!open);
+              }}
+            >
+              {open ? 'إخفاء' : '✏️ تعديل ما اتحفظ فعلاً'}
+            </button>
+          )}
+        </div>
+        {open ? (
+          <div class="space-y-2 mb-2">
+            {list.map((item, i) =>
+              item.range ? (
+                <div key={i} class="text-sm text-ink-dark">
+                  {suraLabel(item)} <span class="text-taupe text-[11px]">(نطاق سور)</span>
+                </div>
+              ) : (
+                <div key={i} class="flex items-center gap-1.5 text-sm flex-wrap">
+                  <span class="font-semibold text-ink-dark">سورة {item.sura}</span>
+                  <span class="text-taupe text-xs">من</span>
+                  <input
+                    type="number"
+                    min={1}
+                    class="w-14 text-center rounded-lg border border-hairline py-1 text-sm"
+                    value={(edited ?? list)[i]?.from ?? ''}
+                    onInput={(e) => {
+                      const val = (e.target as HTMLInputElement).value;
+                      setEdited(
+                        (edited ?? list).map((x, idx) => (idx === i ? { ...x, from: val } : x)),
+                      );
+                    }}
+                  />
+                  <span class="text-taupe text-xs">إلى</span>
+                  <input
+                    type="number"
+                    min={1}
+                    class="w-14 text-center rounded-lg border border-hairline py-1 text-sm"
+                    value={(edited ?? list)[i]?.to ?? ''}
+                    onInput={(e) => {
+                      const val = (e.target as HTMLInputElement).value;
+                      setEdited(
+                        (edited ?? list).map((x, idx) => (idx === i ? { ...x, to: val } : x)),
+                      );
+                    }}
+                  />
+                </div>
+              ),
+            )}
+          </div>
+        ) : (
+          <div class="text-sm mb-2 text-ink-dark">{info}</div>
+        )}
+      </div>
+    );
   }
 
   const cardCls = 'bg-white border border-hairline rounded-2xl p-[18px]';
@@ -776,8 +921,15 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
 
             {showLohEval && (
               <div>
-                <div class="text-xs font-semibold text-[#5B5646] mb-1">اللوح</div>
-                <div class="text-sm mb-2 text-ink-dark">{prevLohInfo}</div>
+                {renderPrevRangeSection(
+                  'اللوح',
+                  prevLohList,
+                  prevLohInfo,
+                  lohRangeEditOpen,
+                  setLohRangeEditOpen,
+                  editedPrevLoh,
+                  setEditedPrevLoh,
+                )}
                 <label class="text-xs text-taupe">التقييم (من 100)</label>
                 <div class="flex items-center gap-2 mt-1 flex-wrap">
                   <input
@@ -830,8 +982,15 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
 
             {showMadiEval && (
               <div class="pt-3.5 border-t border-hairline">
-                <div class="text-xs font-semibold text-[#5B5646] mb-1">الماضي</div>
-                <div class="text-sm mb-2 text-ink-dark">{prevMadiInfo}</div>
+                {renderPrevRangeSection(
+                  'الماضي',
+                  prevMadiList,
+                  prevMadiInfo,
+                  madiRangeEditOpen,
+                  setMadiRangeEditOpen,
+                  editedPrevMadi,
+                  setEditedPrevMadi,
+                )}
                 <label class="text-xs text-taupe">التقييم (من 100)</label>
                 <div class="flex items-center gap-2 mt-1 flex-wrap">
                   <input
