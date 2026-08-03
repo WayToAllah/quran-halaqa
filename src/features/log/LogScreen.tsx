@@ -40,9 +40,12 @@ function formatDate(dateStr: string): string {
  * while giving the number something to be about: "لوح ٩٠" alone is a score
  * with nothing attached to it.
  *
- * The bar is a fixed width rather than flexible so the four bars down a day's
- * cards line up and can be read against each other; the sura takes the slack
- * and truncates, since its start is the part that identifies it.
+ * The bar is a fixed width rather than flexible so the bars down a day's cards
+ * line up and can be read against each other; the sura takes the slack and
+ * truncates, since its start is the part that identifies it. 96px was measured
+ * against the longest realistic label ("ماضي: آل عمران (١٢٠–١٥٠)") at 430px
+ * wide — it still fits uncut, so the width goes to the bar, which needs the
+ * length to be worth reading at all.
  */
 function ScoreRow({
   label,
@@ -63,7 +66,7 @@ function ScoreRow({
         {what}
       </span>
       <div
-        class="w-14 h-1.5 rounded-full bg-[#F1ECDD] overflow-hidden shrink-0"
+        class="w-24 h-1.5 rounded-full bg-[#F1ECDD] overflow-hidden shrink-0"
         role="img"
         aria-label={`${tier} — ${toArabicDigits(score)} من ١٠٠`}
       >
