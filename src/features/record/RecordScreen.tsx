@@ -128,13 +128,22 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   const [prevMadiScore, setPrevMadiScore] = useState('');
   // Lets the teacher correct what a PAST session's assignment actually
   // covered — e.g. the child was assigned ayahs 1-10 but only really had 1-2
-  // memorized. `null` means "use the stored value unedited"; editing swaps in
-  // a working copy that gets persisted back onto evalSource (a DIFFERENT
-  // record than the one being saved today) when the session is saved.
-  const [lohRangeEditOpen, setLohRangeEditOpen] = useState(false);
-  const [madiRangeEditOpen, setMadiRangeEditOpen] = useState(false);
-  const [editedPrevLoh, setEditedPrevLoh] = useState<SuraAssignment[] | null>(null);
-  const [editedPrevMadi, setEditedPrevMadi] = useState<SuraAssignment[] | null>(null);
+  // memorized. `null` means "use the stored value unedited"; typing in the
+  // "إلى" box swaps in a working copy that gets persisted back onto evalSource
+  // (a DIFFERENT record than the one being saved today) when the session is
+  // saved.
+  //
+  // The edits carry the id of the session they belong to rather than being
+  // cleared by an effect when evalSource changes: evalSource arrives from an
+  // async read, so an effect keyed on its id can fire AFTER the card is on
+  // screen and wipe a correction the teacher has already typed. Tagging the
+  // edits and ignoring them when the tag doesn't match is a pure derivation
+  // with no such race.
+  const [prevEdits, setPrevEdits] = useState<{
+    sourceId: string;
+    loh: SuraAssignment[] | null;
+    madi: SuraAssignment[] | null;
+  } | null>(null);
   // Mistake-counter history per evaluation. Preserved so reopening the counter
   // shows the same taps; committed to the record's loh/madi.mistakes on save.
   const [lohMistakes, setLohMistakes] = useState<MistakeKind[]>([]);
@@ -227,8 +236,25 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   // the record we're already saving, and its assignment is edited directly
   // in "اللوح الجديد"/"الماضي الجديد" below instead.
   const evalSourceIsSeparateRecord = !!evalSource && evalSource.id !== editingId;
+  // Edits belong to one specific past session. Once evalSource is a different
+  // session (another student picked, edit mode entered/left), the old edits
+  // are simply not "active" any more — no clearing step, so they can never
+  // land on the wrong record and can never be wiped mid-typing.
+  const activeEdits = prevEdits && prevEdits.sourceId === evalSource?.id ? prevEdits : null;
+  const editedPrevLoh = activeEdits?.loh ?? null;
+  const editedPrevMadi = activeEdits?.madi ?? null;
   const effectivePrevLoh = editedPrevLoh ?? prevLohList;
   const effectivePrevMadi = editedPrevMadi ?? prevMadiList;
+
+  /** Records a correction against the session currently being evaluated. */
+  function setEditedPrev(which: 'loh' | 'madi', rows: SuraAssignment[]) {
+    const sourceId = evalSource?.id;
+    if (!sourceId) return;
+    setPrevEdits((cur) => {
+      const base = cur && cur.sourceId === sourceId ? cur : { sourceId, loh: null, madi: null };
+      return { ...base, [which]: rows };
+    });
+  }
   const prevLohInfo = fmtSuraInfo(effectivePrevLoh);
   const prevMadiInfo = fmtSuraInfo(effectivePrevMadi);
   // Only grade what was actually assigned. A score box under a dash invites a
@@ -239,16 +265,6 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   // still stored on the record.
   const showLohEval = prevLohList.length > 0 || prevLohScore !== '';
   const showMadiEval = prevMadiList.length > 0 || prevMadiScore !== '';
-
-  // A different evalSource (new student picked, editingId changed, etc.)
-  // invalidates any in-progress range correction — stale edits must never
-  // leak onto the wrong session.
-  useEffect(() => {
-    setLohRangeEditOpen(false);
-    setMadiRangeEditOpen(false);
-    setEditedPrevLoh(null);
-    setEditedPrevMadi(null);
-  }, [evalSource?.id]);
 
   const lohScoreState = parseScoreField(prevLohScore);
   const madiScoreState = parseScoreField(prevMadiScore);
@@ -695,81 +711,70 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     }
   }
 
-  /** Renders "اللوح"/"الماضي" inside the evaluation card: plain text normally,
-   * or per-item من/إلى inputs once the teacher taps ✏️ to correct what was
-   * actually memorized. Whole-sura-range items ("🔗 نطاق سور") are shown but
-   * not editable here — correcting those needs sura boundaries, not ayah
-   * numbers, and stays a Log-screen edit for now. */
+  /** Renders "اللوح"/"الماضي" inside the evaluation card. The end ayah ("إلى")
+   * is a live input, always editable — mid-session the teacher often finds the
+   * child only really memorized part of what was assigned, and typing the real
+   * end ayah straight into the line beats hunting for an edit affordance
+   * first. Only "إلى" is editable: the start ayah is where the assignment
+   * genuinely began, so shortening from the end is the real-world correction.
+   *
+   * Whole-sura-range items ("🔗 نطاق سور") stay plain text — correcting those
+   * needs sura boundaries, not ayah numbers, and remains a Log-screen edit.
+   * When evalSource isn't a separate saved record (editing a student's very
+   * first session), the whole section is plain text too: that assignment is
+   * already editable below in "اللوح الجديد"/"الماضي الجديد". */
   function renderPrevRangeSection(
     label: string,
+    which: 'loh' | 'madi',
     list: SuraAssignment[],
     info: string,
-    open: boolean,
-    setOpen: (v: boolean) => void,
     edited: SuraAssignment[] | null,
-    setEdited: (v: SuraAssignment[] | null) => void,
   ) {
     const editable = evalSourceIsSeparateRecord && list.some((it) => !it.range);
+    if (!editable) {
+      return (
+        <div>
+          <div class="text-xs font-semibold text-[#5B5646] mb-1">{label}</div>
+          <div class="text-sm mb-2 text-ink-dark">{info}</div>
+        </div>
+      );
+    }
+    const current = edited ?? list;
     return (
       <div>
-        <div class="flex items-center justify-between mb-1">
-          <div class="text-xs font-semibold text-[#5B5646]">{label}</div>
-          {editable && (
-            <button
-              type="button"
-              class="text-[11px] font-semibold text-forest"
-              onClick={() => {
-                if (!open) setEdited(list.map((it) => ({ ...it })));
-                setOpen(!open);
-              }}
-            >
-              {open ? 'إخفاء' : '✏️ تعديل ما اتحفظ فعلاً'}
-            </button>
+        <div class="text-xs font-semibold text-[#5B5646] mb-1">{label}</div>
+        <div class="space-y-1.5 mb-2">
+          {list.map((item, i) =>
+            item.range ? (
+              <div key={i} class="text-sm text-ink-dark">
+                {suraLabel(item)}
+              </div>
+            ) : (
+              <div key={i} class="flex items-center gap-1.5 text-sm flex-wrap">
+                <span class="text-ink-dark">
+                  {`سورة ${item.sura}`}
+                  {item.from ? ` (من ${item.from}` : ''}
+                </span>
+                {item.from && <span class="text-taupe text-xs">إلى</span>}
+                <input
+                  type="number"
+                  min={1}
+                  aria-label={`آخر آية اتحفظت في ${item.sura}`}
+                  class="w-14 text-center rounded-lg border border-mustard/50 bg-[#FFFCF3] py-1 text-sm font-semibold text-forest"
+                  value={current[i]?.to ?? ''}
+                  onInput={(e) => {
+                    const val = (e.target as HTMLInputElement).value;
+                    setEditedPrev(
+                      which,
+                      current.map((x, idx) => (idx === i ? { ...x, to: val } : x)),
+                    );
+                  }}
+                />
+                {item.from && <span class="text-ink-dark">)</span>}
+              </div>
+            ),
           )}
         </div>
-        {open ? (
-          <div class="space-y-2 mb-2">
-            {list.map((item, i) =>
-              item.range ? (
-                <div key={i} class="text-sm text-ink-dark">
-                  {suraLabel(item)} <span class="text-taupe text-[11px]">(نطاق سور)</span>
-                </div>
-              ) : (
-                <div key={i} class="flex items-center gap-1.5 text-sm flex-wrap">
-                  <span class="font-semibold text-ink-dark">سورة {item.sura}</span>
-                  <span class="text-taupe text-xs">من</span>
-                  <input
-                    type="number"
-                    min={1}
-                    class="w-14 text-center rounded-lg border border-hairline py-1 text-sm"
-                    value={(edited ?? list)[i]?.from ?? ''}
-                    onInput={(e) => {
-                      const val = (e.target as HTMLInputElement).value;
-                      setEdited(
-                        (edited ?? list).map((x, idx) => (idx === i ? { ...x, from: val } : x)),
-                      );
-                    }}
-                  />
-                  <span class="text-taupe text-xs">إلى</span>
-                  <input
-                    type="number"
-                    min={1}
-                    class="w-14 text-center rounded-lg border border-hairline py-1 text-sm"
-                    value={(edited ?? list)[i]?.to ?? ''}
-                    onInput={(e) => {
-                      const val = (e.target as HTMLInputElement).value;
-                      setEdited(
-                        (edited ?? list).map((x, idx) => (idx === i ? { ...x, to: val } : x)),
-                      );
-                    }}
-                  />
-                </div>
-              ),
-            )}
-          </div>
-        ) : (
-          <div class="text-sm mb-2 text-ink-dark">{info}</div>
-        )}
       </div>
     );
   }
@@ -921,15 +926,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
 
             {showLohEval && (
               <div>
-                {renderPrevRangeSection(
-                  'اللوح',
-                  prevLohList,
-                  prevLohInfo,
-                  lohRangeEditOpen,
-                  setLohRangeEditOpen,
-                  editedPrevLoh,
-                  setEditedPrevLoh,
-                )}
+                {renderPrevRangeSection('اللوح', 'loh', prevLohList, prevLohInfo, editedPrevLoh)}
                 <label class="text-xs text-taupe">التقييم (من 100)</label>
                 <div class="flex items-center gap-2 mt-1 flex-wrap">
                   <input
@@ -984,12 +981,10 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
               <div class="pt-3.5 border-t border-hairline">
                 {renderPrevRangeSection(
                   'الماضي',
+                  'madi',
                   prevMadiList,
                   prevMadiInfo,
-                  madiRangeEditOpen,
-                  setMadiRangeEditOpen,
                   editedPrevMadi,
-                  setEditedPrevMadi,
                 )}
                 <label class="text-xs text-taupe">التقييم (من 100)</label>
                 <div class="flex items-center gap-2 mt-1 flex-wrap">

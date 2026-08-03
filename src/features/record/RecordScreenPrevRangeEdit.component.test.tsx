@@ -9,11 +9,13 @@ import type { SessionRecord, Student } from '../../types';
 // only really memorized part of what was assigned last time (e.g. 2 ayahs of
 // a 1-10 assignment) meant leaving the record screen, editing the OLD session
 // from the log, then coming back to record today's session. These tests lock
-// in the in-place fix: a ✏️ toggle in the evaluation card that lets the
-// teacher shorten that old assignment right there, saved alongside today's
-// session on the same "حفظ".
+// in the in-place fix: the "إلى" ayah in the evaluation card is a live input,
+// and the correction saves onto that past session alongside today's.
 
-const students: Student[] = [{ id: 's_1', name: 'زيد احمد' }];
+const students: Student[] = [
+  { id: 's_1', name: 'زيد احمد' },
+  { id: 's_2', name: 'سالم' },
+];
 
 const saveRecordMock = vi.fn().mockResolvedValue(undefined);
 let previousSessionForS1: SessionRecord | null = null;
@@ -60,6 +62,11 @@ async function saveAndConfirm() {
   );
 }
 
+/** The live "إلى" box for a given sura in the evaluation card. */
+function endAyahBox(sura: string) {
+  return screen.getByLabelText(`آخر آية اتحفظت في ${sura}`);
+}
+
 const prevSession: SessionRecord = {
   id: 'r_prev',
   studentId: 's_1',
@@ -75,24 +82,30 @@ beforeEach(() => {
 });
 
 describe('RecordScreen — correcting a previous session range from the eval card', () => {
-  it('offers the ✏️ toggle for a normal (non-range) previous assignment', async () => {
+  it('shows the "إلى" ayah as a live input, pre-filled, with no toggle to press first', async () => {
     previousSessionForS1 = prevSession;
     renderScreen();
     await selectStudent('زيد احمد');
-    expect(await screen.findAllByText(/تعديل ما اتحفظ فعلاً/)).toHaveLength(2); // loh + madi
+    await screen.findByText('📋 ما سمعناه النهارده');
+
+    expect(endAyahBox('البقرة')).toHaveValue(10);
+    expect(endAyahBox('آل عمران')).toHaveValue(20);
+    // No edit affordance stands between the teacher and the field.
+    expect(screen.queryByText(/تعديل ما اتحفظ فعلاً/)).not.toBeInTheDocument();
   });
 
-  it('opens من/إلى inputs pre-filled with the stored values', async () => {
+  it('keeps the start ayah as plain text — only the end is correctable', async () => {
     previousSessionForS1 = prevSession;
     renderScreen();
     await selectStudent('زيد احمد');
-    const toggles = await screen.findAllByText(/تعديل ما اتحفظ فعلاً/);
-    await userEvent.click(toggles[0]); // اللوح
-    expect(screen.getByDisplayValue('1')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('10')).toBeInTheDocument();
+    await screen.findByText('📋 ما سمعناه النهارده');
+
+    expect(screen.getByText(/البقرة \(من 1/)).toBeInTheDocument();
+    // Exactly two number boxes in the card belong to ranges (loh + madi ends).
+    expect(screen.queryByLabelText('آية البداية')).not.toBeInTheDocument();
   });
 
-  it('does not offer the toggle for a whole-sura range assignment', async () => {
+  it('renders a whole-sura range assignment as plain text, with no input', async () => {
     previousSessionForS1 = {
       ...prevSession,
       newLoh: [{ sura: 'الناس', toSura: 'الفلق', range: true }],
@@ -101,11 +114,12 @@ describe('RecordScreen — correcting a previous session range from the eval car
     renderScreen();
     await selectStudent('زيد احمد');
     await screen.findByText('📋 ما سمعناه النهارده');
-    // Only the madi toggle should be absent too (empty list), and loh has no toggle.
-    expect(screen.queryByText(/تعديل ما اتحفظ فعلاً/)).not.toBeInTheDocument();
+
+    expect(screen.getByText('من الناس إلى الفلق')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/آخر آية اتحفظت/)).not.toBeInTheDocument();
   });
 
-  it('does not offer the toggle when editing a first-ever session (no separate previous record)', async () => {
+  it('stays plain text when editing a first-ever session (no separate previous record)', async () => {
     const editRec: SessionRecord = {
       id: 'r_first',
       studentId: 's_1',
@@ -115,48 +129,55 @@ describe('RecordScreen — correcting a previous session range from the eval car
       newMadi: [],
       note: '',
     };
-    previousSessionForS1 = null; // no prior session — evalSource falls back to editRec itself
+    previousSessionForS1 = null; // evalSource falls back to editRec itself
     renderScreen(editRec);
     await screen.findByText(/تعديل جلسة محفوظة/);
-    expect(screen.queryByText(/تعديل ما اتحفظ فعلاً/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/آخر آية اتحفظت/)).not.toBeInTheDocument();
   });
 
-  it('saves the corrected range on the PREVIOUS record, not on today’s new record', async () => {
+  it('saves the corrected end ayah on the PREVIOUS record, not on today’s new record', async () => {
     previousSessionForS1 = prevSession;
     renderScreen();
     await selectStudent('زيد احمد');
-    const toggles = await screen.findAllByText(/تعديل ما اتحفظ فعلاً/);
-    await userEvent.click(toggles[0]); // اللوح
+    await screen.findByText('📋 ما سمعناه النهارده');
 
-    const toInput = screen.getByDisplayValue('10');
-    await userEvent.clear(toInput);
-    await userEvent.type(toInput, '2');
+    const box = endAyahBox('البقرة');
+    await userEvent.clear(box);
+    await userEvent.type(box, '2');
 
     await saveAndConfirm();
 
     await waitFor(() => expect(saveRecordMock).toHaveBeenCalledTimes(2));
-    const savedRecords = saveRecordMock.mock.calls.map((c) => c[2] as SessionRecord);
-    const savedPrev = savedRecords.find((r) => r.id === 'r_prev');
-    const savedToday = savedRecords.find((r) => r.id !== 'r_prev');
+    const saved = saveRecordMock.mock.calls.map((c) => c[2] as SessionRecord);
+    const savedPrev = saved.find((r) => r.id === 'r_prev');
+    const savedToday = saved.find((r) => r.id !== 'r_prev');
 
-    expect(savedPrev).toBeTruthy();
     expect(savedPrev!.newLoh).toEqual([{ sura: 'البقرة', from: '1', to: '2' }]);
     // Untouched fields on the previous record survive the correction.
     expect(savedPrev!.date).toBe('2026-07-20');
     expect(savedPrev!.newMadi).toEqual([{ sura: 'آل عمران', from: '1', to: '20' }]);
-
-    // Today's own new-assignment section is unaffected by the correction.
     expect(savedToday).toBeTruthy();
-    expect(savedToday!.id).not.toBe('r_prev');
   });
 
-  it('does not write a second record when the toggle is opened but nothing is changed', async () => {
+  it('writes only today’s record when the "إلى" boxes are left alone', async () => {
     previousSessionForS1 = prevSession;
     renderScreen();
     await selectStudent('زيد احمد');
-    const toggles = await screen.findAllByText(/تعديل ما اتحفظ فعلاً/);
-    await userEvent.click(toggles[0]);
-    // no edits made — just opened and closed
+    await screen.findByText('📋 ما سمعناه النهارده');
+    await saveAndConfirm();
+    await waitFor(() => expect(saveRecordMock).toHaveBeenCalledTimes(1));
+  });
+
+  it('writes only today’s record when a box is edited back to its original value', async () => {
+    previousSessionForS1 = prevSession;
+    renderScreen();
+    await selectStudent('زيد احمد');
+    await screen.findByText('📋 ما سمعناه النهارده');
+
+    const box = endAyahBox('البقرة');
+    await userEvent.clear(box);
+    await userEvent.type(box, '10'); // same as stored
+
     await saveAndConfirm();
     await waitFor(() => expect(saveRecordMock).toHaveBeenCalledTimes(1));
   });
@@ -165,14 +186,70 @@ describe('RecordScreen — correcting a previous session range from the eval car
     previousSessionForS1 = prevSession;
     renderScreen();
     await selectStudent('زيد احمد');
-    const toggles = await screen.findAllByText(/تعديل ما اتحفظ فعلاً/);
-    await userEvent.click(toggles[0]);
-    const toInput = screen.getByDisplayValue('10');
-    await userEvent.clear(toInput);
-    await userEvent.type(toInput, '2');
+    await screen.findByText('📋 ما سمعناه النهارده');
+
+    const box = endAyahBox('البقرة');
+    await userEvent.clear(box);
+    await userEvent.type(box, '2');
 
     await userEvent.click(screen.getByRole('button', { name: /حفظ الجلسة/ }));
     expect(await screen.findByText('مراجعة قبل الحفظ')).toBeInTheDocument();
     expect(screen.getByText(/البقرة \(1–2\)/)).toBeInTheDocument();
+  });
+
+  it('keeps a correction typed the moment the card appears, mid-load', async () => {
+    // evalSource arrives from an async read. An earlier version cleared the
+    // edits from an effect keyed on its id, which could fire AFTER the card
+    // rendered — silently wiping a correction the teacher had already typed.
+    previousSessionForS1 = null;
+    const { rerender } = renderScreen();
+    await selectStudent('زيد احمد');
+
+    // The previous session lands and the card appears.
+    previousSessionForS1 = prevSession;
+    rerender(
+      <ToastProvider>
+        <RecordScreen editRecord={null} onEditConsumed={() => {}} />
+      </ToastProvider>,
+    );
+    await screen.findByText('📋 ما سمعناه النهارده');
+
+    const box = endAyahBox('البقرة');
+    await userEvent.clear(box);
+    await userEvent.type(box, '2');
+    expect(box).toHaveValue(2); // survives any late reset
+
+    await saveAndConfirm();
+    await waitFor(() => expect(saveRecordMock).toHaveBeenCalledTimes(2));
+    const savedPrev = saveRecordMock.mock.calls
+      .map((c) => c[2] as SessionRecord)
+      .find((r) => r.id === 'r_prev');
+    expect(savedPrev!.newLoh).toEqual([{ sura: 'البقرة', from: '1', to: '2' }]);
+  });
+
+  it('never lands one student’s correction on another student’s session', async () => {
+    previousSessionForS1 = prevSession;
+    renderScreen();
+    await selectStudent('زيد احمد');
+    await screen.findByText('📋 ما سمعناه النهارده');
+
+    const box = endAyahBox('البقرة');
+    await userEvent.clear(box);
+    await userEvent.type(box, '2');
+
+    // Switch to a student with no previous session at all, then save.
+    const picker = screen.getByPlaceholderText('ابحث أو اختر اسم الطالب…');
+    await userEvent.clear(picker);
+    await userEvent.type(picker, 'سالم');
+    await userEvent.click(await screen.findByRole('button', { name: 'سالم' }));
+    // Give the new session some content so the "جلسة فارغة" confirm doesn't
+    // stand between us and the save under test.
+    await userEvent.type(screen.getByPlaceholderText(/ملاحظة/), 'حضر');
+
+    await saveAndConfirm();
+    await waitFor(() => expect(saveRecordMock).toHaveBeenCalled());
+    // Only today's record — the stale correction is inert, not re-applied.
+    const ids = saveRecordMock.mock.calls.map((c) => (c[2] as SessionRecord).id);
+    expect(ids).not.toContain('r_prev');
   });
 });
