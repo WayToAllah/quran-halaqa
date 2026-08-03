@@ -252,4 +252,49 @@ describe('RecordScreen — correcting a previous session range from the eval car
     const ids = saveRecordMock.mock.calls.map((c) => (c[2] as SessionRecord).id);
     expect(ids).not.toContain('r_prev');
   });
+
+  it('shows a whole-sura assignment as starting from ayah 1, not as a bare name', async () => {
+    // Typing just a sura name assigns the whole sura: no `from` is stored,
+    // because ayah 1 is where a sura begins. The card used to print the bare
+    // name beside a lone box, which read as if the start were unknown.
+    previousSessionForS1 = { ...prevSession, newLoh: [{ sura: 'المدثر' }], newMadi: [] };
+    renderScreen();
+    await selectStudent('زيد احمد');
+    await screen.findByText('📋 ما سمعناه النهارده');
+
+    expect(screen.getByText('سورة المدثر (من 1')).toBeInTheDocument();
+    expect(endAyahBox('المدثر')).toHaveValue(null); // open-ended: whole sura
+  });
+
+  it('writes the implied start explicitly when a whole sura gets an end ayah', async () => {
+    previousSessionForS1 = { ...prevSession, newLoh: [{ sura: 'المدثر' }], newMadi: [] };
+    renderScreen();
+    await selectStudent('زيد احمد');
+    await screen.findByText('📋 ما سمعناه النهارده');
+
+    await userEvent.type(endAyahBox('المدثر'), '2');
+    await saveAndConfirm();
+
+    await waitFor(() => expect(saveRecordMock).toHaveBeenCalledTimes(2));
+    const savedPrev = saveRecordMock.mock.calls
+      .map((c) => c[2] as SessionRecord)
+      .find((r) => r.id === 'r_prev');
+    // Not {sura, to} — a range with no start would be ambiguous everywhere else.
+    expect(savedPrev!.newLoh).toEqual([{ sura: 'المدثر', from: '1', to: '2' }]);
+  });
+
+  it('leaves a whole-sura assignment alone when the box is typed in then emptied', async () => {
+    previousSessionForS1 = { ...prevSession, newLoh: [{ sura: 'المدثر' }], newMadi: [] };
+    renderScreen();
+    await selectStudent('زيد احمد');
+    await screen.findByText('📋 ما سمعناه النهارده');
+
+    const box = endAyahBox('المدثر');
+    await userEvent.type(box, '5');
+    await userEvent.clear(box); // changed my mind — he had the whole sura
+
+    await saveAndConfirm();
+    // No phantom {sura, from:'1'} rewrite of an untouched assignment.
+    await waitFor(() => expect(saveRecordMock).toHaveBeenCalledTimes(1));
+  });
 });

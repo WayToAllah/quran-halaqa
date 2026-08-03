@@ -751,11 +751,11 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
               </div>
             ) : (
               <div key={i} class="flex items-center gap-1.5 text-sm flex-wrap">
-                <span class="text-ink-dark">
-                  {`سورة ${item.sura}`}
-                  {item.from ? ` (من ${item.from}` : ''}
-                </span>
-                {item.from && <span class="text-taupe text-xs">إلى</span>}
+                {/* A whole-sura assignment carries no `from` — it starts at
+                    ayah 1 by definition, so that's what the teacher should
+                    read, not a bare sura name next to a lone box. */}
+                <span class="text-ink-dark">{`سورة ${item.sura} (من ${item.from || '1'}`}</span>
+                <span class="text-taupe text-xs">إلى</span>
                 <input
                   type="number"
                   min={1}
@@ -764,13 +764,27 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
                   value={current[i]?.to ?? ''}
                   onInput={(e) => {
                     const val = (e.target as HTMLInputElement).value;
+                    // Row i is rebuilt from the STORED row, so the implied
+                    // start is written out explicitly the moment an end ayah
+                    // makes the assignment a real range — a saved
+                    // {sura, to} with no `from` would read as ambiguous
+                    // everywhere else. Emptying the box puts the row back to
+                    // exactly what was stored, so no phantom edit is saved.
+                    const orig = list[i];
+                    const next: SuraAssignment = { ...orig };
+                    if (val) {
+                      next.from = orig.from || '1';
+                      next.to = val;
+                    } else {
+                      delete next.to;
+                    }
                     setEditedPrev(
                       which,
-                      current.map((x, idx) => (idx === i ? { ...x, to: val } : x)),
+                      current.map((x, idx) => (idx === i ? next : x)),
                     );
                   }}
                 />
-                {item.from && <span class="text-ink-dark">)</span>}
+                <span class="text-ink-dark">)</span>
               </div>
             ),
           )}
