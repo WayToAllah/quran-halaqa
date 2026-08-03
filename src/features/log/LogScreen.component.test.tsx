@@ -158,6 +158,19 @@ describe('LogScreen — search', () => {
   });
 });
 
+describe('LogScreen — search box', () => {
+  it('clears the search in one tap and shows the full list again', async () => {
+    renderScreen();
+    await userEvent.type(screen.getByLabelText('ابحث في السجل باسم الطالب'), 'محمد');
+    await screen.findByText('محمد علي');
+    expect(screen.queryByText('زيد احمد')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'مسح البحث' }));
+
+    expect(await screen.findByText('زيد احمد')).toBeInTheDocument();
+  });
+});
+
 describe('LogScreen — delete with undo', () => {
   /** Row delete button + the in-app confirmation that stands in front of it. */
   async function deleteRow(name: string) {

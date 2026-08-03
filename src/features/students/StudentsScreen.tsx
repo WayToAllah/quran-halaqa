@@ -19,6 +19,7 @@ import { useToast } from '../../ui/ToastProvider';
 import { MOSQUE_ID, HALAQA_ID } from '../../config';
 import { StudentModal } from './StudentModal';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { SearchInput } from '../../ui/SearchInput';
 import { FloatingAddButton } from '../../ui/FloatingAddButton';
 import type { Student } from '../../types';
 
@@ -130,38 +131,13 @@ export function StudentsScreen() {
         </span>
       </div>
 
-      <div class="relative mb-3.5">
-        <input
-          type="text"
-          class="w-full border border-hairline rounded-xl px-3.5 py-3 pr-10 text-sm text-ink-dark bg-white"
-          placeholder="ابحث بالاسم…"
-          value={query}
-          onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
-        />
-        {query ? (
-          <button
-            type="button"
-            aria-label="مسح البحث"
-            class="absolute right-2.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full text-taupe text-sm flex items-center justify-center"
-            onClick={() => setQuery('')}
-          >
-            ✕
-          </button>
-        ) : (
-          <svg
-            viewBox="0 0 24 24"
-            width="17"
-            height="17"
-            fill="none"
-            stroke="#8A8372"
-            stroke-width="2"
-            class="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
-          >
-            <circle cx="11" cy="11" r="7" />
-            <path d="M21 21l-4.3-4.3" />
-          </svg>
-        )}
-      </div>
+      <SearchInput
+        class="mb-3.5"
+        value={query}
+        onChange={setQuery}
+        placeholder="ابحث بالاسم…"
+        label="ابحث عن طالب بالاسم"
+      />
 
       {!studentsLoaded && (
         <div class="space-y-2.5">

@@ -10,6 +10,7 @@ import { displayStudentName } from '../../domain/students';
 import { hasScore, scoreName } from '../../domain/scoring';
 import { sessionGrading } from '../../domain/record';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { SearchInput } from '../../ui/SearchInput';
 import { ayahRange, joinSuraNames } from '../../domain/suras';
 import { hijriShort } from '../../domain/hijri';
 import { PlainStars } from '../../ui/StarRating';
@@ -268,27 +269,13 @@ export function LogScreen({ onEditRecord }: LogScreenProps = {}) {
     <div class="p-[18px] pb-[100px]" dir="rtl">
       <div class="text-[19px] font-extrabold text-ink-dark mb-4">السجل</div>
 
-      <div class="relative mb-4">
-        <input
-          type="text"
-          class="w-full border border-hairline rounded-xl px-3.5 py-3 pr-10 text-sm text-ink-dark bg-white"
-          placeholder="ابحث باسم الطالب…"
-          value={query}
-          onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
-        />
-        <svg
-          viewBox="0 0 24 24"
-          width="17"
-          height="17"
-          fill="none"
-          stroke="#8A8372"
-          stroke-width="2"
-          class="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
-        >
-          <circle cx="11" cy="11" r="7" />
-          <path d="M21 21l-4.3-4.3" />
-        </svg>
-      </div>
+      <SearchInput
+        class="mb-4"
+        value={query}
+        onChange={setQuery}
+        placeholder="ابحث باسم الطالب…"
+        label="ابحث في السجل باسم الطالب"
+      />
 
       {showSkeleton && (
         <div class="space-y-2.5">

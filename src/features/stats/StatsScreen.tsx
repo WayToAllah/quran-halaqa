@@ -16,6 +16,7 @@ import {
 import { MOSQUE_ID, HALAQA_ID } from '../../config';
 import { buildAttendanceCardData, buildAttendanceCardSvg } from '../../domain/attendanceCard';
 import { svgToPngBlob, shareOrDownloadPng } from './shareCard';
+import { SearchInput } from '../../ui/SearchInput';
 
 /** Tier badge colors ported from the mockup — same lookup reused across the
  * Record/Log/Stats screens so a score tier always looks the same everywhere. */
@@ -335,27 +336,14 @@ export function StatsScreen() {
 
       <div class={cardCls}>
         <div class={cardTitleCls}>تفصيل الطلاب</div>
-        <div class="relative mb-3">
-          <input
-            type="text"
-            class="w-full border border-hairline rounded-xl px-3.5 py-2.5 pr-9 text-sm text-ink-dark"
-            placeholder="ابحث عن طالب…"
-            value={search}
-            onInput={(e) => setSearch((e.target as HTMLInputElement).value)}
-          />
-          <svg
-            viewBox="0 0 24 24"
-            width="15"
-            height="15"
-            fill="none"
-            stroke="#8A8372"
-            stroke-width="2"
-            class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-          >
-            <circle cx="11" cy="11" r="7" />
-            <path d="M21 21l-4.3-4.3" />
-          </svg>
-        </div>
+        <SearchInput
+          compact
+          class="mb-3"
+          value={search}
+          onChange={setSearch}
+          placeholder="ابحث عن طالب…"
+          label="ابحث عن طالب في تفصيل الطلاب"
+        />
         <div class="flex gap-1.5 mb-3.5">
           {SORT_TABS.map((tab) => (
             <button
