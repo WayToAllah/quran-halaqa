@@ -97,7 +97,9 @@ beforeEach(() => {
 describe('LogScreen — rendering', () => {
   it('shows a genuine zero score as إعادة, not blank (scoreName(0) regression)', () => {
     renderScreen();
-    expect(screen.getByText(/إعادة/)).toBeInTheDocument();
+    // Scoped to the card: "إعادة" is also a filter tab above the list.
+    const row = screen.getByText('زيد احمد').closest('.rounded-2xl') as HTMLElement;
+    expect(within(row).getByText(/إعادة/)).toBeInTheDocument();
   });
 
   it('shows the new-assignment sura for a real session', () => {
@@ -155,6 +157,76 @@ describe('LogScreen — search', () => {
     expect(screen.getByRole('button', { name: 'تحميل المزيد' })).toBeInTheDocument();
     await userEvent.type(screen.getByPlaceholderText('ابحث باسم الطالب…'), 'زيد');
     expect(screen.queryByRole('button', { name: 'تحميل المزيد' })).not.toBeInTheDocument();
+  });
+});
+
+describe('LogScreen — day grouping', () => {
+  it('heads each halaqa day with its date and how many were recorded', () => {
+    renderScreen();
+    // 3 July: زيد's session. 5 July and 1 July: سالم's pair. 2 July: محمد.
+    expect(screen.getByText(/٣ يوليو/)).toBeInTheDocument();
+    const headings = screen.getAllByText(/جلسة$/);
+    expect(headings.length).toBeGreaterThan(1);
+    // Each fixture day here holds exactly one session.
+    expect(screen.getAllByText('١ جلسة').length).toBeGreaterThan(0);
+  });
+
+  it('groups the cards under their own day, newest day first', () => {
+    renderScreen();
+    const text = document.body.textContent ?? '';
+    // 5 July (سالم) must appear before 3 July (زيد) in document order.
+    expect(text.indexOf('٥ يوليو')).toBeLessThan(text.indexOf('٣ يوليو'));
+  });
+
+  it('drops the now-duplicated date from the cards themselves', () => {
+    renderScreen();
+    const row = screen.getByText('زيد احمد').closest('.rounded-2xl') as HTMLElement;
+    expect(within(row).queryByText(/يوليو/)).not.toBeInTheDocument();
+  });
+});
+
+describe('LogScreen — filters', () => {
+  it('starts on الكل with nothing filtered out', () => {
+    renderScreen();
+    expect(screen.getByRole('tab', { name: 'الكل' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('زيد احمد')).toBeInTheDocument();
+    expect(screen.getByText('محمد علي')).toBeInTheDocument();
+  });
+
+  it('narrows to sessions marked إعادة', async () => {
+    renderScreen();
+    await userEvent.click(screen.getByRole('tab', { name: 'إعادة' }));
+
+    // زيد's session scored 0 — a genuine إعادة.
+    expect(screen.getByText('زيد احمد')).toBeInTheDocument();
+    // محمد is attendance-only; سالم passed with 85.
+    expect(screen.queryByText('محمد علي')).not.toBeInTheDocument();
+    expect(screen.queryByText('سالم')).not.toBeInTheDocument();
+  });
+
+  it('narrows to attendance-only rows', async () => {
+    renderScreen();
+    await userEvent.click(screen.getByRole('tab', { name: 'حضور فقط' }));
+
+    expect(screen.getByText('محمد علي')).toBeInTheDocument();
+    expect(screen.queryByText('زيد احمد')).not.toBeInTheDocument();
+  });
+
+  it('explains an empty list as the filter, not an empty log', async () => {
+    renderScreen();
+    await userEvent.click(screen.getByRole('tab', { name: 'فيها تجويد' }));
+
+    expect(screen.getByText(/لا يوجد جلسات تحت "فيها تجويد"/)).toBeInTheDocument();
+    expect(screen.queryByText('لا يوجد جلسات مسجلة بعد')).not.toBeInTheDocument();
+  });
+
+  it('combines with the search rather than overriding it', async () => {
+    renderScreen();
+    await userEvent.click(screen.getByRole('tab', { name: 'حضور فقط' }));
+    await userEvent.type(screen.getByLabelText('ابحث في السجل باسم الطالب'), 'زيد');
+
+    // زيد matches the search but has no attendance-only row.
+    expect(await screen.findByText(/لا يوجد نتائج/)).toBeInTheDocument();
   });
 });
 

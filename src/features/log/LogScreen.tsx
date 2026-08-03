@@ -5,7 +5,6 @@ import { useStudents } from '../../hooks/useStudents';
 import { useUndoableDelete } from '../../hooks/useUndoableDelete';
 import { deleteRecord as deleteRecordDoc, saveRecord } from '../../data/records.repo';
 import { republishPublicStatsFor } from '../../data/publishStats';
-import { esc, toArabicDigits } from '../../domain/text';
 import { displayStudentName } from '../../domain/students';
 import { hasScore, scoreName } from '../../domain/scoring';
 import { sessionGrading } from '../../domain/record';
@@ -13,6 +12,9 @@ import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { SearchInput } from '../../ui/SearchInput';
 import { ayahRange, joinSuraNames } from '../../domain/suras';
 import { hijriShort } from '../../domain/hijri';
+import { groupRecordsByDay, matchesLogFilter } from '../../domain/logGrouping';
+import type { LogFilter } from '../../domain/logGrouping';
+import { toArabicDigits } from '../../domain/text';
 import { PlainStars } from '../../ui/StarRating';
 import { useToast } from '../../ui/ToastProvider';
 import { MOSQUE_ID, HALAQA_ID } from '../../config';
@@ -66,6 +68,54 @@ function ScoreBar({ label, score, barColor }: { label: string; score: number; ba
   );
 }
 
+const FILTER_TABS: { id: LogFilter; label: string }[] = [
+  { id: 'all', label: 'الكل' },
+  { id: 'repeat', label: 'إعادة' },
+  { id: 'attendance', label: 'حضور فقط' },
+  { id: 'tajweed', label: 'فيها تجويد' },
+];
+
+/** Weekday + Gregorian date, e.g. "الأحد ٢٥ يوليو". The weekday is what the
+ * teacher actually navigates by — the halaqa meets on fixed days. */
+function formatDayHeading(dateStr: string): string {
+  if (!dateStr) return 'بدون تاريخ';
+  try {
+    return new Date(dateStr + 'T12:00:00').toLocaleDateString('ar-EG', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+/**
+ * Sticky separator between halaqa days.
+ *
+ * ~50 students means one day fills more than the log's 40-record page, so a
+ * flat list gave no clue where one halaqa ended and the previous began. The
+ * count answers the question the teacher actually has at a glance — how many
+ * were recorded that day — and staying stuck to the top keeps the answer
+ * visible while scrolling through the day's cards.
+ */
+function DayHeading({ date, count }: { date: string; count: number }) {
+  const hijri = date ? hijriShort(date) : '';
+  return (
+    <div class="sticky top-0 z-10 -mx-[18px] px-[18px] py-2 bg-parchment/95 backdrop-blur-sm mb-2.5">
+      <div class="flex items-baseline justify-between gap-2">
+        <div class="min-w-0">
+          <span class="text-[13px] font-extrabold text-ink-dark">{formatDayHeading(date)}</span>
+          {hijri && <span class="text-[11px] text-[#0F3D2E] font-semibold mr-2">{hijri}</span>}
+        </div>
+        <span class="shrink-0 text-[11px] font-bold text-[#8A6A15] bg-[#FFF8E6] px-2.5 py-0.5 rounded-full">
+          {toArabicDigits(count)} جلسة
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function LogEntry({
   record,
   studentName,
@@ -84,16 +134,11 @@ function LogEntry({
   return (
     <div class="bg-white border border-hairline rounded-2xl p-4 space-y-3">
       <div class="flex items-center justify-between">
+        {/* No date here: the sticky day heading above the block already
+            carries it, and repeating it on all ~50 of a day's cards was pure
+            noise competing with the student's name. */}
         <div class="min-w-0">
           <div class="text-sm font-extrabold text-ink-dark truncate">{studentName}</div>
-          {hijriShort(r.date) ? (
-            <div class="mt-0.5 leading-tight">
-              <div class="text-[11.5px] text-[#0F3D2E] font-semibold">{hijriShort(r.date)}</div>
-              <div class="text-[10px] text-taupe">{formatDate(r.date)}</div>
-            </div>
-          ) : (
-            <div class="text-[11.5px] text-taupe mt-0.5">{formatDate(r.date)}</div>
-          )}
         </div>
         <div class="flex items-center gap-1.5 shrink-0">
           {!r.attendance_only && (
@@ -196,10 +241,14 @@ export function LogScreen({ onEditRecord }: LogScreenProps = {}) {
   // history), not just the paginated slice already in memory.
   const search = useRecordSearch(MOSQUE_ID, HALAQA_ID, query, students);
 
+  const [filter, setFilter] = useState<LogFilter>('all');
+
   const visibleRecords = useMemo(() => {
     const source = isSearching ? search.results : records;
-    return source.filter((r) => !pendingIds.has(r.id));
-  }, [isSearching, search.results, records, pendingIds]);
+    return source.filter((r) => !pendingIds.has(r.id) && matchesLogFilter(r, filter));
+  }, [isSearching, search.results, records, pendingIds, filter]);
+
+  const days = useMemo(() => groupRecordsByDay(visibleRecords), [visibleRecords]);
 
   // Skeleton shows for the initial paginated load, or while a search resolves.
   const showSkeleton = isSearching ? search.searching : !loaded;
@@ -277,6 +326,26 @@ export function LogScreen({ onEditRecord }: LogScreenProps = {}) {
         label="ابحث في السجل باسم الطالب"
       />
 
+      <div class="flex gap-1.5 mb-4 overflow-x-auto" role="tablist" aria-label="تصفية السجل">
+        {FILTER_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={filter === tab.id}
+            class={
+              'shrink-0 px-3 py-1.5 rounded-full text-[12.5px] font-semibold border ' +
+              (filter === tab.id
+                ? 'bg-forest text-parchment border-forest'
+                : 'bg-white text-[#5B5646] border-hairline')
+            }
+            onClick={() => setFilter(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {showSkeleton && (
         <div class="space-y-2.5">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -287,19 +356,32 @@ export function LogScreen({ onEditRecord }: LogScreenProps = {}) {
 
       {showEmpty && (
         <div class="text-center text-sm text-taupe py-8">
-          {query ? `لا يوجد نتائج لـ "${esc(query)}"` : 'لا يوجد جلسات مسجلة بعد'}
+          {/* Say which of the two things came up empty — a filter that hides
+              everything otherwise reads as "no sessions exist". */}
+          {query
+            ? `لا يوجد نتائج لـ "${query}"`
+            : filter === 'all'
+              ? 'لا يوجد جلسات مسجلة بعد'
+              : `لا يوجد جلسات تحت "${FILTER_TABS.find((t) => t.id === filter)?.label}"`}
         </div>
       )}
 
-      <div class="space-y-3">
-        {visibleRecords.map((r) => (
-          <LogEntry
-            key={r.id}
-            record={r}
-            studentName={displayStudentName(r, students)}
-            onEdit={() => handleEdit(r)}
-            onDelete={() => setPendingDelete(r)}
-          />
+      <div class="space-y-4">
+        {days.map((day) => (
+          <div key={day.date || 'undated'}>
+            <DayHeading date={day.date} count={day.records.length} />
+            <div class="space-y-3">
+              {day.records.map((r) => (
+                <LogEntry
+                  key={r.id}
+                  record={r}
+                  studentName={displayStudentName(r, students)}
+                  onEdit={() => handleEdit(r)}
+                  onDelete={() => setPendingDelete(r)}
+                />
+              ))}
+            </div>
+          </div>
         ))}
       </div>
 
