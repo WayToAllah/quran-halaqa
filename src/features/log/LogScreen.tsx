@@ -3,11 +3,13 @@ import { useRecentRecords } from '../../hooks/useRecentRecords';
 import { useRecordSearch } from '../../hooks/useRecordSearch';
 import { useStudents } from '../../hooks/useStudents';
 import { useUndoableDelete } from '../../hooks/useUndoableDelete';
-import { deleteRecord as deleteRecordDoc } from '../../data/records.repo';
+import { deleteRecord as deleteRecordDoc, saveRecord } from '../../data/records.repo';
 import { republishPublicStatsFor } from '../../data/publishStats';
 import { esc, toArabicDigits } from '../../domain/text';
 import { displayStudentName } from '../../domain/students';
 import { hasScore, scoreName } from '../../domain/scoring';
+import { sessionGrading } from '../../domain/record';
+import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { ayahRange, joinSuraNames } from '../../domain/suras';
 import { hijriShort } from '../../domain/hijri';
 import { PlainStars } from '../../ui/StarRating';
@@ -205,15 +207,52 @@ export function LogScreen({ onEditRecord }: LogScreenProps = {}) {
     ? search.resolved && visibleRecords.length === 0
     : loaded && visibleRecords.length === 0;
 
-  function handleDelete(r: SessionRecord) {
+  /** Session queued for deletion, waiting on the confirmation dialog. */
+  const [pendingDelete, setPendingDelete] = useState<SessionRecord | null>(null);
+
+  function deleteLabel(r: SessionRecord) {
     const name = displayStudentName(r, students);
-    const label = r.attendance_only ? `حضور ${name}` : `جلسة ${name}`;
-    if (!confirm(`حذف \"${label}\"؟`)) return;
-    requestDelete(r.id, `🗑 تم حذف ${label}`, async (id) => {
-      await deleteRecordDoc(MOSQUE_ID, HALAQA_ID, id);
-      // Refresh the parent projection now that this session is gone.
-      if (r.studentId) void republishPublicStatsFor([r.studentId]);
-    });
+    return r.attendance_only ? `حضور ${name}` : `جلسة ${name}`;
+  }
+
+  function confirmDelete(r: SessionRecord) {
+    const label = deleteLabel(r);
+    requestDelete(
+      r.id,
+      `🗑 تم حذف ${label}`,
+      async (id) => {
+        await deleteRecordDoc(MOSQUE_ID, HALAQA_ID, id);
+        // Refresh the parent projection now that this session is gone.
+        if (r.studentId) void republishPublicStatsFor([r.studentId]);
+      },
+      async () => {
+        // `r` is the full record as it was listed, so the restore is
+        // byte-identical under the same id — the session slots back into the
+        // chain exactly where it was.
+        await saveRecord(MOSQUE_ID, HALAQA_ID, r);
+        if (r.studentId) void republishPublicStatsFor([r.studentId]);
+      },
+    );
+  }
+
+  /** What the teacher stands to break, spelled out before they commit.
+   *
+   * A session's assignment is marked at the NEXT session. Deleting it leaves
+   * that next session holding a score for work that no longer exists, and its
+   * evaluation card then re-points at an older session — so the mark shows
+   * against an assignment the child was never given. Saying which session is
+   * affected, by date, is the difference between an informed delete and the
+   * orphaned records this app has had to clean up before. */
+  function deleteMessage(r: SessionRecord): string {
+    // Search results hold a student's full history; the paginated list is
+    // newest-first, so anything newer than `r` is already loaded either way.
+    const source = isSearching ? search.results : records;
+    const grader = sessionGrading(r, source);
+    if (!grader) return 'مش هينفع ترجّعها غير من زرار التراجع.';
+    return (
+      `التكليف اللي في الجلسة دي متقيّم في جلسة ${formatDate(grader.date)}. ` +
+      'لو مسحتها، التقييم ده هيفضل من غير التكليف بتاعه.'
+    );
   }
 
   function handleEdit(r: SessionRecord) {
@@ -272,10 +311,25 @@ export function LogScreen({ onEditRecord }: LogScreenProps = {}) {
             record={r}
             studentName={displayStudentName(r, students)}
             onEdit={() => handleEdit(r)}
-            onDelete={() => handleDelete(r)}
+            onDelete={() => setPendingDelete(r)}
           />
         ))}
       </div>
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title={`حذف ${deleteLabel(pendingDelete)}؟`}
+          message={deleteMessage(pendingDelete)}
+          confirmLabel="احذف"
+          destructive
+          onConfirm={() => {
+            const r = pendingDelete;
+            setPendingDelete(null);
+            confirmDelete(r);
+          }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
 
       {loaded && hasMore && !isSearching && (
         <button

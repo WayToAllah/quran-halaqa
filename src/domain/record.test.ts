@@ -9,6 +9,7 @@ import {
   cleanAssignmentRow,
   cleanTajweed,
   rowsSignature,
+  sessionGrading,
 } from './record';
 import type { SessionRecord, Student } from '../types';
 
@@ -286,5 +287,65 @@ describe('assignmentsGradedRepeat', () => {
     ]);
     expect(map.get('p1')!.loh).toBe(true);
     expect(map.has('att')).toBe(false);
+  });
+});
+
+describe('sessionGrading', () => {
+  const base = { studentId: 's_1', student: 'زيد' };
+  // 20th hands out البقرة 1–10; the 25th marks it. Deleting the 20th would
+  // leave the 25th's score pointing at nothing.
+  const jul20: SessionRecord = {
+    ...base,
+    id: 'r_20',
+    date: '2026-07-20',
+    newLoh: [{ sura: 'البقرة', from: '1', to: '10' }],
+  };
+  const jul25: SessionRecord = {
+    ...base,
+    id: 'r_25',
+    date: '2026-07-25',
+    loh: { score: 90 },
+    newLoh: [{ sura: 'البقرة', from: '11', to: '20' }],
+  };
+
+  it('finds the next session that marked the assignment', () => {
+    expect(sessionGrading(jul20, [jul20, jul25])?.id).toBe('r_25');
+  });
+
+  it('returns null when the next session has not been marked yet', () => {
+    const unmarked: SessionRecord = { ...jul25, loh: undefined, madi: undefined };
+    expect(sessionGrading(jul20, [jul20, unmarked])).toBeNull();
+  });
+
+  it('returns null when the session handed out no assignment', () => {
+    const noAssignment: SessionRecord = { ...jul20, newLoh: [], newMadi: [] };
+    expect(sessionGrading(noAssignment, [noAssignment, jul25])).toBeNull();
+  });
+
+  it('picks the IMMEDIATE successor, not the newest session', () => {
+    const jul30: SessionRecord = { ...base, id: 'r_30', date: '2026-07-30', loh: { score: 80 } };
+    expect(sessionGrading(jul20, [jul30, jul20, jul25])?.id).toBe('r_25');
+  });
+
+  it('ignores other students entirely', () => {
+    const other: SessionRecord = { ...jul25, id: 'r_x', studentId: 's_2' };
+    expect(sessionGrading(jul20, [jul20, other])).toBeNull();
+  });
+
+  it('ignores attendance-only rows on both sides of the pair', () => {
+    const att: SessionRecord = { ...base, id: 'r_att', date: '2026-07-22', attendance_only: true };
+    // An attendance row between them must not be mistaken for the marker...
+    expect(sessionGrading(jul20, [jul20, att, jul25])?.id).toBe('r_25');
+    // ...and an attendance row itself grades nothing.
+    expect(sessionGrading(att, [jul20, att, jul25])).toBeNull();
+  });
+
+  it('treats a genuine zero as a mark — إعادة still depends on the assignment', () => {
+    const failed: SessionRecord = { ...jul25, loh: { score: 0 } };
+    expect(sessionGrading(jul20, [jul20, failed])?.id).toBe('r_25');
+  });
+
+  it('returns null when nothing follows the session', () => {
+    expect(sessionGrading(jul25, [jul20, jul25])).toBeNull();
   });
 });

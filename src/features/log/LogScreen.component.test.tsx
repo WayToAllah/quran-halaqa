@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/preact';
+import { render, screen, within, waitFor } from '@testing-library/preact';
 import userEvent from '@testing-library/user-event';
 import { ToastProvider } from '../../ui/ToastProvider';
 import { LogScreen } from './LogScreen';
@@ -8,6 +8,7 @@ import type { SessionRecord, Student } from '../../types';
 const students: Student[] = [
   { id: 's_1', name: 'زيد احمد' },
   { id: 's_2', name: 'محمد علي' },
+  { id: 's_3', name: 'سالم' },
 ];
 
 const records: SessionRecord[] = [
@@ -24,11 +25,27 @@ const records: SessionRecord[] = [
     date: '2026-07-02',
     attendance_only: true,
   },
+  // A marked pair on its own student, so the delete-warning tests don't
+  // disturb the fixtures the rendering tests assert against.
+  // r_a hands out an assignment; r_b marks it.
+  {
+    id: 'r_b',
+    studentId: 's_3',
+    date: '2026-07-05',
+    loh: { score: 85 },
+  },
+  {
+    id: 'r_a',
+    studentId: 's_3',
+    date: '2026-07-01',
+    newLoh: [{ sura: 'الفاتحة', from: '1', to: '7' }],
+  },
 ];
 
 let hasMoreValue = true;
 const loadMoreMock = vi.fn();
 const deleteRecordMock = vi.fn().mockResolvedValue(undefined);
+const saveRecordMock = vi.fn().mockResolvedValue(undefined);
 
 // Server-side search fetches every matching student's full history. The mock
 // returns the fixture records filtered by studentId, simulating Firestore.
@@ -50,6 +67,7 @@ vi.mock('../../hooks/useStudents', () => ({
 }));
 vi.mock('../../data/records.repo', () => ({
   deleteRecord: (...args: unknown[]) => deleteRecordMock(...args),
+  saveRecord: (...args: unknown[]) => saveRecordMock(...args),
   getAllRecordsForStudent: (m: string, h: string, id: string) =>
     getAllRecordsForStudentMock(m, h, id),
 }));
@@ -141,26 +159,85 @@ describe('LogScreen — search', () => {
 });
 
 describe('LogScreen — delete with undo', () => {
-  it('hides the entry immediately and does not call deleteRecord until the undo window passes', async () => {
-    renderScreen();
-    const row = screen.getByText('محمد علي').closest('.rounded-2xl') as HTMLElement;
+  /** Row delete button + the in-app confirmation that stands in front of it. */
+  async function deleteRow(name: string) {
+    const row = screen.getByText(name).closest('.rounded-2xl') as HTMLElement;
     await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));
+    await userEvent.click(screen.getByRole('button', { name: 'احذف' }));
+  }
+
+  it('commits the delete straight away rather than waiting out the undo window', async () => {
+    // The old behaviour only scheduled the delete: closing the app inside the
+    // five seconds meant it never happened and the row silently came back.
+    renderScreen();
+    await deleteRow('محمد علي');
 
     expect(screen.queryByText('محمد علي')).not.toBeInTheDocument();
-    expect(screen.getByText(/تم حذف حضور محمد علي/)).toBeInTheDocument();
-    expect(deleteRecordMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(deleteRecordMock).toHaveBeenCalledTimes(1));
+    expect(deleteRecordMock.mock.calls[0][2]).toBe('r2');
+    expect(await screen.findByText(/تم حذف حضور محمد علي/)).toBeInTheDocument();
   });
 
-  it('respects a cancelled confirm() and keeps the entry', async () => {
-    vi.stubGlobal(
-      'confirm',
-      vi.fn(() => false),
-    );
+  it('writes the record back under the same id when "تراجع" is tapped', async () => {
+    renderScreen();
+    await deleteRow('محمد علي');
+    await userEvent.click(await screen.findByRole('button', { name: 'تراجع' }));
+
+    await waitFor(() => expect(saveRecordMock).toHaveBeenCalledTimes(1));
+    // Byte-identical restore: same id, so the session slots back into place.
+    expect((saveRecordMock.mock.calls[0][2] as SessionRecord).id).toBe('r2');
+    expect(screen.getByText('محمد علي')).toBeInTheDocument();
+  });
+
+  it('puts the row back and says so when the delete itself fails', async () => {
+    deleteRecordMock.mockRejectedValueOnce(new Error('offline'));
+    renderScreen();
+    await deleteRow('محمد علي');
+
+    // No success toast over a delete that did not happen.
+    expect(await screen.findByText(/فشل الحذف/)).toBeInTheDocument();
+    expect(screen.getByText('محمد علي')).toBeInTheDocument();
+  });
+
+  it('keeps the entry when the confirmation is declined', async () => {
     renderScreen();
     const row = screen.getByText('زيد احمد').closest('.rounded-2xl') as HTMLElement;
     await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));
+    await userEvent.click(screen.getByRole('button', { name: 'إلغاء' }));
+
     expect(screen.getByText('زيد احمد')).toBeInTheDocument();
     expect(deleteRecordMock).not.toHaveBeenCalled();
+  });
+
+  // The browser's confirm() is unstyled, blocks the page and reads as a system
+  // error on a phone — and it had no room to explain what a delete breaks.
+  it('names the session that marked this one, so the teacher knows what breaks', async () => {
+    renderScreen();
+    // سالم's 1 July session handed out the assignment his 5 July session marked.
+    const rows = screen.getAllByText('سالم');
+    const row = rows[rows.length - 1].closest('.rounded-2xl') as HTMLElement;
+    await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));
+
+    expect(screen.getByText(/متقيّم في جلسة/)).toBeInTheDocument();
+    expect(screen.getByText(/التقييم ده هيفضل من غير التكليف/)).toBeInTheDocument();
+  });
+
+  it('does not cry wolf when nothing marks the session', async () => {
+    renderScreen();
+    // 5 July is سالم's newest session — nothing has marked it yet.
+    const row = screen.getAllByText('سالم')[0].closest('.rounded-2xl') as HTMLElement;
+    await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));
+
+    expect(screen.queryByText(/متقيّم في جلسة/)).not.toBeInTheDocument();
+  });
+
+  it("asks in the app's own dialog, not the browser's", async () => {
+    renderScreen();
+    const row = screen.getByText('زيد احمد').closest('.rounded-2xl') as HTMLElement;
+    await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));
+
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    expect(screen.getByText('حذف جلسة زيد احمد؟')).toBeInTheDocument();
   });
 });
 

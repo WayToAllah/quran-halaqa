@@ -196,3 +196,52 @@ export function validateAyahRange(suraName: string, from: string, to: string): A
   }
   return errors;
 }
+
+/**
+ * The session that grades `target`'s assignment, if one exists.
+ *
+ * A session's newLoh/newMadi is recited and marked at the student's NEXT
+ * session — the two records are a pair, joined only by "same student, next in
+ * time". Deleting `target` therefore does not just remove one row: it leaves
+ * that next session holding a score for an assignment that no longer exists,
+ * and the evaluation card then silently re-points at an OLDER session, so the
+ * mark ends up displayed against work the child was never given. This is how
+ * the historical orphaned-session cases arose, and there was nothing warning
+ * the teacher at the moment of deleting.
+ *
+ * Returns null when nothing is at stake: `target` handed out no assignment,
+ * or the next session hasn't been marked yet (so nothing depends on it).
+ * Attendance-only rows neither carry assignments nor grade them.
+ */
+export function sessionGrading(
+  target: Pick<SessionRecord, 'id' | 'date' | 'studentId' | 'attendance_only'> & {
+    newLoh?: SuraAssignment[];
+    newMadi?: SuraAssignment[];
+    loh?: unknown;
+    madi?: unknown;
+  },
+  all: SessionRecord[],
+): SessionRecord | null {
+  if (target.attendance_only || !target.studentId) return null;
+
+  const assigned =
+    extractAssignedSuras(target.newLoh, undefined).length > 0 ||
+    extractAssignedSuras(target.newMadi, undefined).length > 0;
+  if (!assigned) return null;
+
+  // The next session in time for this student — byNewest puts newest first,
+  // so the last of the strictly-later ones is the immediate successor.
+  const later = all
+    .filter(
+      (r) =>
+        r.id !== target.id &&
+        r.studentId === target.studentId &&
+        !r.attendance_only &&
+        byNewest(r, target) < 0,
+    )
+    .sort(byNewest);
+  const next = later[later.length - 1];
+  if (!next) return null;
+
+  return hasScore(next.loh) || hasScore(next.madi) ? next : null;
+}

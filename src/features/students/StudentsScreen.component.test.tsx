@@ -180,22 +180,26 @@ describe('StudentsScreen — delete with undo', () => {
     await userEvent.click(screen.getByRole('button', { name: 'احذف الطالب' }));
   }
 
-  it('hides the student immediately and shows an undo toast', async () => {
+  it('hides the student and commits the delete straight away', async () => {
+    // The delete used to be merely scheduled: quitting the app inside the undo
+    // window meant it never ran and the student silently reappeared.
     renderScreen();
     await deleteStudent('محمد علي');
 
     expect(screen.queryByText('محمد علي')).not.toBeInTheDocument();
-    expect(screen.getByText(/تم حذف محمد علي/)).toBeInTheDocument();
-    expect(deleteStudentMock).not.toHaveBeenCalled(); // not yet — still in the undo window
+    await waitFor(() => expect(deleteStudentMock).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText(/تم حذف محمد علي/)).toBeInTheDocument();
   });
 
-  it('restores the student if "تراجع" is clicked before the timer fires', async () => {
+  it('writes the student back under the same id when undo is tapped', async () => {
     renderScreen();
     await deleteStudent('محمد علي');
-    await userEvent.click(screen.getByText('تراجع'));
+    await userEvent.click(await screen.findByText('تراجع'));
 
     expect(screen.getByText('محمد علي')).toBeInTheDocument();
-    expect(deleteStudentMock).not.toHaveBeenCalled();
+    // Same id back, so their records and parent link re-attach.
+    await waitFor(() => expect(saveStudentMock).toHaveBeenCalledTimes(1));
+    expect(saveStudentMock.mock.calls[0][2].id).toBe('s_2');
   });
 
   // The browser's confirm() is unstyled, blocks the page and reads as a system

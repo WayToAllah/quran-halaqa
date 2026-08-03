@@ -2,7 +2,11 @@ import { useMemo, useState } from 'preact/hooks';
 import { useStudents } from '../../hooks/useStudents';
 import { useAllRecords } from '../../hooks/useAllRecords';
 import { useUndoableDelete } from '../../hooks/useUndoableDelete';
-import { deleteStudent as deleteStudentDoc, updateStudent } from '../../data/students.repo';
+import {
+  deleteStudent as deleteStudentDoc,
+  updateStudent,
+  saveStudent,
+} from '../../data/students.repo';
 import { normAr, toArabicDigits } from '../../domain/text';
 import { getStudentName, recordsForStudent, sortStudentsByName } from '../../domain/students';
 import {
@@ -104,8 +108,12 @@ export function StudentsScreen() {
     const s = pendingDeleteStudent;
     if (!s) return;
     setPendingDeleteStudent(null);
-    requestDelete(s.id, `🗑 تم حذف ${getStudentName(s)}`, (id) =>
-      deleteStudentDoc(MOSQUE_ID, HALAQA_ID, id),
+    requestDelete(
+      s.id,
+      `🗑 تم حذف ${getStudentName(s)}`,
+      (id) => deleteStudentDoc(MOSQUE_ID, HALAQA_ID, id),
+      // Same id back, so the student's records and parent link re-attach.
+      () => saveStudent(MOSQUE_ID, HALAQA_ID, s),
     );
   }
 
