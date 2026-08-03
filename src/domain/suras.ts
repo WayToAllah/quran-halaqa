@@ -161,9 +161,18 @@ export function findSuraByName(typed: string): SuraInfo | undefined {
  * ascending mushaf order. */
 export const SURAS_IN_LOH_ORDER: ReadonlyArray<SuraInfo> = [SURAS[0], ...SURAS.slice(1).reverse()];
 
-/** '(3–10)' / '(من 3)' / '' — ayah-range suffix for display. */
+/** '(3–10)' / '(آية 6)' / '(من 3)' / '' — ayah-range suffix for display.
+ *
+ * A single-ayah assignment is entered as from === to, but "(6–6)" reads as a
+ * span the teacher never meant; "(آية 6)" says what it is. This is the one
+ * chokepoint every surface goes through — the log, the WhatsApp message, the
+ * parent page and the evaluation card all format ranges here (directly or via
+ * suraLabel), so they change together. */
 export function ayahRange(from?: string | number, to?: string | number): string {
-  if (from && to) return ' (' + from + '–' + to + ')';
+  if (from && to) {
+    if (String(from) === String(to)) return ' (آية ' + from + ')';
+    return ' (' + from + '–' + to + ')';
+  }
   if (from) return ' (من ' + from + ')';
   return '';
 }

@@ -144,6 +144,27 @@ describe('buildWhatsAppMessage', () => {
     expect(lines[madiIdx + 1]).toBe('   ⭐⭐⭐ جيد');
   });
 
+  it('reads a single-ayah assignment as "آية 6", not a 6–6 span', () => {
+    // The teacher assigns one ayah by entering the same number twice. The
+    // parent should read what was actually memorized, not a range.
+    const lines = buildWhatsAppMessage(
+      {
+        id: 'r1',
+        studentId: 's_1',
+        student: 'زيد احمد',
+        date: '2026-07-03',
+        loh: { score: 90 },
+      },
+      {
+        ...prevSession,
+        newLoh: [{ sura: 'الطلاق', from: '6', to: '6' }],
+      },
+    ).split('\n');
+
+    const lohIdx = lines.findIndex((l) => l.startsWith('• اللوح'));
+    expect(lines[lohIdx]).toBe('• اللوح: الطلاق (آية 6)  ←  90/100');
+  });
+
   it('puts the tajweed stars on their own line too, scored or star-count only', () => {
     const scored = buildWhatsAppMessage(
       {

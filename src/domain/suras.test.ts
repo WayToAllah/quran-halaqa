@@ -73,6 +73,12 @@ describe('suraPageLabel', () => {
 describe('ayahRange', () => {
   it('formats a full range', () => {
     expect(ayahRange('3', '10')).toBe(' (3–10)');
+
+    // A single ayah is entered as from === to; "(6–6)" reads as a span the
+    // teacher never meant.
+    expect(ayahRange('6', '6')).toBe(' (آية 6)');
+    expect(ayahRange(6, 6)).toBe(' (آية 6)');
+    expect(ayahRange('6', '7')).toBe(' (6–7)');
   });
   it('formats an open-ended "from" only', () => {
     expect(ayahRange('5', undefined)).toBe(' (من 5)');
@@ -96,6 +102,7 @@ describe('joinSuraNames', () => {
   });
   it('includes ayah ranges in the joined output', () => {
     expect(joinSuraNames([{ sura: 'البقرة', from: '1', to: '10' }])).toBe('البقرة (1–10)');
+    expect(joinSuraNames([{ sura: 'الطلاق', from: '6', to: '6' }])).toBe('الطلاق (آية 6)');
   });
   it('renders a whole-sura range as "من X إلى Y"', () => {
     expect(joinSuraNames([{ sura: 'الملك', toSura: 'الناس', range: true }])).toBe(
@@ -122,6 +129,7 @@ describe('suraLabel', () => {
   });
   it('labels an ayah range', () => {
     expect(suraLabel({ sura: 'البقرة', from: '1', to: '10' })).toBe('البقرة (1–10)');
+    expect(suraLabel({ sura: 'الطلاق', from: '6', to: '6' })).toBe('الطلاق (آية 6)');
   });
   it('labels a whole-sura range as "من X إلى Y"', () => {
     expect(suraLabel({ sura: 'الملك', toSura: 'الناس', range: true })).toBe('من الملك إلى الناس');
