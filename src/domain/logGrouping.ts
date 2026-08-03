@@ -1,6 +1,6 @@
 import { byNewest } from './dates';
 import { isRepeatGrade } from './record';
-import type { SessionRecord } from '../types';
+import type { SessionRecord, SuraAssignment } from '../types';
 
 export interface LogDay {
   /** ISO date, 'YYYY-MM-DD'. */
@@ -68,4 +68,45 @@ export function matchesLogFilter(r: SessionRecord, filter: LogFilter): boolean {
     default:
       return true;
   }
+}
+
+/**
+ * What each record's marks were actually given for, keyed by record id.
+ *
+ * A session is marked on the assignment it was given at the PREVIOUS session,
+ * so the sura behind a score lives on a different record than the score does.
+ * Without it the log could only say "لوح ٩٠" — a number with nothing attached
+ * to it — while the sura sitting on the same card was the NEW assignment, a
+ * different thing entirely and an easy misread.
+ *
+ * Resolved for the whole list in one pass rather than per card, so rendering
+ * fifty rows doesn't re-scan the list fifty times. Records whose predecessor
+ * isn't loaded yet (the log pages newest-first, so older sessions may still be
+ * below the fold) simply get nothing — the card then shows the bare mark
+ * rather than a wrong sura.
+ */
+export function markedAssignments(
+  all: SessionRecord[],
+): Map<string, { loh: SuraAssignment[]; madi: SuraAssignment[] }> {
+  const byStudent = new Map<string, SessionRecord[]>();
+  for (const r of all) {
+    if (!r.studentId || r.attendance_only) continue;
+    const list = byStudent.get(r.studentId);
+    if (list) list.push(r);
+    else byStudent.set(r.studentId, [r]);
+  }
+
+  const out = new Map<string, { loh: SuraAssignment[]; madi: SuraAssignment[] }>();
+  for (const sessions of byStudent.values()) {
+    // Newest first, so each session's predecessor is the next one along.
+    sessions.sort(byNewest);
+    for (let i = 0; i < sessions.length - 1; i++) {
+      const prev = sessions[i + 1];
+      out.set(sessions[i].id, {
+        loh: (prev.newLoh ?? []).filter((a) => a?.sura),
+        madi: (prev.newMadi ?? []).filter((a) => a?.sura),
+      });
+    }
+  }
+  return out;
 }

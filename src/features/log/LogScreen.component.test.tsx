@@ -97,28 +97,29 @@ beforeEach(() => {
 describe('LogScreen — rendering', () => {
   it('shows a genuine zero score as إعادة, not blank (scoreName(0) regression)', () => {
     renderScreen();
-    // Scoped to the card: "إعادة" is also a filter tab above the list.
-    const row = screen.getByText('زيد احمد').closest('.rounded-2xl') as HTMLElement;
-    expect(within(row).getByText(/إعادة/)).toBeInTheDocument();
+    // The band rides on the bar's colour, so the word lives in the bar's
+    // accessible name — colour alone would not be a reading. A zero must still
+    // come out as إعادة rather than an empty band (scoreName(0) is falsy).
+    expect(screen.getByLabelText(/إعادة — ٠ من ١٠٠/)).toBeInTheDocument();
   });
 
   it('shows the new-assignment sura for a real session', () => {
     renderScreen();
-    expect(screen.getByText(/لوح جديد.*البقرة/)).toBeInTheDocument();
+    expect(screen.getByText(/لوح: البقرة/)).toBeInTheDocument();
   });
 
   it('shows "حضور فقط" for an attendance-only entry, with no edit button', () => {
     renderScreen();
-    expect(screen.getByText('✅ حضور فقط')).toBeInTheDocument();
-    const row = screen.getByText('محمد علي').closest('.rounded-2xl') as HTMLElement;
-    expect(within(row).queryByRole('button', { name: 'تعديل' })).not.toBeInTheDocument();
+    expect(screen.getByText('حضور فقط', { selector: 'span' })).toBeInTheDocument();
+    const row = screen.getByText('محمد علي').closest('[class*="rounded-xl"]') as HTMLElement;
+    expect(within(row).queryByRole('button', { name: /^تعديل / })).not.toBeInTheDocument();
   });
 
   it('hands the session up to onEditRecord when ✏️ is tapped', async () => {
     const onEditRecord = vi.fn();
     renderScreen({ onEditRecord });
-    const row = screen.getByText('زيد احمد').closest('.rounded-2xl') as HTMLElement;
-    await userEvent.click(within(row).getByRole('button', { name: 'تعديل' }));
+    const row = screen.getByText('زيد احمد').closest('[class*="rounded-xl"]') as HTMLElement;
+    await userEvent.click(within(row).getByRole('button', { name: /^تعديل / }));
     expect(onEditRecord).toHaveBeenCalledTimes(1);
     expect(onEditRecord.mock.calls[0][0].id).toBe('r1');
   });
@@ -160,6 +161,48 @@ describe('LogScreen — search', () => {
   });
 });
 
+describe('LogScreen — compact card', () => {
+  it('puts the name and its marks on one row', () => {
+    renderScreen();
+    const row = screen.getByText('زيد احمد').closest('[class*="rounded-xl"]') as HTMLElement;
+    // Sura, bar and number share a line — no separate label row above the bar.
+    expect(within(row).getByLabelText(/إعادة — ٠ من ١٠٠/)).toBeInTheDocument();
+    expect(within(row).queryByText('تقييم اللوح')).not.toBeInTheDocument();
+  });
+
+  it('keeps the mark and the assignment distinguishable despite sharing a name', () => {
+    renderScreen();
+    const row = screen.getByText('زيد احمد').closest('[class*="rounded-xl"]') as HTMLElement;
+    // The mark's own line says لوح; the handed-out line is prefixed "جديد —".
+    expect(within(row).getByText('جديد —')).toBeInTheDocument();
+    expect(within(row).getByText(/لوح: البقرة/)).toBeInTheDocument();
+  });
+
+  it('shows a mark against the sura it was actually given for', async () => {
+    renderScreen();
+    // سالم's 5 July session scored 85. That mark is for الفاتحة, handed out on
+    // 1 July — not for whatever his 5 July card hands out next.
+    const row = screen.getAllByText('سالم')[0].closest('[class*="rounded-xl"]') as HTMLElement;
+    expect(within(row).getByText(/لوح: الفاتحة/)).toBeInTheDocument();
+  });
+
+  it('shows the bare mark when the earlier session is not loaded', () => {
+    // The log pages newest-first; a sura guessed from the wrong session would
+    // be worse than none.
+    renderScreen();
+    const row = screen.getByText('زيد احمد').closest('[class*="rounded-xl"]') as HTMLElement;
+    const marks = within(row).getAllByText('لوح');
+    expect(marks.length).toBeGreaterThan(0);
+  });
+
+  it('names the row each action belongs to, for screen readers', () => {
+    renderScreen();
+    // Forty identical "حذف" buttons tell a screen-reader user nothing.
+    expect(screen.getByRole('button', { name: 'حذف زيد احمد' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'تعديل زيد احمد' })).toBeInTheDocument();
+  });
+});
+
 describe('LogScreen — day grouping', () => {
   it('heads each halaqa day with its date and how many were recorded', () => {
     renderScreen();
@@ -180,7 +223,7 @@ describe('LogScreen — day grouping', () => {
 
   it('drops the now-duplicated date from the cards themselves', () => {
     renderScreen();
-    const row = screen.getByText('زيد احمد').closest('.rounded-2xl') as HTMLElement;
+    const row = screen.getByText('زيد احمد').closest('[class*="rounded-xl"]') as HTMLElement;
     expect(within(row).queryByText(/يوليو/)).not.toBeInTheDocument();
   });
 });
@@ -246,8 +289,8 @@ describe('LogScreen — search box', () => {
 describe('LogScreen — delete with undo', () => {
   /** Row delete button + the in-app confirmation that stands in front of it. */
   async function deleteRow(name: string) {
-    const row = screen.getByText(name).closest('.rounded-2xl') as HTMLElement;
-    await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));
+    const row = screen.getByText(name).closest('[class*="rounded-xl"]') as HTMLElement;
+    await userEvent.click(within(row).getByRole('button', { name: /^حذف / }));
     await userEvent.click(screen.getByRole('button', { name: 'احذف' }));
   }
 
@@ -286,8 +329,8 @@ describe('LogScreen — delete with undo', () => {
 
   it('keeps the entry when the confirmation is declined', async () => {
     renderScreen();
-    const row = screen.getByText('زيد احمد').closest('.rounded-2xl') as HTMLElement;
-    await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));
+    const row = screen.getByText('زيد احمد').closest('[class*="rounded-xl"]') as HTMLElement;
+    await userEvent.click(within(row).getByRole('button', { name: /^حذف / }));
     await userEvent.click(screen.getByRole('button', { name: 'إلغاء' }));
 
     expect(screen.getByText('زيد احمد')).toBeInTheDocument();
@@ -300,8 +343,8 @@ describe('LogScreen — delete with undo', () => {
     renderScreen();
     // سالم's 1 July session handed out the assignment his 5 July session marked.
     const rows = screen.getAllByText('سالم');
-    const row = rows[rows.length - 1].closest('.rounded-2xl') as HTMLElement;
-    await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));
+    const row = rows[rows.length - 1].closest('[class*="rounded-xl"]') as HTMLElement;
+    await userEvent.click(within(row).getByRole('button', { name: /^حذف / }));
 
     expect(screen.getByText(/متقيّم في جلسة/)).toBeInTheDocument();
     expect(screen.getByText(/التقييم ده هيفضل من غير التكليف/)).toBeInTheDocument();
@@ -310,16 +353,16 @@ describe('LogScreen — delete with undo', () => {
   it('does not cry wolf when nothing marks the session', async () => {
     renderScreen();
     // 5 July is سالم's newest session — nothing has marked it yet.
-    const row = screen.getAllByText('سالم')[0].closest('.rounded-2xl') as HTMLElement;
-    await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));
+    const row = screen.getAllByText('سالم')[0].closest('[class*="rounded-xl"]') as HTMLElement;
+    await userEvent.click(within(row).getByRole('button', { name: /^حذف / }));
 
     expect(screen.queryByText(/متقيّم في جلسة/)).not.toBeInTheDocument();
   });
 
   it("asks in the app's own dialog, not the browser's", async () => {
     renderScreen();
-    const row = screen.getByText('زيد احمد').closest('.rounded-2xl') as HTMLElement;
-    await userEvent.click(within(row).getByRole('button', { name: 'حذف' }));
+    const row = screen.getByText('زيد احمد').closest('[class*="rounded-xl"]') as HTMLElement;
+    await userEvent.click(within(row).getByRole('button', { name: /^حذف / }));
 
     expect(screen.getByRole('alertdialog')).toBeInTheDocument();
     expect(screen.getByText('حذف جلسة زيد احمد؟')).toBeInTheDocument();
@@ -334,8 +377,8 @@ describe('LogScreen — edit', () => {
         <LogScreen onEditRecord={onEditRecord} />
       </ToastProvider>,
     );
-    const row = screen.getByText('زيد احمد').closest('.rounded-2xl') as HTMLElement;
-    await userEvent.click(within(row).getByRole('button', { name: 'تعديل' }));
+    const row = screen.getByText('زيد احمد').closest('[class*="rounded-xl"]') as HTMLElement;
+    await userEvent.click(within(row).getByRole('button', { name: /^تعديل / }));
     expect(onEditRecord).toHaveBeenCalledTimes(1);
     expect(onEditRecord.mock.calls[0][0].id).toBe('r1');
   });

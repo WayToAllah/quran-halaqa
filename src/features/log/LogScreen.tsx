@@ -12,13 +12,13 @@ import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { SearchInput } from '../../ui/SearchInput';
 import { ayahRange, joinSuraNames } from '../../domain/suras';
 import { hijriShort } from '../../domain/hijri';
-import { groupRecordsByDay, matchesLogFilter } from '../../domain/logGrouping';
+import { groupRecordsByDay, matchesLogFilter, markedAssignments } from '../../domain/logGrouping';
 import type { LogFilter } from '../../domain/logGrouping';
 import { toArabicDigits } from '../../domain/text';
 import { PlainStars } from '../../ui/StarRating';
 import { useToast } from '../../ui/ToastProvider';
 import { MOSQUE_ID, HALAQA_ID } from '../../config';
-import type { SessionRecord } from '../../types';
+import type { SessionRecord, SuraAssignment } from '../../types';
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return dateStr;
@@ -31,39 +31,47 @@ function formatDate(dateStr: string): string {
 
 /** Tier badge colors ported from the mockup, keyed by the real scoreName()
  * bands (85/75/65/50) — same lookup used on the Record screen. */
-const TIER_COLORS: Record<string, { bg: string; color: string }> = {
-  ممتاز: { bg: '#E7F2EC', color: '#0F3D2E' },
-  'جيد جداً': { bg: '#EFF6E8', color: '#3E6B22' },
-  جيد: { bg: '#FFF8E6', color: '#8A6A15' },
-  مقبول: { bg: '#FBEEE3', color: '#9A5A24' },
-  إعادة: { bg: '#FBEAE7', color: '#B24A3A' },
-};
-
-function ScoreBar({ label, score, barColor }: { label: string; score: number; barColor: string }) {
+/**
+ * One mark on one line: what was recited, how it went, out of a hundred.
+ *
+ * The bar used to sit under a label row of its own, costing two rows per mark
+ * — four rows before a card said anything about suras. Putting the sura, the
+ * bar and the number on a single line keeps the bar's at-a-glance comparison
+ * while giving the number something to be about: "لوح ٩٠" alone is a score
+ * with nothing attached to it.
+ *
+ * The bar is a fixed width rather than flexible so the four bars down a day's
+ * cards line up and can be read against each other; the sura takes the slack
+ * and truncates, since its start is the part that identifies it.
+ */
+function ScoreRow({
+  label,
+  score,
+  suras,
+  barColor,
+}: {
+  label: string;
+  score: number;
+  suras: SuraAssignment[];
+  barColor: string;
+}) {
   const tier = scoreName(score);
-  const tc = TIER_COLORS[tier] ?? { bg: '#F1ECDD', color: '#5B5646' };
+  const what = suras.length > 0 ? `${label}: ${joinSuraNames(suras)}` : label;
   return (
-    <div>
-      <div class="flex items-center justify-between mb-1.5">
-        <span class="text-[11.5px] text-taupe font-semibold">{label}</span>
-        <span
-          class="text-[11px] font-bold px-2.5 py-0.5 rounded-full"
-          style={{ background: tc.bg, color: tc.color }}
-        >
-          {tier}
-        </span>
+    <div class="flex items-center gap-2">
+      <span class="text-[11.5px] text-[#5B5646] truncate min-w-0 flex-1" title={what}>
+        {what}
+      </span>
+      <div
+        class="w-14 h-1.5 rounded-full bg-[#F1ECDD] overflow-hidden shrink-0"
+        role="img"
+        aria-label={`${tier} — ${toArabicDigits(score)} من ١٠٠`}
+      >
+        <div class="h-full rounded-full" style={{ width: score + '%', background: barColor }} />
       </div>
-      <div class="flex items-center gap-2.5">
-        <div class="flex-1 h-1.5 rounded-full bg-[#F1ECDD] overflow-hidden">
-          <div class="h-full rounded-full" style={{ width: score + '%', background: barColor }} />
-        </div>
-        <span
-          class="text-[12.5px] font-extrabold shrink-0 w-9 text-left"
-          style={{ color: barColor }}
-        >
-          {toArabicDigits(score)}
-        </span>
-      </div>
+      <span class="text-[12.5px] font-extrabold shrink-0 w-7 text-left" style={{ color: barColor }}>
+        {toArabicDigits(score)}
+      </span>
     </div>
   );
 }
@@ -102,7 +110,7 @@ function formatDayHeading(dateStr: string): string {
 function DayHeading({ date, count }: { date: string; count: number }) {
   const hijri = date ? hijriShort(date) : '';
   return (
-    <div class="sticky top-0 z-10 -mx-[18px] px-[18px] py-2 bg-parchment/95 backdrop-blur-sm mb-2.5">
+    <div class="sticky top-0 z-10 -mx-[18px] px-[18px] py-2 bg-parchment/95 backdrop-blur-sm mb-2">
       <div class="flex items-baseline justify-between gap-2">
         <div class="min-w-0">
           <span class="text-[13px] font-extrabold text-ink-dark">{formatDayHeading(date)}</span>
@@ -119,11 +127,15 @@ function DayHeading({ date, count }: { date: string; count: number }) {
 function LogEntry({
   record,
   studentName,
+  marked,
   onEdit,
   onDelete,
 }: {
   record: SessionRecord;
   studentName: string;
+  /** The assignment this session's marks were given for — it lives on the
+   * PREVIOUS session, so the screen resolves it and passes it down. */
+  marked?: { loh: SuraAssignment[]; madi: SuraAssignment[] };
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -131,26 +143,35 @@ function LogEntry({
   const lohArr = (r.newLoh ?? []).filter((l) => l?.sura);
   const madiArr = (r.newMadi ?? []).filter((m) => m?.sura);
 
+  // One line per fact: who, each mark with what it was for, then what was
+  // handed out for next time. Marks come from the PREVIOUS session's
+  // assignment (passed in), the "جديد" line from this one's.
+  const assignments: string[] = [];
+  if (lohArr.length > 0) assignments.push(`لوح: ${joinSuraNames(lohArr)}`);
+  if (madiArr.length > 0) assignments.push(`ماضي: ${joinSuraNames(madiArr)}`);
+
   return (
-    <div class="bg-white border border-hairline rounded-2xl p-4 space-y-3">
-      <div class="flex items-center justify-between">
-        {/* No date here: the sticky day heading above the block already
-            carries it, and repeating it on all ~50 of a day's cards was pure
-            noise competing with the student's name. */}
-        <div class="min-w-0">
-          <div class="text-sm font-extrabold text-ink-dark truncate">{studentName}</div>
+    <div class="bg-white border border-hairline rounded-xl px-3 py-2.5 space-y-1.5">
+      <div class="flex items-center gap-2">
+        <div class="text-[13px] font-extrabold text-ink-dark truncate min-w-0 flex-1">
+          {studentName}
         </div>
-        <div class="flex items-center gap-1.5 shrink-0">
+        {r.attendance_only && (
+          <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#E7F2EC] text-[#0F3D2E] shrink-0">
+            حضور فقط
+          </span>
+        )}
+        <div class="flex items-center gap-1 shrink-0">
           {!r.attendance_only && (
             <button
-              class="w-[30px] h-[30px] rounded-[9px] border border-hairline bg-white flex items-center justify-center"
-              aria-label="تعديل"
+              class="w-9 h-9 rounded-[10px] flex items-center justify-center"
+              aria-label={`تعديل ${studentName}`}
               onClick={onEdit}
             >
               <svg
                 viewBox="0 0 24 24"
-                width="14"
-                height="14"
+                width="15"
+                height="15"
                 fill="none"
                 stroke="#5B5646"
                 stroke-width="1.8"
@@ -162,14 +183,14 @@ function LogEntry({
             </button>
           )}
           <button
-            class="w-[30px] h-[30px] rounded-[9px] border border-hairline bg-white flex items-center justify-center"
-            aria-label="حذف"
+            class="w-9 h-9 rounded-[10px] flex items-center justify-center"
+            aria-label={`حذف ${studentName}`}
             onClick={onDelete}
           >
             <svg
               viewBox="0 0 24 24"
-              width="14"
-              height="14"
+              width="15"
+              height="15"
               fill="none"
               stroke="#B24A3A"
               stroke-width="1.8"
@@ -181,42 +202,37 @@ function LogEntry({
         </div>
       </div>
 
-      {r.attendance_only ? (
-        <div class="text-xs text-taupe">✅ حضور فقط</div>
-      ) : (
-        <>
-          {hasScore(r.loh) && (
-            <ScoreBar label="تقييم اللوح" score={r.loh!.score!} barColor="#0F3D2E" />
-          )}
-          {lohArr.length > 0 && (
-            <div class="text-[12px] text-[#5B5646]">📝 لوح جديد: {joinSuraNames(lohArr)}</div>
-          )}
-
-          {hasScore(r.madi) && (
-            <ScoreBar label="تقييم الماضي" score={r.madi!.score!} barColor="#C9A227" />
-          )}
-          {madiArr.length > 0 && (
-            <div class="text-[12px] text-[#5B5646]">🔄 ماضي جديد: {joinSuraNames(madiArr)}</div>
-          )}
-
-          {r.tajweed?.sura && (
-            <div class="text-[12px] text-[#5B5646] flex items-center gap-1.5 flex-wrap">
-              <span>
-                📐 تجويد: {r.tajweed.sura}
-                {ayahRange(r.tajweed.from, r.tajweed.to)}
-              </span>
-              <PlainStars count={r.tajweed.stars ?? 0} />
-              {r.tajweed.note && <span>· {r.tajweed.note}</span>}
-            </div>
-          )}
-
-          {r.note && (
-            <div class="text-[12.5px] text-taupe italic pt-2.5 border-t border-dashed border-hairline">
-              💬 {r.note}
-            </div>
-          )}
-        </>
+      {hasScore(r.loh) && (
+        <ScoreRow label="لوح" score={r.loh!.score!} suras={marked?.loh ?? []} barColor="#0F3D2E" />
       )}
+      {hasScore(r.madi) && (
+        <ScoreRow
+          label="ماضي"
+          score={r.madi!.score!}
+          suras={marked?.madi ?? []}
+          barColor="#C9A227"
+        />
+      )}
+
+      {assignments.length > 0 && (
+        <div class="text-[12px] text-[#5B5646] leading-snug">
+          <span class="text-taupe">جديد — </span>
+          {assignments.join(' · ')}
+        </div>
+      )}
+
+      {r.tajweed?.sura && (
+        <div class="text-[12px] text-[#5B5646] flex items-center gap-1.5 flex-wrap leading-snug">
+          <span>
+            تجويد: {r.tajweed.sura}
+            {ayahRange(r.tajweed.from, r.tajweed.to)}
+          </span>
+          <PlainStars count={r.tajweed.stars ?? 0} />
+          {r.tajweed.note && <span>· {r.tajweed.note}</span>}
+        </div>
+      )}
+
+      {r.note && <div class="text-[12px] text-taupe italic leading-snug">💬 {r.note}</div>}
     </div>
   );
 }
@@ -249,6 +265,12 @@ export function LogScreen({ onEditRecord }: LogScreenProps = {}) {
   }, [isSearching, search.results, records, pendingIds, filter]);
 
   const days = useMemo(() => groupRecordsByDay(visibleRecords), [visibleRecords]);
+  // Resolved over the FULL loaded list, not the filtered view: a filter that
+  // hides the previous session must not blank out the sura behind a mark.
+  const marks = useMemo(
+    () => markedAssignments(isSearching ? search.results : records),
+    [isSearching, search.results, records],
+  );
 
   // Skeleton shows for the initial paginated load, or while a search resolves.
   const showSkeleton = isSearching ? search.searching : !loaded;
@@ -376,6 +398,7 @@ export function LogScreen({ onEditRecord }: LogScreenProps = {}) {
                   key={r.id}
                   record={r}
                   studentName={displayStudentName(r, students)}
+                  marked={marks.get(r.id)}
                   onEdit={() => handleEdit(r)}
                   onDelete={() => setPendingDelete(r)}
                 />

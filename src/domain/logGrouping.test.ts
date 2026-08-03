@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { groupRecordsByDay, matchesLogFilter } from './logGrouping';
+import { groupRecordsByDay, matchesLogFilter, markedAssignments } from './logGrouping';
 import type { SessionRecord } from '../types';
 
 function rec(id: string, date: string, extra: Partial<SessionRecord> = {}): SessionRecord {
@@ -90,5 +90,42 @@ describe('matchesLogFilter', () => {
     // A tajweed object with no sura is an empty shell, not a passage.
     const empty = rec('r8', '2026-07-25', { tajweed: { sura: '', stars: 0 } });
     expect(matchesLogFilter(empty, 'tajweed')).toBe(false);
+  });
+});
+
+describe('markedAssignments', () => {
+  const jul01 = rec('r1', '2026-07-01', { newLoh: [{ sura: 'الفاتحة', from: '1', to: '7' }] });
+  const jul05 = rec('r2', '2026-07-05', {
+    loh: { score: 90 },
+    newLoh: [{ sura: 'البقرة', from: '1', to: '10' }],
+  });
+
+  it('attributes a mark to the assignment given at the previous session', () => {
+    const map = markedAssignments([jul05, jul01]);
+    // The 5 July score was earned on الفاتحة, handed out on 1 July — NOT on
+    // البقرة, which is the new assignment sitting on the same card.
+    expect(map.get('r2')?.loh).toEqual([{ sura: 'الفاتحة', from: '1', to: '7' }]);
+  });
+
+  it('gives nothing for a session with no predecessor loaded', () => {
+    // The log pages newest-first, so an older session may not be loaded yet.
+    // Better a bare mark than a sura taken from the wrong session.
+    expect(markedAssignments([jul05]).get('r2')).toBeUndefined();
+  });
+
+  it('never crosses students', () => {
+    const otherStudent = { ...jul01, id: 'r_x', studentId: 's_2' };
+    expect(markedAssignments([jul05, otherStudent]).get('r2')).toBeUndefined();
+  });
+
+  it('skips attendance rows when looking back', () => {
+    const att = rec('r_att', '2026-07-03', { attendance_only: true });
+    const map = markedAssignments([jul05, att, jul01]);
+    expect(map.get('r2')?.loh).toEqual([{ sura: 'الفاتحة', from: '1', to: '7' }]);
+  });
+
+  it('works off an unsorted list', () => {
+    const map = markedAssignments([jul01, jul05]);
+    expect(map.get('r2')?.loh?.[0].sura).toBe('الفاتحة');
   });
 });
