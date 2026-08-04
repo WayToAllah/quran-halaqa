@@ -58,7 +58,9 @@ export const MOCK_PUBLIC_STATS: PublicStats = {
     { date: '2026-06-20', loh: 70, madi: 80 },
     { date: '2026-06-22', loh: 75, madi: 78 },
     { date: '2026-06-25', loh: 80, madi: 85 },
-    { date: '2026-06-27', loh: 78, madi: 82 },
+    // One إعادة on purpose: the preview has to exercise the ✕ marker and the
+    // break in the line, not just a happy uphill run.
+    { date: '2026-06-27', loh: 0, madi: 82 },
     { date: '2026-07-01', loh: 85, madi: 88 },
     { date: '2026-07-04', loh: 90, madi: 85 },
     { date: '2026-07-07', loh: 88, madi: 92 },

@@ -118,4 +118,33 @@ describe('ParentPage — progress chart', () => {
     expect(screen.queryByText(/محتاج تشجيع/)).not.toBeInTheDocument();
     expect(screen.queryByText(/مستقر/)).not.toBeInTheDocument();
   });
+
+  it('prints the axis values so a non-zero floor cannot mislead', () => {
+    // A chart whose baseline is 50 while looking like 0 exaggerates every
+    // difference. The gridline labels are what make the scale honest.
+    const { container } = render(<ParentPage previewStats={MOCK_PUBLIC_STATS} />);
+    const texts = Array.from(container.querySelectorAll('svg text')).map((t) => t.textContent);
+    expect(texts).toEqual(['١٠٠', '٨٠', '٦٠']);
+  });
+
+  it('marks an إعادة session and breaks the line instead of plunging to it', () => {
+    const stats = {
+      ...MOCK_PUBLIC_STATS,
+      scoreHistory: [
+        { date: '2026-07-01', loh: 90, madi: null },
+        { date: '2026-07-03', loh: 0, madi: null },
+        { date: '2026-07-05', loh: 85, madi: null },
+      ],
+    };
+    const { container } = render(<ParentPage previewStats={stats} />);
+    const paths = Array.from(container.querySelectorAll('svg path')).map(
+      (p) => p.getAttribute('d') || '',
+    );
+    const line = paths.find((d) => d.includes('L') && (d.match(/M/g) || []).length === 2);
+    expect(line).toBeTruthy(); // two subpaths = the line broke at the إعادة
+    // ✕ marks are two crossing strokes; one إعادة means one such mark.
+    const crosses = paths.filter((d) => (d.match(/M/g) || []).length === 2 && !d.includes(' L 1'));
+    expect(crosses.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('إعادة').length).toBeGreaterThan(0);
+  });
 });

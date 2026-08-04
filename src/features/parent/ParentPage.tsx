@@ -258,6 +258,9 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
               <i style="width:9px;height:9px;border-radius:50%;display:inline-block;background:var(--accent)"></i>{' '}
               الماضي
             </span>
+            <span style="display:flex;align-items:center;gap:6px">
+              <i style="color:var(--warn);font-weight:700;line-height:1">✕</i> إعادة
+            </span>
           </div>
           <div style="position:relative;width:100%">
             <svg
@@ -265,7 +268,48 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
               preserveAspectRatio="xMidYMid meet"
               style="width:100%;height:auto;display:block;overflow:visible"
             >
-              <line x1="18" y1="20" x2="18" y2="80" stroke="var(--border)" stroke-width="1" />
+              {/* Below the pass line: everything here is إعادة. Tinted so the
+                  axis floor reads as a grading boundary, not as zero. */}
+              <rect
+                x={chart.plotLeft}
+                y={chart.passY}
+                width={chart.plotRight - chart.plotLeft}
+                height={chart.plotBottom - chart.passY}
+                fill="var(--warn)"
+                opacity="0.09"
+              />
+              {chart.gridLines.map((g) => (
+                <g key={g.value}>
+                  <line
+                    x1={chart.plotLeft}
+                    y1={g.y}
+                    x2={chart.plotRight}
+                    y2={g.y}
+                    stroke={g.strong ? 'var(--border-strong)' : 'var(--border)'}
+                    stroke-width={g.strong ? 1 : 0.7}
+                    stroke-dasharray={g.strong ? '' : '3 4'}
+                  />
+                  {g.label && (
+                    <text
+                      x={chart.plotLeft - 4}
+                      y={g.y + 2.6}
+                      text-anchor="end"
+                      font-size="7.5"
+                      fill="var(--text-hint)"
+                    >
+                      {g.label}
+                    </text>
+                  )}
+                </g>
+              ))}
+              <line
+                x1={chart.plotLeft}
+                y1={chart.plotTop}
+                x2={chart.plotLeft}
+                y2={chart.plotBottom}
+                stroke="var(--border)"
+                stroke-width="1"
+              />
               {chart.lohPath && (
                 <path
                   d={chart.lohPath}
@@ -286,35 +330,63 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
                   stroke-linejoin="round"
                 />
               )}
-              {chart.lohLast && (
+              {/* إعادة sessions: a ✕ in the tinted zone rather than a point on
+                  the line, so one failed session reads as its own event
+                  instead of collapsing the whole trend into a spike. */}
+              {chart.lohRepeats.map((p, i) => (
+                <path
+                  key={'lr' + i}
+                  d={`M ${p.x - 3.2} ${p.y - 3.2} L ${p.x + 3.2} ${p.y + 3.2} M ${p.x - 3.2} ${p.y + 3.2} L ${p.x + 3.2} ${p.y - 3.2}`}
+                  stroke="var(--warn)"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              ))}
+              {chart.madiRepeats.map((p, i) => (
+                <path
+                  key={'mr' + i}
+                  d={`M ${p.x - 3.2} ${p.y - 3.2} L ${p.x + 3.2} ${p.y + 3.2} M ${p.x - 3.2} ${p.y + 3.2} L ${p.x + 3.2} ${p.y - 3.2}`}
+                  stroke="var(--warn)"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  opacity="0.55"
+                />
+              ))}
+              {chart.lohLast && !chart.lohLast.repeat && (
                 <circle cx={chart.lohLast.x} cy={chart.lohLast.y} r="4" fill="var(--ink)" />
               )}
-              {chart.madiLast && (
+              {chart.madiLast && !chart.madiLast.repeat && (
                 <circle cx={chart.madiLast.x} cy={chart.madiLast.y} r="4" fill="var(--accent)" />
               )}
             </svg>
             {chart.lohLast && (
               <div
                 style={
-                  'position:absolute;transform:translate(-50%,-50%);font-size:11px;font-weight:700;color:var(--ink);white-space:nowrap;pointer-events:none;left:' +
+                  'position:absolute;transform:translate(-50%,-50%);font-size:11px;font-weight:700;white-space:nowrap;pointer-events:none;color:' +
+                  (chart.lohLast.repeat ? 'var(--warn)' : 'var(--ink)') +
+                  ';left:' +
                   pctLeft(chart.lohLast.x) +
                   ';top:' +
                   pctTop(lohLabelY)
                 }
               >
-                {chart.lohLast.label}٪
+                {chart.lohLast.label}
+                {chart.lohLast.repeat ? '' : '٪'}
               </div>
             )}
             {chart.madiLast && (
               <div
                 style={
-                  'position:absolute;transform:translate(-50%,-50%);font-size:11px;font-weight:700;color:var(--accent);white-space:nowrap;pointer-events:none;left:' +
+                  'position:absolute;transform:translate(-50%,-50%);font-size:11px;font-weight:700;white-space:nowrap;pointer-events:none;color:' +
+                  (chart.madiLast.repeat ? 'var(--warn)' : 'var(--accent)') +
+                  ';left:' +
                   pctLeft(chart.madiLast.x) +
                   ';top:' +
                   pctTop(madiLabelY)
                 }
               >
-                {chart.madiLast.label}٪
+                {chart.madiLast.label}
+                {chart.madiLast.repeat ? '' : '٪'}
               </div>
             )}
           </div>

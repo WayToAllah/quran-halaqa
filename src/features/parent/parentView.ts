@@ -93,10 +93,24 @@ export function getParentTheme(dark: boolean): ParentTheme {
 
 const CHART_W = 320;
 const CHART_PAD_X = 18;
-const CHART_TOP = 20;
-const CHART_BOTTOM = 80;
+const CHART_TOP = 14;
+const CHART_BOTTOM = 86;
 /** How many trailing sessions the sparkline shows. */
 export const CHART_WINDOW = 8;
+/** Bottom of the value axis. Deliberately NOT zero: real scores cluster
+ * between 69 and 100, and stretching that band over a 0–100 axis left it
+ * flattened into a third of the plot while two thirds sat empty. Fixed (not
+ * fitted per student) so two children's charts — and one child's chart across
+ * months — stay comparable, and so a three-point dip can't be magnified into
+ * a cliff by an auto-fitted axis. */
+export const CHART_FLOOR = 50;
+/** The إعادة cut-off from scoring.ts. Scores below it leave the line entirely
+ * (see seriesPath) and are drawn as their own marker, so one zero can't drag
+ * the whole trend into a spike and hide everything else. */
+export const CHART_PASS_MARK = 60;
+/** Drawn on the grade boundaries, so "above the جيد جداً line" is readable
+ * without doing arithmetic. */
+const CHART_GRID_VALUES = [100, 90, 80, 70, CHART_PASS_MARK];
 
 function chartX(i: number, n: number): number {
   if (n <= 1) return CHART_PAD_X;
@@ -104,29 +118,75 @@ function chartX(i: number, n: number): number {
   return CHART_PAD_X + step * i;
 }
 function chartY(v: number): number {
-  return CHART_TOP + ((100 - v) / 100) * (CHART_BOTTOM - CHART_TOP);
+  const clamped = Math.min(100, Math.max(CHART_FLOOR, v));
+  return CHART_TOP + ((100 - clamped) / (100 - CHART_FLOOR)) * (CHART_BOTTOM - CHART_TOP);
 }
+/** Middle of the إعادة zone — the band between the pass line and the floor. */
+const REPEAT_Y = chartY((CHART_PASS_MARK + CHART_FLOOR) / 2);
 
-/** Build an SVG path string over the non-null points of one series, using the
- * point's index (so loh and madi stay time-aligned even when one has gaps). */
+/** Build an SVG path over the passing points of one series, using the point's
+ * index (so loh and madi stay time-aligned even when one has gaps). A null
+ * (unscored) OR an إعادة breaks the line into a new subpath rather than
+ * bending down to it. */
 function seriesPath(values: Array<number | null>): string {
   const n = values.length;
-  const pts: string[] = [];
+  const segments: string[] = [];
+  let open = false;
   values.forEach((v, i) => {
-    if (v != null) pts.push(chartX(i, n) + ' ' + chartY(v));
+    if (v == null || v < CHART_PASS_MARK) {
+      open = false;
+      return;
+    }
+    const pt = chartX(i, n) + ' ' + chartY(v);
+    if (open) segments.push('L ' + pt);
+    else segments.push('M ' + pt);
+    open = true;
   });
-  return pts.length ? 'M ' + pts.join(' L ') : '';
+  return segments.join(' ');
+}
+
+/** The إعادة points of one series, placed in the zone under the pass line. */
+function seriesRepeats(values: Array<number | null>): Array<{ x: number; y: number }> {
+  const n = values.length;
+  const out: Array<{ x: number; y: number }> = [];
+  values.forEach((v, i) => {
+    if (v != null && v < CHART_PASS_MARK) out.push({ x: chartX(i, n), y: REPEAT_Y });
+  });
+  return out;
+}
+
+export interface ChartGridLine {
+  value: number;
+  y: number;
+  /** Arabic-Indic label, or '' for an unlabelled line (keeps the gutter from
+   * turning into a wall of numbers on a phone). */
+  label: string;
+  /** The إعادة cut-off, drawn heavier than the rest. */
+  strong: boolean;
 }
 
 export interface ChartView {
   lohPath: string;
   madiPath: string;
+  /** إعادة sessions, drawn as ✕ marks instead of points on the line. */
+  lohRepeats: Array<{ x: number; y: number }>;
+  madiRepeats: Array<{ x: number; y: number }>;
+  gridLines: ChartGridLine[];
+  /** Plot band edges + the pass line, exported so the page can draw the
+   * shaded إعادة zone without re-deriving the geometry. */
+  plotTop: number;
+  plotBottom: number;
+  plotLeft: number;
+  plotRight: number;
+  passY: number;
   /** Last non-null point of each series, for the end dot + label (null if the
    * series has no data at all). `label` is the value already in Arabic-Indic
    * digits — printing `value` straight produced "92٪", a Latin number wearing
-   * an Arabic percent sign, right above a stat grid that reads "٩٢٪". */
-  lohLast: { x: number; y: number; value: number; label: string } | null;
-  madiLast: { x: number; y: number; value: number; label: string } | null;
+   * an Arabic percent sign, right above a stat grid that reads "٩٢٪" — or the
+   * word إعادة when the session failed, since "٠٪" reads like a missing
+   * number rather than a grade. */
+  lohLast: { x: number; y: number; value: number; label: string; repeat: boolean } | null;
+  madiLast: { x: number; y: number; value: number; label: string; repeat: boolean } | null;
   viewBox: string;
 }
 
@@ -139,7 +199,15 @@ export function buildChart(history: PublicStats['scoreHistory']): ChartView {
   const lastNonNull = (vals: Array<number | null>) => {
     for (let i = vals.length - 1; i >= 0; i--) {
       const v = vals[i];
-      if (v != null) return { x: chartX(i, n), y: chartY(v), value: v, label: toArabicDigits(v) };
+      if (v == null) continue;
+      const repeat = v < CHART_PASS_MARK;
+      return {
+        x: chartX(i, n),
+        y: repeat ? REPEAT_Y : chartY(v),
+        value: v,
+        label: repeat ? 'إعادة' : toArabicDigits(v),
+        repeat,
+      };
     }
     return null;
   };
@@ -147,6 +215,19 @@ export function buildChart(history: PublicStats['scoreHistory']): ChartView {
   return {
     lohPath: seriesPath(lohVals),
     madiPath: seriesPath(madiVals),
+    lohRepeats: seriesRepeats(lohVals),
+    madiRepeats: seriesRepeats(madiVals),
+    gridLines: CHART_GRID_VALUES.map((value) => ({
+      value,
+      y: chartY(value),
+      label: value % 20 === 0 ? toArabicDigits(value) : '',
+      strong: value === CHART_PASS_MARK,
+    })),
+    plotTop: CHART_TOP,
+    plotBottom: CHART_BOTTOM,
+    plotLeft: CHART_PAD_X,
+    plotRight: CHART_W - CHART_PAD_X,
+    passY: chartY(CHART_PASS_MARK),
     lohLast: lastNonNull(lohVals),
     madiLast: lastNonNull(madiVals),
     viewBox: `0 0 ${CHART_W} 100`,

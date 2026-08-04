@@ -12,10 +12,13 @@ import {
   firstInitial,
   rankBadgeText,
   CHART_WINDOW,
+  CHART_FLOOR,
+  CHART_PASS_MARK,
   formatSessionDate,
   formatShortDate,
 } from './parentView';
 import { MOCK_PUBLIC_STATS } from './mockPublicStats';
+import { scoreName } from '../../domain/scoring';
 
 function baseStats(overrides: Partial<PublicStats> = {}): PublicStats {
   return {
@@ -124,6 +127,104 @@ describe('buildChart', () => {
     // last point value should be 19 (the newest), not something earlier
     expect(c.lohLast?.value).toBe(19);
     expect(CHART_WINDOW).toBe(8);
+  });
+});
+
+/** Y coordinates only — the path reads "M x y L x y". */
+function pathYs(path: string): number[] {
+  return path
+    .split(/[ML]/)
+    .map((seg) => seg.trim())
+    .filter(Boolean)
+    .map((seg) => Number(seg.split(/\s+/)[1]));
+}
+
+describe('buildChart scale', () => {
+  // The old chart spread 0–100 over the plot band, so the 69–100 range every
+  // real student lives in occupied about a third of the height and read as a
+  // flat line. The band now starts at CHART_FLOOR.
+  it('starts the axis at the floor, not at zero', () => {
+    expect(CHART_FLOOR).toBe(50);
+    const c = buildChart([
+      { date: 'a', loh: CHART_PASS_MARK, madi: null },
+      { date: 'b', loh: 100, madi: null },
+    ]);
+    const ys = pathYs(c.lohPath);
+    expect(Math.min(...ys)).toBeCloseTo(c.plotTop, 5); // 100 at the top
+    expect(Math.max(...ys)).toBeCloseTo(c.passY, 5); // 60 on the pass line
+    // On the old 0-based axis the pass line sat 40% down the plot; on a
+    // 50-based one it sits 80% down, which is the whole point.
+    expect((c.passY - c.plotTop) / (c.plotBottom - c.plotTop)).toBeCloseTo(0.8, 2);
+  });
+
+  it('gives the real score range more than half the plot height', () => {
+    const c = buildChart([
+      { date: 'a', loh: 69, madi: null },
+      { date: 'b', loh: 100, madi: null },
+    ]);
+    const ys = pathYs(c.lohPath);
+    const used = (Math.max(...ys) - Math.min(...ys)) / (c.plotBottom - c.plotTop);
+    expect(used).toBeGreaterThan(0.55); // was ~0.31 on the 0-based axis
+  });
+
+  it('pins the floor to the grading scale, below the إعادة cut-off', () => {
+    // If the bands in scoring.ts ever move, this fails rather than silently
+    // drawing a pass line in the wrong place.
+    expect(scoreName(CHART_PASS_MARK)).not.toBe('إعادة');
+    expect(scoreName(CHART_PASS_MARK - 1)).toBe('إعادة');
+    expect(CHART_FLOOR).toBeLessThan(CHART_PASS_MARK);
+  });
+
+  it('lifts an إعادة out of the line and marks it instead', () => {
+    const c = buildChart([
+      { date: 'a', loh: 90, madi: null },
+      { date: 'b', loh: 0, madi: null },
+      { date: 'c', loh: 85, madi: null },
+    ]);
+    // The line breaks around the إعادة: two separate subpaths, no plunge.
+    expect((c.lohPath.match(/M/g) || []).length).toBe(2);
+    expect(c.lohRepeats).toHaveLength(1);
+    // Marker sits inside the إعادة zone, never off the bottom of the viewBox.
+    expect(c.lohRepeats[0].y).toBeGreaterThan(c.passY);
+    expect(c.lohRepeats[0].y).toBeLessThanOrEqual(c.plotBottom);
+  });
+
+  it('never lets a zero drag the drawn line below the floor', () => {
+    const c = buildChart([
+      { date: 'a', loh: 0, madi: 0 },
+      { date: 'b', loh: 95, madi: 95 },
+    ]);
+    const ys = pathYs(c.lohPath);
+    expect(Math.max(...ys)).toBeLessThanOrEqual(c.plotBottom);
+  });
+
+  it('labels a trailing إعادة by name rather than as a percentage', () => {
+    const c = buildChart([
+      { date: 'a', loh: 88, madi: null },
+      { date: 'b', loh: 40, madi: null },
+    ]);
+    expect(c.lohLast?.repeat).toBe(true);
+    expect(c.lohLast?.label).toBe('إعادة');
+    expect(c.lohLast?.value).toBe(40);
+  });
+
+  it('marks a normal trailing score as not a repeat', () => {
+    const c = buildChart([{ date: 'a', loh: 88, madi: null }]);
+    expect(c.lohLast?.repeat).toBe(false);
+    expect(c.lohLast?.label).toBe('٨٨');
+  });
+
+  it('publishes gridlines on the grade boundaries, labelled every 20 points', () => {
+    const c = buildChart(baseStats().scoreHistory);
+    expect(c.gridLines.map((g) => g.value)).toEqual([100, 90, 80, 70, 60]);
+    expect(c.gridLines.filter((g) => g.label !== '').map((g) => g.label)).toEqual([
+      '١٠٠',
+      '٨٠',
+      '٦٠',
+    ]);
+    // The pass line is the one a parent reads against, so it is drawn stronger.
+    expect(c.gridLines.find((g) => g.value === CHART_PASS_MARK)?.strong).toBe(true);
+    expect(c.gridLines.find((g) => g.value === 90)?.strong).toBe(false);
   });
 });
 
