@@ -27,6 +27,7 @@ function baseStats(overrides: Partial<PublicStats> = {}): PublicStats {
     attendPct: 88,
     rank: 2,
     sessionsCount: 23,
+    attendedDays: 23,
     totalAyat: 1240,
     avgLoh: 86,
     avgMadi: 84,
@@ -166,6 +167,22 @@ describe('buildStats', () => {
   it('shows a dash for a missing loh average', () => {
     const cells = buildStats(baseStats({ avgLoh: null }));
     expect(cells[3].value).toBe('—');
+  });
+
+  // The percentage and the day count must be two readings of ONE number.
+  // "عدد الجلسات" was counted from a different set (sessions only, undeduped)
+  // and read as a contradiction next to the percentage.
+  it('shows attended days, the same figure the percentage is built from', () => {
+    const cells = buildStats(
+      baseStats({ attendedDays: 20, enrolledHalaqaDays: 25, attendPct: 80, sessionsCount: 14 }),
+    );
+    expect(cells[2]).toEqual({ label: 'أيام الحضور', value: '٢٠', color: 'ink' });
+  });
+
+  it('falls back to uniqueDays for documents published before attendedDays existed', () => {
+    const stale = baseStats({ uniqueDays: 23 });
+    delete (stale as Partial<PublicStats>).attendedDays;
+    expect(buildStats(stale)[2].value).toBe('٢٣');
   });
 });
 

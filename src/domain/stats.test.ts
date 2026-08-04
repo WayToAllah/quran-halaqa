@@ -191,8 +191,8 @@ describe('buildStudentPublicStats', () => {
   it('aggregates monthlyStats keyed by YYYY-MM', () => {
     const result = buildStudentPublicStats(zaid, records, 2, 1, ['2026-07-03', '2026-07-01']);
     expect(result.monthlyStats['2026-07']).toEqual({
-      attendPct: 100, // 2 unique days / 2 halaqa days
-      sessionsCount: 2,
+      attendPct: 100, // 2 attended days / 2 halaqa days
+      attendedDays: 2,
       totalAyat: 20,
       avgLoh: 45,
     });
@@ -296,6 +296,80 @@ describe('buildStudentPublicStats attendance window (parent-facing)', () => {
     );
     expect(Object.keys(result.monthlyStats)).toEqual(['2026-07']);
     expect(result.monthlyStats['2026-07'].attendPct).toBe(50); // 1 of 2 July days
+  });
+});
+
+describe('buildStudentPublicStats attendance numerator (parent-facing)', () => {
+  // Callers pass sortedHalaqaDatesDesc(), which has ALREADY dropped
+  // EXCLUDED_HALAQA_DATES — so 2026-06-04 below is a bonus/makeup day that is
+  // deliberately absent from the denominator. The numerator has to agree:
+  // a day that isn't a halaqa day can't be a day of attendance either.
+  const halaqaDatesDesc = ['2026-06-06', '2026-06-05', '2026-06-03', '2026-06-02'];
+
+  it('does not let a bonus (excluded) day inflate the percentage', () => {
+    const recs: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-06-02', loh: { score: 90 } },
+      { id: 'r2', studentId: 's_1', date: '2026-06-04', loh: { score: 90 } }, // bonus day
+      { id: 'r3', studentId: 's_1', date: '2026-06-05', loh: { score: 90 } },
+    ];
+    const result = buildStudentPublicStats(zaid, recs, 4, null, halaqaDatesDesc);
+    expect(result.enrolledHalaqaDays).toBe(4);
+    expect(result.attendedDays).toBe(2); // 06-02 and 06-05 only
+    expect(result.attendPct).toBe(50); // was 75% while the bonus day leaked in
+  });
+
+  it('ignores a record carrying no date at all', () => {
+    const recs: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-06-02', loh: { score: 90 } },
+      { id: 'r2', studentId: 's_1' } as SessionRecord, // legacy/broken row
+    ];
+    const result = buildStudentPublicStats(zaid, recs, 4, null, halaqaDatesDesc);
+    expect(result.attendedDays).toBe(1);
+    expect(result.attendPct).toBe(25); // an undated row used to count as a day
+  });
+
+  it('counts a day once when both an attendance mark and a session exist', () => {
+    const recs: SessionRecord[] = [
+      { id: 'att_1', studentId: 's_1', date: '2026-06-02', attendance_only: true },
+      { id: 'r1', studentId: 's_1', date: '2026-06-02', loh: { score: 90 } },
+    ];
+    const result = buildStudentPublicStats(zaid, recs, 4, null, halaqaDatesDesc);
+    expect(result.attendedDays).toBe(1);
+    expect(result.attendPct).toBe(25);
+  });
+
+  it('counts an attendance-only day as attendance, same as a full session', () => {
+    const recs: SessionRecord[] = [
+      { id: 'att_1', studentId: 's_1', date: '2026-06-02', attendance_only: true },
+      { id: 'att_2', studentId: 's_1', date: '2026-06-03', attendance_only: true },
+      { id: 'r1', studentId: 's_1', date: '2026-06-05', loh: { score: 90 } },
+    ];
+    const result = buildStudentPublicStats(zaid, recs, 4, null, halaqaDatesDesc);
+    expect(result.attendedDays).toBe(3);
+    expect(result.attendPct).toBe(75);
+  });
+
+  it('can never report more attended days than enrolled days', () => {
+    const recs: SessionRecord[] = [
+      ...halaqaDatesDesc.map(
+        (date, i) => ({ id: `r${i}`, studentId: 's_1', date, loh: { score: 90 } }) as SessionRecord,
+      ),
+      { id: 'bonus', studentId: 's_1', date: '2026-06-04', loh: { score: 90 } },
+    ];
+    const result = buildStudentPublicStats(zaid, recs, 4, null, halaqaDatesDesc);
+    expect(result.attendedDays).toBe(result.enrolledHalaqaDays);
+    expect(result.attendPct).toBe(100); // reached honestly, not by a Math.min cap
+  });
+
+  it('applies the same numerator inside monthlyStats', () => {
+    const recs: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-06-02', loh: { score: 90 } },
+      { id: 'r2', studentId: 's_1', date: '2026-06-04', loh: { score: 90 } }, // bonus day
+      { id: 'r3', studentId: 's_1', date: '2026-06-05', loh: { score: 90 } },
+    ];
+    const result = buildStudentPublicStats(zaid, recs, 4, null, halaqaDatesDesc);
+    expect(result.monthlyStats['2026-06'].attendedDays).toBe(2);
+    expect(result.monthlyStats['2026-06'].attendPct).toBe(50);
   });
 });
 

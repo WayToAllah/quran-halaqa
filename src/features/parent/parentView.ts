@@ -194,7 +194,17 @@ export function buildStats(stats: PublicStats): StatCell[] {
   return [
     { label: 'نسبة الحضور', value: toArabicDigits(stats.attendPct) + '٪', color: 'ink' },
     { label: 'آية مُسمّعة', value: formatArabicNumber(stats.totalAyat), color: 'accent' },
-    { label: 'عدد الجلسات', value: toArabicDigits(stats.sessionsCount), color: 'ink' },
+    // Deliberately the SAME number the percentage is built from. It used to be
+    // sessionsCount, counted from a different set (recitation sessions only,
+    // not deduplicated by day) — so a boy marked present on six group-attendance
+    // days read as "١٠٠٪ حضور · ١٤ جلسة" over a 20-day window, which a parent
+    // rightly reads as a contradiction. `uniqueDays` is the fallback for
+    // documents published before attendedDays existed.
+    {
+      label: 'أيام الحضور',
+      value: toArabicDigits(stats.attendedDays ?? stats.uniqueDays),
+      color: 'ink',
+    },
     {
       label: 'متوسط اللوح',
       value: stats.avgLoh != null ? toArabicDigits(stats.avgLoh) + '٪' : '—',

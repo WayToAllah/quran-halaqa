@@ -134,7 +134,8 @@ export function buildStudentPublicStats(
     if (r.tajweed?.sura && !isRepeatGrade(r.tajweed)) totalAyat += itemAyat(r.tajweed);
   });
 
-  const uniqueDays = new Set(allRecs.map((r) => r.date)).size;
+  const studentDates = new Set(allRecs.map((r) => r.date).filter((d): d is string => !!d));
+  const uniqueDays = studentDates.size;
   // Parent-facing denominator: halaqa days since THIS student's first recorded
   // day, not since the halaqa's first day. A student who joined mid-year was
   // never absent from the days before he enrolled. `totalHalaqaDays` is still
@@ -142,8 +143,14 @@ export function buildStudentPublicStats(
   // distinguishable — see enrolledHalaqaDates() for why they differ.
   const enrolledDates = enrolledHalaqaDates(allRecs, halaqaDatesDesc);
   const enrolledDays = enrolledDates.length;
-  const attendPct =
-    enrolledDays > 0 ? Math.min(100, Math.round((uniqueDays / enrolledDays) * 100)) : 0;
+  // The numerator is the INTERSECTION with that same window, not the student's
+  // raw date count. Anything the denominator drops — a bonus day in
+  // EXCLUDED_HALAQA_DATES, an undated legacy row — must be dropped here too,
+  // or the fraction compares two different calendars and reads too high (the
+  // old Math.min(100, …) cap existed only to hide exactly that). Attendance
+  // marks and full sessions both count, and a day carrying both counts once.
+  const attendedDays = enrolledDates.filter((d) => studentDates.has(d)).length;
+  const attendPct = enrolledDays > 0 ? Math.round((attendedDays / enrolledDays) * 100) : 0;
 
   const latest = realRecs[0];
   const currentTask = latest
@@ -192,14 +199,13 @@ export function buildStudentPublicStats(
     ...enrolledDates.map((d) => d.slice(0, 7)),
   ]);
   allMonths.forEach((month) => {
-    const monthHalaqaDays = enrolledDates.filter((d) => d.slice(0, 7) === month).length;
-    const monthAllRecs = allRecs.filter((r) => r.date?.slice(0, 7) === month);
+    const monthEnrolledDates = enrolledDates.filter((d) => d.slice(0, 7) === month);
+    const monthHalaqaDays = monthEnrolledDates.length;
     const monthRealRecs = realRecs.filter((r) => r.date?.slice(0, 7) === month);
-    const monthUniqueDays = new Set(monthAllRecs.map((r) => r.date)).size;
+    // Same intersection rule as the all-time figure above.
+    const monthAttendedDays = monthEnrolledDates.filter((d) => studentDates.has(d)).length;
     const monthAttendPct =
-      monthHalaqaDays > 0
-        ? Math.min(100, Math.round((monthUniqueDays / monthHalaqaDays) * 100))
-        : 0;
+      monthHalaqaDays > 0 ? Math.round((monthAttendedDays / monthHalaqaDays) * 100) : 0;
     const monthScoredLoh = monthRealRecs.filter((r) => hasScore(r.loh));
     const monthAvgLoh = monthScoredLoh.length
       ? Math.round(monthScoredLoh.reduce((a, r) => a + r.loh!.score!, 0) / monthScoredLoh.length)
@@ -223,7 +229,7 @@ export function buildStudentPublicStats(
     });
     monthlyStats[month] = {
       attendPct: monthAttendPct,
-      sessionsCount: monthAllRecs.length,
+      attendedDays: monthAttendedDays,
       totalAyat: monthAyat,
       avgLoh: monthAvgLoh,
     };
@@ -245,6 +251,7 @@ export function buildStudentPublicStats(
     totalHalaqaDays,
     enrolledHalaqaDays: enrolledDays,
     uniqueDays,
+    attendedDays,
     attendPct,
     rank,
     sessionsCount: realRecs.length,

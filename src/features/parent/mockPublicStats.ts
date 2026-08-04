@@ -12,6 +12,7 @@ export const MOCK_PUBLIC_STATS: PublicStats = {
   attendPct: 88,
   rank: 2,
   sessionsCount: 23,
+  attendedDays: 23,
   totalAyat: 1240,
   avgLoh: 86,
   avgMadi: 84,

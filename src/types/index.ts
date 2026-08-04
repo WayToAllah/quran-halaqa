@@ -127,10 +127,21 @@ export interface PublicStats {
    * `attendPct`. Documents published before this field existed simply carry a
    * stale attendPct until their next republish. */
   enrolledHalaqaDays: number;
+  /** Every distinct date this student has a record on — including bonus days
+   * that `enrolledHalaqaDays` excludes. Kept for reference/back-compat; it is
+   * NOT the numerator of attendPct (that's `attendedDays`). */
   uniqueDays: number;
-  /** uniqueDays ÷ enrolledHalaqaDays, capped at 100. */
+  /** Halaqa days inside the enrollment window the student actually attended —
+   * the numerator of `attendPct`, and a strict subset of `enrolledHalaqaDays`.
+   * Optional because documents published before this field existed don't carry
+   * it; readers fall back to `uniqueDays`. */
+  attendedDays?: number;
+  /** attendedDays ÷ enrolledHalaqaDays. Cannot exceed 100 by construction. */
   attendPct: number;
   rank: number | null;
+  /** Sessions of actual recitation (attendance-only marks excluded). Published
+   * for completeness; the parent page shows `attendedDays`, which is what the
+   * percentage is built from. */
   sessionsCount: number;
   totalAyat: number;
   avgLoh: number | null;
@@ -157,6 +168,6 @@ export interface PublicStats {
    * 'YYYY-MM'. The chart, badges, and session list stay outside this filter. */
   monthlyStats: Record<
     string,
-    { attendPct: number; sessionsCount: number; totalAyat: number; avgLoh: number | null }
+    { attendPct: number; attendedDays: number; totalAyat: number; avgLoh: number | null }
   >;
 }
