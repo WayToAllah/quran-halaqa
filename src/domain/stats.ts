@@ -5,6 +5,7 @@ import { itemAyat } from './suras';
 import { getStudentName, recordsForStudent } from './students';
 import { computeAttendanceStreak, enrolledHalaqaDates } from './attendance';
 import { assignmentsGradedRepeat, isRepeatGrade } from './record';
+import { visibleBadges } from './badges';
 
 export const AYAT_MILESTONES: ReadonlyArray<{
   key: string;
@@ -83,7 +84,9 @@ export function buildStudentBadges(opts: BuildBadgesOptions): Badge[] {
     badges.push({ key: 'improving', icon: '📈', label: 'الأكثر تحسناً' });
   }
 
-  return badges;
+  // Hidden keys are filtered here (rather than at each push site) so the
+  // award rules above stay readable and independent of what's on show.
+  return visibleBadges(badges);
 }
 
 /**

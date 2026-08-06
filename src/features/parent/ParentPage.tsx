@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { PublicStats } from '../../types';
 import { fetchPublicStatsRest } from '../../data/firestoreRest';
+import { visibleBadges } from '../../domain/badges';
 import {
   getParentTheme,
   buildChart,
@@ -135,6 +136,9 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
   const task = buildCurrentTask(stats);
   const sessions = buildSessions(stats);
   const rankText = rankBadgeText(stats.rank);
+  // publicStats documents written before a badge was hidden still carry it,
+  // so filter on read as well as on write (see domain/badges.ts).
+  const badges = visibleBadges(stats.badges);
 
   // End-of-line value labels, nudged apart when the two points sit close.
   const close =
@@ -393,14 +397,14 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
         </div>
 
         {/* Badges */}
-        {stats.badges.length > 0 && (
+        {badges.length > 0 && (
           <div style={cardStyle}>
             <div style={cardTitle}>
               <span style={titleDot}>🏅</span>
               الأوسمة
             </div>
             <div style="display:flex;flex-wrap:wrap;gap:9px">
-              {stats.badges.map((b) => (
+              {badges.map((b) => (
                 <span
                   key={b.key}
                   style="display:inline-flex;align-items:center;gap:7px;background:var(--good-tint);color:var(--good);border:1px solid oklch(56% 0.09 150 / 0.3);font-size:12.5px;font-weight:700;padding:7px 14px;border-radius:20px"

@@ -2,11 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { scoreName } from './scoring';
 import {
   ATTENDANCE_STREAK_THRESHOLD,
+  AYAT_MILESTONES,
   EXCELLENCE_SCORE_THRESHOLD,
   buildStudentBadges,
   buildStudentPublicStats,
   computeIsImproving,
 } from './stats';
+import { HIDDEN_BADGE_KEYS } from './badges';
 import type { SessionRecord, Student } from '../types';
 
 const zaid: Student = { id: 's_1', name: 'زيد احمد' };
@@ -79,17 +81,49 @@ describe('buildStudentBadges', () => {
   });
 
   it('awards ayat milestone badges only once thresholds are met', () => {
-    const badges100 = buildStudentBadges({
+    const badges500 = buildStudentBadges({
       attendPct: 0,
       allRecs: [],
       realRecsNewestFirst: [],
-      totalAyat: 100,
+      totalAyat: 500,
       avgLoh: null,
       avgMadi: null,
       halaqaDatesDesc: [],
     });
-    expect(badges100.map((b) => b.key)).toContain('ayat100');
-    expect(badges100.map((b) => b.key)).not.toContain('ayat200');
+    expect(badges500.map((b) => b.key)).toContain('ayat500');
+
+    const badges499 = buildStudentBadges({
+      attendPct: 0,
+      allRecs: [],
+      realRecsNewestFirst: [],
+      totalAyat: 499,
+      avgLoh: null,
+      avgMadi: null,
+      halaqaDatesDesc: [],
+    });
+    expect(badges499.map((b) => b.key)).not.toContain('ayat500');
+  });
+
+  it('withholds every currently hidden badge key even when its threshold is met', () => {
+    const badges = buildStudentBadges({
+      attendPct: 0,
+      allRecs: [],
+      realRecsNewestFirst: [],
+      totalAyat: 100000,
+      avgLoh: null,
+      avgMadi: null,
+      halaqaDatesDesc: [],
+    });
+    for (const key of HIDDEN_BADGE_KEYS) {
+      expect(badges.map((b) => b.key)).not.toContain(key);
+    }
+  });
+
+  it('still defines the hidden milestones so their thresholds can be tuned', () => {
+    // Hiding is a display decision; the award rules stay in the codebase.
+    for (const key of HIDDEN_BADGE_KEYS) {
+      expect(AYAT_MILESTONES.map((m) => m.key)).toContain(key);
+    }
   });
 
   it('awards excellence at the score threshold using the combined avg', () => {

@@ -147,4 +147,34 @@ describe('ParentPage — progress chart', () => {
     expect(crosses.length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('إعادة').length).toBeGreaterThan(0);
   });
+
+  it('hides withheld badges even when the stored publicStats document still has them', () => {
+    // publicStats documents are written once and only rewritten when that
+    // student is republished, so an already-stored ayat100/ayat200 must be
+    // filtered out at render time — not left to wait for a republish.
+    const stats: PublicStats = {
+      ...MOCK_PUBLIC_STATS,
+      badges: [
+        { key: 'ayat100', icon: '📖', label: 'حافظ ١٠٠ آية' },
+        { key: 'ayat200', icon: '📗', label: 'حافظ ٢٠٠ آية' },
+        { key: 'ayat500', icon: '📘', label: 'حافظ ٥٠٠ آية' },
+      ],
+    };
+    render(<ParentPage previewStats={stats} />);
+    expect(screen.queryByText(/حافظ ١٠٠ آية/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/حافظ ٢٠٠ آية/)).not.toBeInTheDocument();
+    expect(screen.getByText(/حافظ ٥٠٠ آية/)).toBeInTheDocument();
+  });
+
+  it('drops the whole badges card when every stored badge is withheld', () => {
+    const stats: PublicStats = {
+      ...MOCK_PUBLIC_STATS,
+      badges: [
+        { key: 'ayat100', icon: '📖', label: 'حافظ ١٠٠ آية' },
+        { key: 'ayat200', icon: '📗', label: 'حافظ ٢٠٠ آية' },
+      ],
+    };
+    render(<ParentPage previewStats={stats} />);
+    expect(screen.queryByText('الأوسمة')).not.toBeInTheDocument();
+  });
 });
