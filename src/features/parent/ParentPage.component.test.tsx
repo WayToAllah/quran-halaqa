@@ -277,7 +277,9 @@ describe('ParentPage — progress chart', () => {
     expect(screen.queryByText(/الرسم\s+والجلسات تحت/)).not.toBeInTheDocument();
     screen.getByRole('button', { name: /يونيو/ }).click();
     await waitFor(() =>
-      expect(screen.getByText(/الرسم\s+والجلسات تحت بيعرضوا الفترة كلها/)).toBeInTheDocument(),
+      expect(
+        screen.getByText(/فقط، والرسم\s+والجلسات تحت بيعرضوا الفترة كلها/),
+      ).toBeInTheDocument(),
     );
   });
 

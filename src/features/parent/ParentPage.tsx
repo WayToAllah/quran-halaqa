@@ -294,8 +294,12 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
 
         {activeMonth !== ALL_MONTHS && (
           <div style="font-size:11.5px;color:var(--text-hint);text-align:center;margin:-4px 0 14px;line-height:1.7">
-            الأرقام فوق عن {monthOptions.find((o) => o.key === activeMonth)?.label} · الرسم والجلسات
-            تحت بيعرضوا الفترة كلها
+            {/* The separator must bind to a word, not to the year: a spaced
+                middle dot after '٢٠٢٦' reorders flush against the digits and
+                reads as another numeral — the same bidi trap as the mistake
+                line above. 'فقط' gives the comma something to attach to. */}
+            الأرقام فوق عن {monthOptions.find((o) => o.key === activeMonth)?.label} فقط، والرسم
+            والجلسات تحت بيعرضوا الفترة كلها
           </div>
         )}
 
