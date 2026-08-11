@@ -177,4 +177,115 @@ describe('ParentPage — progress chart', () => {
     render(<ParentPage previewStats={stats} />);
     expect(screen.queryByText('الأوسمة')).not.toBeInTheDocument();
   });
+  // ── The grade word ─────────────────────────────────────────────────────
+  it('prints the band name beside each score in the session list', () => {
+    render(<ParentPage previewStats={MOCK_PUBLIC_STATS} />);
+    // 92 → ممتاز, 88 → جيد جداً; both appear in the timeline.
+    expect(screen.getAllByText('ممتاز').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('جيد جداً').length).toBeGreaterThan(0);
+  });
+
+  // The grade is added to the existing sub-line, so the mistake tally must
+  // still be there — one line carrying both, not the grade replacing it.
+  it('keeps the mistake tally on the same line as the grade', () => {
+    render(<ParentPage previewStats={MOCK_PUBLIC_STATS} />);
+    // The grade is its own <span> (it carries the band colour), so the line is
+    // split across nodes — assert on the containing line's text, not a single
+    // text node.
+    const line = screen
+      .getAllByText('ممتاز')
+      .map((el) => el.parentElement?.textContent ?? '')
+      .find((t) => t.includes('خطأ'));
+    expect(line).toBe('ممتاز، ٢ خطأ، ١ خطأ تجويدي');
+  });
+
+  it('says إعادة under a failed session', () => {
+    const session = (score: number) => ({
+      date: '2026-07-09',
+      loh: { score },
+      madi: null,
+      newLoh: [],
+      newMadi: [],
+      tajweed: null,
+      note: '',
+    });
+    // The chart legend prints إعادة unconditionally, so counting occurrences
+    // against a passing baseline is the only honest assertion here — an
+    // absolute count would go green with no grade rendered at all.
+    const count = (score: number) => {
+      const { unmount } = render(
+        <ParentPage previewStats={{ ...MOCK_PUBLIC_STATS, recentSessions: [session(score)] }} />,
+      );
+      const n = screen.queryAllByText('إعادة').length;
+      unmount();
+      return n;
+    };
+    expect(count(0)).toBe(count(95) + 1);
+  });
+
+  // ── Ten sessions ───────────────────────────────────────────────────────
+  it('renders all ten published sessions, not five', () => {
+    const stats: PublicStats = {
+      ...MOCK_PUBLIC_STATS,
+      recentSessions: Array.from({ length: 10 }, (_, i) => ({
+        date: '2026-07-' + String(20 - i).padStart(2, '0'),
+        loh: { score: 80 },
+        madi: null,
+        newLoh: [],
+        newMadi: [],
+        tajweed: null,
+        note: 'جلسة رقم ' + (i + 1),
+      })),
+    };
+    render(<ParentPage previewStats={stats} />);
+    expect(screen.getByText('جلسة رقم 1')).toBeInTheDocument();
+    expect(screen.getByText('جلسة رقم 10')).toBeInTheDocument();
+  });
+
+  // ── Month filter ───────────────────────────────────────────────────────
+  const monthly: PublicStats = {
+    ...MOCK_PUBLIC_STATS,
+    attendPct: 88,
+    attendedDays: 23,
+    totalAyat: 1240,
+    avgLoh: 86,
+    monthlyStats: {
+      '2026-06': { attendPct: 70, attendedDays: 7, totalAyat: 300, avgLoh: 78 },
+      '2026-07': { attendPct: 92, attendedDays: 12, totalAyat: 540, avgLoh: 90 },
+    },
+  };
+
+  it('offers no month filter for documents without monthly figures', () => {
+    render(<ParentPage previewStats={{ ...MOCK_PUBLIC_STATS, monthlyStats: {} }} />);
+    expect(screen.queryByRole('group', { name: /الشهر/ })).not.toBeInTheDocument();
+  });
+
+  it('swaps the four headline numbers when a month is picked', async () => {
+    render(<ParentPage previewStats={monthly} />);
+    expect(screen.getByText('٨٨٪')).toBeInTheDocument();
+    const june = screen.getByRole('button', { name: /يونيو/ });
+    june.click();
+    await waitFor(() => expect(screen.getByText('٧٠٪')).toBeInTheDocument());
+    expect(screen.getByText('٣٠٠')).toBeInTheDocument();
+    expect(screen.queryByText('٨٨٪')).not.toBeInTheDocument();
+  });
+
+  // The chart and the timeline are deliberately outside the filter, so the
+  // page has to say so rather than let the parent assume otherwise.
+  it('explains that only the headline numbers are filtered', async () => {
+    render(<ParentPage previewStats={monthly} />);
+    expect(screen.queryByText(/الرسم\s+والجلسات تحت/)).not.toBeInTheDocument();
+    screen.getByRole('button', { name: /يونيو/ }).click();
+    await waitFor(() =>
+      expect(screen.getByText(/الرسم\s+والجلسات تحت بيعرضوا الفترة كلها/)).toBeInTheDocument(),
+    );
+  });
+
+  it('returns to the all-time figures via الكل', async () => {
+    render(<ParentPage previewStats={monthly} />);
+    screen.getByRole('button', { name: /يونيو/ }).click();
+    await waitFor(() => expect(screen.getByText('٧٠٪')).toBeInTheDocument());
+    screen.getByRole('button', { name: 'الكل' }).click();
+    await waitFor(() => expect(screen.getByText('٨٨٪')).toBeInTheDocument());
+  });
 });

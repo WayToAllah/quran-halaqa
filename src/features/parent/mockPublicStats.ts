@@ -66,5 +66,10 @@ export const MOCK_PUBLIC_STATS: PublicStats = {
     { date: '2026-07-07', loh: 88, madi: 92 },
     { date: '2026-07-09', loh: 92, madi: 90 },
   ],
-  monthlyStats: {},
+  // Two months so the ?preview page exercises the month filter; the live page
+  // reads whatever stats.ts published for the real student.
+  monthlyStats: {
+    '2026-06': { attendPct: 75, attendedDays: 9, totalAyat: 430, avgLoh: 78 },
+    '2026-07': { attendPct: 93, attendedDays: 14, totalAyat: 810, avgLoh: 90 },
+  },
 };

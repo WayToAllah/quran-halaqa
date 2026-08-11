@@ -8,9 +8,12 @@ import {
   buildStats,
   buildCurrentTask,
   buildSessions,
+  buildMonthOptions,
   rankBadgeText,
+  ALL_MONTHS,
   type ParentTheme,
   type ColorRole,
+  type GradeTone,
 } from './parentView';
 
 type LoadState =
@@ -52,6 +55,11 @@ function cssVars(t: ParentTheme): string {
 }
 
 const statColor: Record<ColorRole, string> = { ink: 'var(--ink)', accent: 'var(--accent)' };
+const gradeColor: Record<GradeTone, string> = {
+  good: 'var(--good)',
+  muted: 'var(--text-muted)',
+  warn: 'var(--warn)',
+};
 function formatUpdatedAt(ms: number): string {
   try {
     return new Intl.DateTimeFormat('ar-EG-u-nu-arab', {
@@ -69,6 +77,7 @@ function formatUpdatedAt(ms: number): string {
 
 export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }: Props) {
   const [dark, setDark] = useState(false);
+  const [month, setMonth] = useState(ALL_MONTHS);
   const [state, setState] = useState<LoadState>(
     previewStats ? { status: 'ready', stats: previewStats } : { status: 'loading' },
   );
@@ -132,7 +141,11 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
 
   const stats = state.stats;
   const chart = buildChart(stats.scoreHistory);
-  const statCells = buildStats(stats);
+  const monthOptions = buildMonthOptions(stats);
+  // A month that vanished between renders (a fresh document dropping an old
+  // month) must not leave the grid stuck on a key nothing answers to.
+  const activeMonth = monthOptions.some((o) => o.key === month) ? month : ALL_MONTHS;
+  const statCells = buildStats(stats, activeMonth);
   const task = buildCurrentTask(stats);
   const sessions = buildSessions(stats);
   const rankText = rankBadgeText(stats.rank);
@@ -225,6 +238,38 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
           </div>
         )}
 
+        {/* Month filter. Only these four numbers move; the chart, the badges and
+            the session list below stay all-time on purpose (they are the
+            student's story, not a monthly report), so the state is spelled out
+            underneath rather than left for the parent to infer. */}
+        {monthOptions.length > 0 && (
+          <div
+            role="group"
+            aria-label="تصفية الأرقام حسب الشهر"
+            style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:11px;scrollbar-width:none"
+          >
+            {monthOptions.map((o) => {
+              const on = o.key === activeMonth;
+              return (
+                <button
+                  key={o.key}
+                  type="button"
+                  onClick={() => setMonth(o.key)}
+                  aria-pressed={on}
+                  style={
+                    'flex-shrink:0;font-family:inherit;font-size:12px;font-weight:700;padding:7px 15px;border-radius:20px;cursor:pointer;white-space:nowrap;transition:background 0.15s ease;' +
+                    (on
+                      ? 'background:var(--ink);color:oklch(97% 0.014 85);border:1px solid var(--ink)'
+                      : 'background:var(--surface);color:var(--text-muted);border:1px solid var(--border-strong)')
+                  }
+                >
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Stat grid */}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:14px">
           {statCells.map((st) => (
@@ -246,6 +291,13 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
             </div>
           ))}
         </div>
+
+        {activeMonth !== ALL_MONTHS && (
+          <div style="font-size:11.5px;color:var(--text-hint);text-align:center;margin:-4px 0 14px;line-height:1.7">
+            الأرقام فوق عن {monthOptions.find((o) => o.key === activeMonth)?.label} · الرسم والجلسات
+            تحت بيعرضوا الفترة كلها
+          </div>
+        )}
 
         {/* Progress chart */}
         <div style={cardStyle}>
@@ -480,9 +532,15 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
                             {s.lohLabel}
                           </span>
                         </div>
-                        {s.lohMistakes && (
-                          <div style="font-size:11px;color:var(--text-hint);margin-top:3px;padding-right:54px">
-                            ↳ {s.lohMistakes}
+                        {(s.lohGrade || s.lohMistakes) && (
+                          <div style="font-size:11px;margin-top:3px;padding-right:54px;color:var(--text-hint)">
+                            {s.lohGrade && (
+                              <span style={'font-weight:700;color:' + gradeColor[s.lohTone]}>
+                                {s.lohGrade}
+                              </span>
+                            )}
+                            {s.lohGrade && s.lohMistakes ? '، ' : ''}
+                            {s.lohMistakes}
                           </div>
                         )}
                       </div>
@@ -511,9 +569,15 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
                             {s.madiLabel}
                           </span>
                         </div>
-                        {s.madiMistakes && (
-                          <div style="font-size:11px;color:var(--text-hint);margin-top:3px;padding-right:54px">
-                            ↳ {s.madiMistakes}
+                        {(s.madiGrade || s.madiMistakes) && (
+                          <div style="font-size:11px;margin-top:3px;padding-right:54px;color:var(--text-hint)">
+                            {s.madiGrade && (
+                              <span style={'font-weight:700;color:' + gradeColor[s.madiTone]}>
+                                {s.madiGrade}
+                              </span>
+                            )}
+                            {s.madiGrade && s.madiMistakes ? '، ' : ''}
+                            {s.madiMistakes}
                           </div>
                         )}
                       </div>

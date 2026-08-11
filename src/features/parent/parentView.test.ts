@@ -16,6 +16,9 @@ import {
   CHART_PASS_MARK,
   formatSessionDate,
   formatShortDate,
+  SESSIONS_WINDOW,
+  buildMonthOptions,
+  ALL_MONTHS,
 } from './parentView';
 import { MOCK_PUBLIC_STATS } from './mockPublicStats';
 import { scoreName } from '../../domain/scoring';
@@ -577,25 +580,30 @@ describe('buildSessions — evaluation vs new homework', () => {
   });
 
   it('finds a predecessor for the oldest row on screen, beyond the window', () => {
-    // 6 published sessions, 5 shown — the 5th still resolves its predecessor.
-    const names = ['واحد', 'اتنين', 'تلاتة', 'اربعة', 'خمسة', 'ستة'];
-    const recentSessions = Array.from({ length: 6 }, (_, i) => ({
-      date: `2026-07-0${6 - i}`,
+    // One more session than the window shows: the last visible row must still
+    // resolve its predecessor out of the unshown tail, so the assertion is
+    // written against SESSIONS_WINDOW rather than a literal count.
+    const total = SESSIONS_WINDOW + 1;
+    const recentSessions = Array.from({ length: total }, (_, i) => ({
+      date: '2026-07-' + String(total - i).padStart(2, '0'),
       loh: { score: 90 },
       madi: null,
-      newLoh: [{ sura: names[5 - i], from: '1', to: '5' }],
+      // No digits in the name: the label is rendered in Arabic-Indic numerals,
+      // so 'سورة1' would come back as 'سورة١' and never match.
+      newLoh: [{ sura: i === total - 1 ? 'الأقدم' : 'سورة', from: '1', to: '5' }],
       newMadi: [],
       tajweed: null,
       note: '',
     }));
     const rows = buildSessions(baseStats({ recentSessions }));
-    expect(rows).toHaveLength(5);
-    expect(rows[4].recitedLoh).toContain('واحد');
+    expect(rows).toHaveLength(SESSIONS_WINDOW);
+    // The oldest visible row was assigned by the one session it can't show.
+    expect(rows[SESSIONS_WINDOW - 1].recitedLoh).toContain('الأقدم');
   });
 
   it('formats a mistake tally, and distinguishes none-recorded from zero', () => {
     const rows = buildSessions(twoSessions());
-    expect(rows[0].lohMistakes).toBe('٢ خطأ · ١ خطأ تجويدي');
+    expect(rows[0].lohMistakes).toBe('٢ خطأ، ١ خطأ تجويدي');
     // madi on the same session carries no tally at all
     expect(rows[0].madiMistakes).toBeNull();
   });
@@ -616,5 +624,143 @@ describe('buildSessions — evaluation vs new homework', () => {
     });
     expect(buildSessions(stats)[0].lohMistakes).toBe('بدون أخطاء');
     expect(buildSessions(stats)[0].madiMistakes).toBeNull();
+  });
+});
+
+// ── The grade word next to the number ────────────────────────────────────
+// A parent reading "٩٢" has no way to know the halaqa's bands. The word is
+// the same one the admin log and the WhatsApp message print (scoreName), so
+// all three describe a session identically.
+describe('buildSessions — grade word', () => {
+  function scored(loh: number | null, madi: number | null): PublicStats {
+    return baseStats({
+      recentSessions: [
+        {
+          date: '2026-07-09',
+          loh: loh == null ? null : { score: loh },
+          madi: madi == null ? null : { score: madi },
+          newLoh: [],
+          newMadi: [],
+          tajweed: null,
+          note: '',
+        },
+      ],
+    });
+  }
+
+  it('labels each score with the band name from scoreName', () => {
+    const s = buildSessions(scored(92, 74))[0];
+    expect(s.lohGrade).toBe('ممتاز');
+    expect(s.madiGrade).toBe('جيد');
+  });
+
+  it('says إعادة for a real zero rather than leaving it blank', () => {
+    const s = buildSessions(scored(0, null))[0];
+    expect(s.lohGrade).toBe('إعادة');
+    expect(s.lohTone).toBe('warn');
+  });
+
+  it('has no grade for an unscored half of the session', () => {
+    const s = buildSessions(scored(88, null))[0];
+    expect(s.madiGrade).toBeNull();
+    expect(s.lohGrade).toBe('جيد جداً');
+  });
+
+  it('tones ممتاز as good and the middle bands as muted', () => {
+    expect(buildSessions(scored(90, 60))[0].lohTone).toBe('good');
+    expect(buildSessions(scored(90, 60))[0].madiTone).toBe('muted');
+  });
+
+  it('agrees with scoreName across every band', () => {
+    [100, 90, 85, 80, 75, 70, 65, 60, 59, 0].forEach((v) => {
+      expect(buildSessions(scored(v, null))[0].lohGrade).toBe(scoreName(v));
+    });
+  });
+});
+
+// ── Session window ───────────────────────────────────────────────────────
+describe('SESSIONS_WINDOW', () => {
+  it('shows ten sessions — the full set stats.ts publishes', () => {
+    expect(SESSIONS_WINDOW).toBe(10);
+  });
+
+  it('renders every published session when there are ten', () => {
+    const recentSessions = Array.from({ length: 10 }, (_, i) => ({
+      date: '2026-07-' + String(20 - i).padStart(2, '0'),
+      loh: { score: 80 },
+      madi: null,
+      newLoh: [],
+      newMadi: [],
+      tajweed: null,
+      note: '',
+    }));
+    expect(buildSessions(baseStats({ recentSessions }))).toHaveLength(10);
+  });
+});
+
+// ── Month filter ─────────────────────────────────────────────────────────
+describe('buildMonthOptions', () => {
+  const monthly = {
+    '2026-06': { attendPct: 70, attendedDays: 7, totalAyat: 300, avgLoh: 78 },
+    '2026-07': { attendPct: 92, attendedDays: 12, totalAyat: 540, avgLoh: 90 },
+  };
+
+  it('lists الكل first, then months newest-first', () => {
+    const opts = buildMonthOptions(baseStats({ monthlyStats: monthly }));
+    expect(opts[0].key).toBe(ALL_MONTHS);
+    expect(opts.map((o) => o.key)).toEqual([ALL_MONTHS, '2026-07', '2026-06']);
+  });
+
+  it('names the month in Arabic rather than showing the raw key', () => {
+    const opts = buildMonthOptions(baseStats({ monthlyStats: monthly }));
+    expect(opts[1].label).toContain('يوليو');
+    expect(opts[1].label).not.toContain('2026-07');
+  });
+
+  // A filter offering one choice is a control that does nothing.
+  it('offers nothing when there is only one month, or none at all', () => {
+    expect(
+      buildMonthOptions(baseStats({ monthlyStats: { '2026-07': monthly['2026-07'] } })),
+    ).toEqual([]);
+    expect(buildMonthOptions(baseStats({ monthlyStats: {} }))).toEqual([]);
+  });
+});
+
+describe('buildStats — filtered by month', () => {
+  const stats = baseStats({
+    attendPct: 88,
+    attendedDays: 23,
+    totalAyat: 1240,
+    avgLoh: 86,
+    monthlyStats: {
+      '2026-06': { attendPct: 70, attendedDays: 7, totalAyat: 300, avgLoh: 78 },
+      '2026-07': { attendPct: 92, attendedDays: 12, totalAyat: 540, avgLoh: null },
+    },
+  });
+
+  it('reads the four cells out of monthlyStats for the chosen month', () => {
+    const cells = buildStats(stats, '2026-06');
+    expect(cells[0].value).toBe('٧٠٪');
+    expect(cells[1].value).toBe('٣٠٠');
+    expect(cells[2].value).toBe('٧');
+    expect(cells[3].value).toBe('٧٨٪');
+  });
+
+  it('still dashes an unscored month instead of printing zero', () => {
+    expect(buildStats(stats, '2026-07')[3].value).toBe('—');
+  });
+
+  it('falls back to the all-time figures for الكل or an unknown month', () => {
+    expect(buildStats(stats, ALL_MONTHS)[0].value).toBe('٨٨٪');
+    expect(buildStats(stats, '1999-01')[0].value).toBe('٨٨٪');
+    expect(buildStats(stats)[0].value).toBe('٨٨٪');
+  });
+
+  // The filter moves four numbers and nothing else; the labels must not drift
+  // or the two states stop being comparable at a glance.
+  it('keeps the same labels in both states', () => {
+    expect(buildStats(stats, '2026-06').map((c) => c.label)).toEqual(
+      buildStats(stats).map((c) => c.label),
+    );
   });
 });

@@ -3,6 +3,7 @@ import { joinSuraNames } from '../../domain/suras';
 import { gregorianStr, gregorianLong } from '../../domain/dates';
 import { hijriShort } from '../../domain/hijri';
 import { toArabicDigits, formatArabicNumber } from '../../domain/text';
+import { scoreName } from '../../domain/scoring';
 
 /**
  * Pure transforms for the parent (child) page. Kept DOM-free so the chart
@@ -271,7 +272,69 @@ export interface StatCell {
   color: ColorRole;
 }
 
-export function buildStats(stats: PublicStats): StatCell[] {
+/** Sentinel key for the unfiltered (all-time) view of the stat grid. */
+export const ALL_MONTHS = 'all';
+
+export interface MonthOption {
+  /** 'all' or a 'YYYY-MM' key into stats.monthlyStats. */
+  key: string;
+  label: string;
+}
+
+/** How many months the filter offers before it stops being a row of chips and
+ * starts being a wall. Newest kept — a parent asking about last March is
+ * asking a question this page was never meant to answer. */
+const MONTH_OPTIONS_LIMIT = 12;
+
+/**
+ * The month chips for the stat grid, newest first, with الكل in front.
+ *
+ * Returns [] when the student has fewer than two months on record: a filter
+ * whose only alternative shows the same four numbers is a control that does
+ * nothing, and documents published before monthlyStats existed carry {} —
+ * both cases must render no filter at all rather than a dead chip.
+ */
+export function buildMonthOptions(stats: PublicStats): MonthOption[] {
+  const keys = Object.keys(stats.monthlyStats ?? {})
+    .sort()
+    .reverse();
+  if (keys.length < 2) return [];
+  return [
+    { key: ALL_MONTHS, label: 'الكل' },
+    ...keys.slice(0, MONTH_OPTIONS_LIMIT).map((key) => ({
+      key,
+      // Anchored at the 1st purely to have a parseable date; only the month
+      // and year are ever printed. toArabicDigits is belt-and-braces — ar-EG
+      // already numbers in Arabic-Indic, but the page must not depend on the
+      // runtime's default numbering system for that.
+      label: toArabicDigits(gregorianStr(key + '-01', { month: 'long', year: 'numeric' })) || key,
+    })),
+  ];
+}
+
+/**
+ * The four headline numbers, either all-time or for one month.
+ *
+ * `monthlyStats` is pre-aggregated by stats.ts and carries exactly these four
+ * figures, so filtering is a lookup, not a recomputation — and the labels stay
+ * identical in both states so the two readings remain comparable. An unknown
+ * key (or a document published before that month existed) falls back to the
+ * all-time figures rather than showing zeros.
+ */
+export function buildStats(stats: PublicStats, month: string = ALL_MONTHS): StatCell[] {
+  const m = month !== ALL_MONTHS ? stats.monthlyStats?.[month] : undefined;
+  if (m) {
+    return [
+      { label: 'نسبة الحضور', value: toArabicDigits(m.attendPct) + '٪', color: 'ink' },
+      { label: 'آية مُسمّعة', value: formatArabicNumber(m.totalAyat), color: 'accent' },
+      { label: 'أيام الحضور', value: toArabicDigits(m.attendedDays), color: 'ink' },
+      {
+        label: 'متوسط اللوح',
+        value: m.avgLoh != null ? toArabicDigits(m.avgLoh) + '٪' : '—',
+        color: 'ink',
+      },
+    ];
+  }
   return [
     { label: 'نسبة الحضور', value: toArabicDigits(stats.attendPct) + '٪', color: 'ink' },
     { label: 'آية مُسمّعة', value: formatArabicNumber(stats.totalAyat), color: 'accent' },
@@ -354,6 +417,18 @@ export function buildCurrentTask(stats: PublicStats): TaskView | null {
   return { loh, madi, date: t.date, dateLabel: formatShortDate(t.date) };
 }
 
+/** Colour role for the grade word. Deliberately three states, not five: the
+ * page already carries teal/copper to tell اللوح from الماضي, and a fifth
+ * colour per band would turn one row into a swatch chart. Only "excellent"
+ * and "failed" need to carry on their own. */
+export type GradeTone = 'good' | 'muted' | 'warn';
+
+export function gradeTone(score: number): GradeTone {
+  if (score >= 90) return 'good';
+  if (score < 60) return 'warn';
+  return 'muted';
+}
+
 export interface SessionView {
   date: string;
   /** Hijri line (may be '' when the calendar is unavailable). */
@@ -364,6 +439,14 @@ export interface SessionView {
   madi: number | null;
   lohLabel: string;
   madiLabel: string;
+  /** 'ممتاز' / 'إعادة' / … — the band name for the score, null when the half
+   * wasn't evaluated. A parent has no way to read ٩٢ against a scale he's
+   * never seen, and this is the SAME word the admin log and the WhatsApp
+   * message print, so all three describe one session identically. */
+  lohGrade: string | null;
+  madiGrade: string | null;
+  lohTone: GradeTone;
+  madiTone: GradeTone;
   lohPct: string;
   madiPct: string;
   /** What today's loh score actually grades: the sura(s) assigned in the
@@ -381,15 +464,26 @@ export interface SessionView {
   note: string;
 }
 
-/** How many recent sessions the timeline shows. */
-export const SESSIONS_WINDOW = 5;
+/** How many recent sessions the timeline shows. Matches the number stats.ts
+ * publishes, so nothing readable is withheld; the oldest row is the only one
+ * whose `recitedLoh` can't be resolved (its predecessor is outside the
+ * published window). */
+export const SESSIONS_WINDOW = 10;
+
+/** Arabic comma, attached to the preceding word with no space before it.
+ * A spaced middle dot (' · ') sat between an Arabic word and an Arabic-Indic
+ * digit, and bidi reordering put it flush against the digit — '٢ خطأ · ١'
+ * rendered as '٢٠ خطأ ١٠', i.e. a parent read two mistakes as twenty. A
+ * comma binds to the letters on its left instead, so it can't be misread as
+ * a numeral. */
+const SEP = '، ';
 
 function mistakeLine(m: MistakeTally | undefined): string | null {
   if (!m) return null;
   const parts: string[] = [];
   if (m.full) parts.push(toArabicDigits(m.full) + ' خطأ');
   if (m.tajweed) parts.push(toArabicDigits(m.tajweed) + ' خطأ تجويدي');
-  return parts.length ? parts.join(' · ') : 'بدون أخطاء';
+  return parts.length ? parts.join(SEP) : 'بدون أخطاء';
 }
 
 export function buildSessions(stats: PublicStats): SessionView[] {
@@ -409,6 +503,10 @@ export function buildSessions(stats: PublicStats): SessionView[] {
       madi: s.madi ? s.madi.score : null,
       lohLabel: s.loh ? toArabicDigits(s.loh.score) : '—',
       madiLabel: s.madi ? toArabicDigits(s.madi.score) : '—',
+      lohGrade: s.loh ? scoreName(s.loh.score) : null,
+      madiGrade: s.madi ? scoreName(s.madi.score) : null,
+      lohTone: s.loh ? gradeTone(s.loh.score) : 'muted',
+      madiTone: s.madi ? gradeTone(s.madi.score) : 'muted',
       lohPct: (s.loh ? s.loh.score : 0) + '%',
       madiPct: (s.madi ? s.madi.score : 0) + '%',
       recitedLoh: prev && prev.newLoh.length ? suraLabelForParent(prev.newLoh) : null,
