@@ -237,6 +237,17 @@ function fit(sheet) {
     apply(size);
     if (bs) bs.style.fontSize = (size * 0.9) + 'px';
   }
+  // width-bound pages leave vertical slack: open the leading so the page fills it
+  const LH = 2.02, CAP = 3.1;
+  lines.forEach(el => { el.style.lineHeight = LH; });
+  if (sheet.scrollHeight < avail) {
+    const slack = avail - sheet.scrollHeight;
+    const perLine = slack / lines.length;
+    const px = LH * size + perLine;
+    const lh = Math.min(CAP, Math.floor((px / size) * 100) / 100);
+    lines.forEach(el => { el.style.lineHeight = lh; });
+    if (sheet.scrollHeight > avail) lines.forEach(el => { el.style.lineHeight = LH; });
+  }
 }
 async function render() {
   const st = document.getElementById('stage');
