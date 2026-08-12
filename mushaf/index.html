@@ -31,6 +31,10 @@ select,input{width:100%;height:42px;font-size:16px;font-family:inherit;padding:0
 .stage img{width:100%;max-width:520px;display:block}
 .miss{padding:40px 24px;text-align:center;color:#993c1d;font-size:14px;line-height:1.8}
 .nav{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.9);border:1px solid #d8d6cf;font-size:20px;color:#3d3d3a}
+.stage img{transition:transform .18s ease,opacity .18s ease}
+.stage.drag img{transition:none}
+.swipehint{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(28,28,27,.78);color:#fff;font-size:12px;padding:5px 12px;border-radius:20px;pointer-events:none;opacity:0;transition:opacity .25s}
+.swipehint.on{opacity:1}
 .nav.r{right:6px}.nav.l{left:6px}
 .fab{position:fixed;right:14px;left:auto;bottom:calc(78px + env(safe-area-inset-bottom));z-index:60}
 #viewer:not(.on) .fab{display:none}
@@ -68,6 +72,7 @@ select,input{width:100%;height:42px;font-size:16px;font-family:inherit;padding:0
     <div class="p" id="pnum"></div>
   </div>
   <div class="stage" id="stage"></div>
+  <div class="swipehint" id="shint"></div>
   <div class="fab">
     <button class="add" id="add"><b id="cnt">٠</b><span>خطأ</span></button>
   </div>
@@ -178,8 +183,8 @@ function render() {
     if (idx > 0) st.insertAdjacentHTML('beforeend', '<button class="nav r" id="prev">&#8250;</button>');
     if (idx < pages.length - 1) st.insertAdjacentHTML('beforeend', '<button class="nav l" id="next">&#8249;</button>');
     const pv = document.getElementById('prev'), nx = document.getElementById('next');
-    if (pv) pv.onclick = () => { idx--; render(); };
-    if (nx) nx.onclick = () => { idx++; render(); };
+    if (pv) pv.onclick = () => goTo(idx - 1, -1);
+    if (nx) nx.onclick = () => goTo(idx + 1, 1);
   }
   document.getElementById('pnum').textContent = 'صفحة ' + AR(p) + (pages.length > 1 ? ' (' + AR(idx + 1) + '/' + AR(pages.length) + ')' : '');
   st.scrollTop = 0;
@@ -197,7 +202,59 @@ document.getElementById('go').onclick = () => {
   document.getElementById('ward').textContent = 'اللوح، ' + sEl.value + ' ' + AR(fEl.value) + '-' + AR(tEl.value);
   document.getElementById('viewer').classList.add('on');
   render();
+  if (pages.length > 1) flash('اسحب يمين للصفحة اللي بعدها');
 };
+function flash(msg) {
+  const s = document.getElementById('shint');
+  s.textContent = msg; s.classList.add('on');
+  clearTimeout(s._t); s._t = setTimeout(() => s.classList.remove('on'), 1100);
+}
+function goTo(n, dir) {
+  if (n < 0) { flash('دي أول صفحة في الورد'); return; }
+  if (n > pages.length - 1) { flash('دي آخر صفحة في الورد'); return; }
+  idx = n; render();
+  const img = document.querySelector('.stage img');
+  if (img) {
+    img.style.transition = 'none';
+    img.style.transform = 'translateX(' + (dir > 0 ? -60 : 60) + 'px)';
+    img.style.opacity = '0';
+    requestAnimationFrame(() => { img.style.transition = ''; img.style.transform = ''; img.style.opacity = '1'; });
+  }
+}
+(function () {
+  const st = document.getElementById('stage');
+  let x0 = 0, y0 = 0, dx = 0, dy = 0, active = false;
+  st.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1 || pages.length < 2) return;
+    active = true; dx = dy = 0;
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
+  }, { passive: true });
+  st.addEventListener('touchmove', e => {
+    if (!active) return;
+    dx = e.touches[0].clientX - x0;
+    dy = e.touches[0].clientY - y0;
+    if (Math.abs(dx) > Math.abs(dy) * 1.5 && Math.abs(dx) > 10) {
+      st.classList.add('drag');
+      const img = st.querySelector('img');
+      if (img) img.style.transform = 'translateX(' + (dx * 0.35) + 'px)';
+    }
+  }, { passive: true });
+  st.addEventListener('touchend', () => {
+    if (!active) return;
+    active = false;
+    st.classList.remove('drag');
+    const img = st.querySelector('img');
+    if (img) img.style.transform = '';
+    if (Math.abs(dx) > Math.abs(dy) * 1.5 && Math.abs(dx) > 55) {
+      if (dx > 0) goTo(idx + 1, 1); else goTo(idx - 1, -1);
+    }
+  }, { passive: true });
+  document.addEventListener('keydown', e => {
+    if (!document.getElementById('viewer').classList.contains('on') || pages.length < 2) return;
+    if (e.key === 'ArrowLeft') goTo(idx + 1, 1);
+    if (e.key === 'ArrowRight') goTo(idx - 1, -1);
+  });
+})();
 document.getElementById('add').onclick = () => { counts[idx]++; total(); };
 document.getElementById('undo').onclick = () => { if (counts[idx] > 0) counts[idx]--; total(); };
 document.getElementById('close').onclick = () => document.getElementById('viewer').classList.remove('on');
