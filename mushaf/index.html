@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>تجربة عدّاد الأخطاء — المصحف</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:system-ui,'Segoe UI',Tahoma,sans-serif;background:#f4f4f2;color:#1c1c1b}
+.wrap{max-width:520px;margin:0 auto;padding:16px}
+h1{font-size:18px;font-weight:600;margin:0 0 4px}
+.sub{font-size:13px;color:#6b6b66;margin:0 0 16px}
+.card{background:#fff;border:1px solid #e2e0da;border-radius:12px;padding:14px;margin-bottom:12px}
+label{display:block;font-size:13px;color:#55554f;margin-bottom:6px}
+select,input{width:100%;height:42px;font-size:16px;font-family:inherit;padding:0 10px;border:1px solid #d8d6cf;border-radius:8px;background:#fff}
+.row{display:flex;gap:10px}.row>div{flex:1}
+.go{width:100%;height:48px;margin-top:12px;font-size:16px;font-weight:600;font-family:inherit;color:#fff;background:#0f6e56;border:0;border-radius:10px}
+.go:disabled{background:#b4b2a9}
+.note{font-size:12px;color:#8a8a83;margin-top:10px;line-height:1.6}
+#pages{font-size:13px;color:#0f6e56;margin-top:10px;min-height:20px}
+/* viewer */
+#viewer{position:fixed;inset:0;background:#faf6ec;display:none;flex-direction:column;z-index:50}
+#viewer.on{display:flex}
+.bar{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border-bottom:1px solid #e2e0da;padding-top:calc(10px + env(safe-area-inset-top))}
+.bar .x{font-size:24px;line-height:1;background:0;border:0;color:#55554f;padding:0 4px}
+.bar .t{flex:1;min-width:0}
+.bar .t b{display:block;font-size:14px;font-weight:600}
+.bar .t span{display:block;font-size:12px;color:#6b6b66;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .p{font-size:12px;color:#6b6b66;white-space:nowrap}
+.stage{flex:1;position:relative;overflow:auto;display:flex;align-items:flex-start;justify-content:center}
+.stage img{width:100%;max-width:520px;display:block}
+.miss{padding:40px 24px;text-align:center;color:#993c1d;font-size:14px;line-height:1.8}
+.nav{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.9);border:1px solid #d8d6cf;font-size:20px;color:#3d3d3a}
+.nav.r{right:6px}.nav.l{left:6px}
+.fab{position:fixed;left:14px;bottom:calc(78px + env(safe-area-inset-bottom));z-index:60}
+#viewer:not(.on) .fab{display:none}
+.undo{width:40px;height:40px;border-radius:50%;background:#fff;border:1px solid #d8d6cf;font-size:19px;color:#55554f;flex:0 0 auto}
+.add{width:84px;height:84px;border-radius:50%;background:#fcebeb;border:3px solid #e24b4a;color:#791f1f;font-family:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.add b{font-size:30px;font-weight:600;line-height:1.05}
+.add span{font-size:12px}
+.add:active{transform:scale(.94)}
+.foot{display:flex;align-items:center;gap:10px;padding:12px;background:#fff;border-top:1px solid #e2e0da;padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+.foot .h{flex:1;font-size:13px;color:#6b6b66}
+.foot #done{height:40px;padding:0 20px;font-size:15px;font-family:inherit;font-weight:600;color:#fff;background:#0f6e56;border:0;border-radius:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>تجربة عدّاد الأخطاء</h1>
+  <p class="sub">نسخة تجريبية مستقلة — مش مربوطة بقاعدة البيانات ولا بتحفظ أي حاجة.</p>
+  <div class="card">
+    <label for="s">السورة</label>
+    <select id="s"></select>
+    <div class="row" style="margin-top:12px">
+      <div><label for="f">من آية</label><input id="f" type="number" min="1" value="1" inputmode="numeric"></div>
+      <div><label for="t">إلى آية</label><input id="t" type="number" min="1" value="7" inputmode="numeric"></div>
+    </div>
+    <div id="pages"></div>
+    <button class="go" id="go">افتح الورد</button>
+    <p class="note">الصور المتاحة في التجربة: الفاتحة + جزء ٢٩ و٣٠ (صفحات ٥٦٢–٦٠٤)، وهي كل اللي الحلقة بتحفظه دلوقتي.</p>
+  </div>
+</div>
+
+<div id="viewer">
+  <div class="bar">
+    <button class="x" id="close" aria-label="إغلاق">&times;</button>
+    <div class="t"><b>زيد احمد</b><span id="ward"></span></div>
+    <div class="p" id="pnum"></div>
+  </div>
+  <div class="stage" id="stage"></div>
+  <div class="fab">
+    <button class="add" id="add"><b id="cnt">٠</b><span>خطأ</span></button>
+  </div>
+  <div class="foot"><button class="undo" id="undo" aria-label="تراجع">&#8630;</button><div class="h" id="hint"></div><button id="done">تم</button></div>
+</div>
+
+<script>
+const SURAS=[['الفاتحة',7],['البقرة',286],['آل عمران',200],['النساء',176],['المائدة',120],['الأنعام',165],['الأعراف',206],['الأنفال',75],['التوبة',129],['يونس',109],['هود',123],['يوسف',111],['الرعد',43],['إبراهيم',52],['الحجر',99],['النحل',128],['الإسراء',111],['الكهف',110],['مريم',98],['طه',135],['الأنبياء',112],['الحج',78],['المؤمنون',118],['النور',64],['الفرقان',77],['الشعراء',227],['النمل',93],['القصص',88],['العنكبوت',69],['الروم',60],['لقمان',34],['السجدة',30],['الأحزاب',73],['سبأ',54],['فاطر',45],['يس',83],['الصافات',182],['ص',88],['الزمر',75],['غافر',85],['فصلت',54],['الشورى',53],['الزخرف',89],['الدخان',59],['الجاثية',37],['الأحقاف',35],['محمد',38],['الفتح',29],['الحجرات',18],['ق',45],['الذاريات',60],['الطور',49],['النجم',62],['القمر',55],['الرحمن',78],['الواقعة',96],['الحديد',29],['المجادلة',22],['الحشر',24],['الممتحنة',13],['الصف',14],['الجمعة',11],['المنافقون',11],['التغابن',18],['الطلاق',12],['التحريم',12],['الملك',30],['القلم',52],['الحاقة',52],['المعارج',44],['نوح',28],['الجن',28],['المزمل',20],['المدثر',56],['القيامة',40],['الإنسان',31],['المرسلات',50],['النبأ',40],['النازعات',46],['عبس',42],['التكوير',29],['الانفطار',19],['المطففين',36],['الانشقاق',25],['البروج',22],['الطارق',17],['الأعلى',19],['الغاشية',26],['الفجر',30],['البلد',20],['الشمس',15],['الليل',21],['الضحى',11],['الشرح',8],['التين',8],['العلق',19],['القدر',5],['البينة',8],['الزلزلة',8],['العاديات',11],['القارعة',11],['التكاثر',8],['العصر',3],['الهمزة',9],['الفيل',5],['قريش',4],['الماعون',7],['الكوثر',3],['الكافرون',6],['النصر',3],['المسد',5],['الإخلاص',4],['الفلق',5],['الناس',6]];
+const PAGE_STARTS_ENC = '1:1;2:1,6,17,25,30,38,49,58,62,70,77,84,89,94,102,106,113,120,127,135,142,146,154,164,170,177,182,187,191,197,203,211,216,220,225,231,234,238,246,249,253,257,260,265,270,275,282,283;3:1,10,16,23,30,38,46,53,62,71,78,84,92,101,109,116,122,133,141,149,154,158,166,174,181,187,195;4:1,7,12,15,20,24,27,34,38,45,52,60,66,75,80,87,92,95,102,106,114,122,128,135,141,148,155,163,171,176;5:3,6,10,14,18,24,32,37,42,46,51,58,65,71,77,83,90,96,104,109,114;6:1,9,19,28,36,45,53,60,69,74,82,91,95,102,111,119,125,132,138,143,147,152,158;7:1,12,23,31,38,44,52,58,68,74,82,88,96,105,121,131,138,144,150,156,160,164,171,179,188,196;8:1,9,17,26,34,41,46,53,62,70;9:1,7,14,21,27,32,37,41,48,55,62,69,73,80,87,94,100,107,112,118,123;10:1,7,15,21,26,34,43,54,62,71,79,89,98,107;11:6,13,20,29,38,46,54,63,72,82,89,98,109,118;12:5,15,23,31,38,44,53,64,70,79,87,96,104;13:1,6,14,19,29,35,43;14:6,11,19,25,34,43;15:1,16,32,52,71,91;16:7,15,27,35,43,55,65,73,80,88,94,103,111,119;17:1,8,18,28,39,50,59,67,76,87,97,105;18:5,16,21,28,35,46,54,62,75,84,98;19:1,12,26,39,52,65,77,96;20:13,38,52,65,77,88,99,114,126;21:1,11,25,36,45,58,73,82,91,102;22:1,6,16,24,31,39,47,56,65,73;23:1,18,28,43,60,75,90,105;24:1,11,21,28,32,37,44,54,59,62;25:3,12,21,33,44,56,68;26:1,20,40,61,84,112,137,160,184,207;27:1,14,23,36,45,56,64,77,89;28:6,14,22,29,36,44,51,60,71,78,85;29:7,15,24,31,39,46,53,64;30:6,16,25,33,42,51;31:1,12,20,29;32:1,12,21;33:1,7,16,23,31,36,44,51,55,63;34:1,8,15,23,32,40,49;35:4,12,19,31,39,45;36:13,28,41,55,71;37:1,25,52,77,103,127,154;38:1,17,27,43,62,84;39:6,11,22,32,41,48,57,68,75;40:8,17,26,34,41,50,59,67,78;41:1,12,21,30,39,47;42:1,11,16,23,32,45,52;43:11,23,34,48,61,74;44:1,19,40;45:1,14,23,33;46:6,15,21,29;47:1,12,20,30;48:1,10,16,24,29;49:5,12;50:1,16,36;51:7,31,52;52:15,32;53:1,27,45;54:7,28,50;55:17,41,68;56:17,51,77;57:4,12,19,25;58:1,7,12,22;59:4,10,17;60:1,6,12;61:6;62:1,9;63:5;64:1,10;65:1,6;66:1,8;67:1,13,27;68:16,43;69:9,35;70:11,40;71:11;72:1,14;73:1,20;74:18,48;75:20;76:6,26;77:20;78:1,31;79:16;80:1;81:1;82:1;83:7,35;85:1;86:1;87:16;89:1,24;91:1;92:15;95:1;97:1;98:8;100:10;103:1;106:1;109:1;112:1';
+// ============================================================
+// جدول صفحات مصحف المدينة (٦٠٤ صفحة) — أول آية تبدأ في كل صفحة.
+// الترميز: "رقم السورة:آية,آية,...;رقم السورة:..." بترتيب الصفحات.
+// كل صفحة في مصحف المدينة تنتهي عند نهاية آية، فلا توجد آية موزعة
+// على صفحتين — لذلك يكفي معرفة أول آية في كل صفحة.
+
+// مصفوفة مضغوطة: كل صفحة = رقم السورة * 1000 + رقم الآية (تصاعدية).
+const PAGE_STARTS = (() => {
+  const out = [];
+  for (const seg of PAGE_STARTS_ENC.split(';')) {
+    const [s, list] = seg.split(':');
+    const sn = +s * 1000;
+    for (const a of list.split(',')) out.push(sn + +a);
+  }
+  return out;
+})();
+
+// رقم صفحة الآية (sura = 1..114 برقم السورة، ayah = 1..n)
+function pageOfAyah(sura, ayah) {
+  const key = sura * 1000 + (ayah || 1);
+  let lo = 0, hi = PAGE_STARTS.length - 1, ans = 0;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (PAGE_STARTS[mid] <= key) { ans = mid; lo = mid + 1; } else hi = mid - 1;
+  }
+  return ans + 1;
+}
+
+// أرقام صفحات ورد واحد. يقبل الشكلين المستخدمين في التطبيق:
+//   { sura, from, to }              → آيات محددة
+//   { sura, toSura, range:true }    → نطاق سور كاملة
+// suraIdx(name) يرجّع ترتيب السورة (1..114) من ثابت SURAS.
+function pagesForAssignment(a, suraIdx, ayahCount) {
+  if (!a || !a.sura) return [];
+  const s1 = suraIdx(a.sura);
+  if (!s1) return [];
+  let start, end;
+  if (a.range && a.toSura) {
+    const s2 = suraIdx(a.toSura);
+    if (!s2) return [];
+    const lo = Math.min(s1, s2), hi = Math.max(s1, s2);
+    start = pageOfAyah(lo, 1);
+    end = pageOfAyah(hi, ayahCount(hi));
+  } else {
+    const f = +a.from || 1;
+    const t = +a.to || f;
+    start = pageOfAyah(s1, Math.min(f, t));
+    end = pageOfAyah(s1, Math.max(f, t));
+  }
+  if (end < start) { const x = start; start = end; end = x; }
+  const out = [];
+  for (let p = start; p <= end; p++) out.push(p);
+  return out;
+}
+
+// صفحات ورد كامل (مصفوفة تكليفات newLoh/newMadi) بدون تكرار ومرتّبة.
+function pagesForWard(list, suraIdx, ayahCount) {
+  const set = new Set();
+  (list || []).forEach(a => pagesForAssignment(a, suraIdx, ayahCount).forEach(p => set.add(p)));
+  return [...set].sort((x, y) => x - y);
+}
+
+const AR = n => String(n).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+const suraIdx = name => { const i = SURAS.findIndex(x => x[0] === name); return i < 0 ? 0 : i + 1; };
+const ayahCount = i => SURAS[i - 1][1];
+
+const sEl = document.getElementById('s'), fEl = document.getElementById('f'), tEl = document.getElementById('t');
+SURAS.forEach(([n, c], i) => {
+  const o = document.createElement('option');
+  o.value = n; o.textContent = (i + 1) + '. ' + n + ' (' + c + ' آية)';
+  sEl.appendChild(o);
+});
+sEl.value = 'النبأ'; fEl.value = 1; tEl.value = 40;
+
+let pages = [], counts = [], idx = 0;
+function calc() {
+  const a = { sura: sEl.value, from: fEl.value, to: tEl.value };
+  const max = ayahCount(suraIdx(a.sura));
+  fEl.max = tEl.max = max;
+  if (+fEl.value > max) fEl.value = max;
+  if (+tEl.value > max) tEl.value = max;
+  pages = pagesForWard([{ sura: sEl.value, from: fEl.value, to: tEl.value }], suraIdx, ayahCount);
+  document.getElementById('pages').textContent =
+    pages.length ? 'الورد ده في ' + (pages.length === 1 ? 'صفحة ' + AR(pages[0]) : AR(pages.length) + ' صفحات: ' + pages.map(AR).join('، ')) : '';
+}
+[sEl, fEl, tEl].forEach(e => e.addEventListener('input', calc));
+calc();
+
+function pad(p) { return String(p).padStart(3, '0'); }
+function render() {
+  const st = document.getElementById('stage');
+  const p = pages[idx];
+  st.innerHTML = '<img src="pages/' + pad(p) + '.webp" alt="صفحة ' + p + '" onerror="this.parentNode.innerHTML=\'<div class=miss>الصفحة ' + AR(p) + ' مش متحمّلة في النسخة التجريبية.<br>المتاح: الفاتحة + صفحات ٥٦٢–٦٠٤.</div>\'">';
+  if (pages.length > 1) {
+    if (idx > 0) st.insertAdjacentHTML('beforeend', '<button class="nav r" id="prev">&#8250;</button>');
+    if (idx < pages.length - 1) st.insertAdjacentHTML('beforeend', '<button class="nav l" id="next">&#8249;</button>');
+    const pv = document.getElementById('prev'), nx = document.getElementById('next');
+    if (pv) pv.onclick = () => { idx--; render(); };
+    if (nx) nx.onclick = () => { idx++; render(); };
+  }
+  document.getElementById('pnum').textContent = 'صفحة ' + AR(p) + (pages.length > 1 ? ' (' + AR(idx + 1) + '/' + AR(pages.length) + ')' : '');
+  st.scrollTop = 0;
+  total();
+}
+function total() {
+  const t = counts.reduce((a, b) => a + b, 0);
+  document.getElementById('cnt').textContent = AR(t);
+  document.getElementById('hint').textContent = t === 0 ? 'دوس على الدايرة الحمرا مع كل خطأ' : 'إجمالي أخطاء الورد ' + AR(t) + (pages.length > 1 ? '، وفي الصفحة دي ' + AR(counts[idx]) : '');
+}
+document.getElementById('go').onclick = () => {
+  calc();
+  if (!pages.length) return;
+  counts = pages.map(() => 0); idx = 0;
+  document.getElementById('ward').textContent = 'اللوح، ' + sEl.value + ' ' + AR(fEl.value) + '-' + AR(tEl.value);
+  document.getElementById('viewer').classList.add('on');
+  render();
+};
+document.getElementById('add').onclick = () => { counts[idx]++; total(); };
+document.getElementById('undo').onclick = () => { if (counts[idx] > 0) counts[idx]--; total(); };
+document.getElementById('close').onclick = () => document.getElementById('viewer').classList.remove('on');
+document.getElementById('done').onclick = () => {
+  const t = counts.reduce((a, b) => a + b, 0);
+  document.getElementById('viewer').classList.remove('on');
+  alert('اتسجّل ' + AR(t) + ' خطأ. في النسخة النهائية الرقم ده هيتحفظ مع الجلسة.');
+};
+</script>
+</body>
+</html>
