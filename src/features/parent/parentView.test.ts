@@ -50,7 +50,6 @@ function baseStats(overrides: Partial<PublicStats> = {}): PublicStats {
         madi: { score: 90 },
         newLoh: [{ sura: 'آل عمران', from: '1', to: '15' }],
         newMadi: [{ sura: 'البقرة', from: '280', to: '286' }],
-        tajweed: null,
         note: 'أداء ممتاز',
       },
     ],
@@ -326,7 +325,6 @@ describe('buildSessions', () => {
           madi: { score: 90 },
           newLoh: [],
           newMadi: [],
-          tajweed: null,
           note: '',
         },
       ],
@@ -383,7 +381,6 @@ describe('evaluation ↔ assignment separation (parent page)', () => {
           madi: { score: 90 },
           newLoh: [{ sura: 'الكهف', from: '1', to: '10' }], // NEW homework
           newMadi: [{ sura: 'مريم', from: '1', to: '5' }],
-          tajweed: null,
           note: '',
         },
       ],
@@ -419,7 +416,6 @@ describe('evaluation ↔ assignment separation (parent page)', () => {
           madi: null,
           newLoh: [{ sura: 'الكهف', from: '1', to: '20' }],
           newMadi: [],
-          tajweed: null,
           note: '',
         },
       ],
@@ -469,7 +465,6 @@ describe('parent-facing dates', () => {
           madi: null,
           newLoh: [],
           newMadi: [],
-          tajweed: null,
           note: '',
         },
       ],
@@ -501,7 +496,6 @@ describe('Arabic-Indic numerals throughout the parent page', () => {
           madi: null,
           newLoh: [{ sura: 'آل عمران', from: '1', to: '15' }],
           newMadi: [],
-          tajweed: null,
           note: '',
         },
       ],
@@ -539,7 +533,6 @@ describe('buildSessions — evaluation vs new homework', () => {
           madi: { score: 90 },
           newLoh: [{ sura: 'آل عمران', from: '1', to: '15' }],
           newMadi: [{ sura: 'البقرة', from: '280', to: '286' }],
-          tajweed: null,
           note: '',
         },
         {
@@ -548,7 +541,6 @@ describe('buildSessions — evaluation vs new homework', () => {
           madi: { score: 85 },
           newLoh: [{ sura: 'البقرة', from: '1', to: '10' }],
           newMadi: [{ sura: 'الفاتحة', from: '1', to: '7' }],
-          tajweed: null,
           note: '',
         },
       ],
@@ -592,7 +584,6 @@ describe('buildSessions — evaluation vs new homework', () => {
       // so 'سورة1' would come back as 'سورة١' and never match.
       newLoh: [{ sura: i === total - 1 ? 'الأقدم' : 'سورة', from: '1', to: '5' }],
       newMadi: [],
-      tajweed: null,
       note: '',
     }));
     const rows = buildSessions(baseStats({ recentSessions }));
@@ -617,7 +608,6 @@ describe('buildSessions — evaluation vs new homework', () => {
           madi: null,
           newLoh: [],
           newMadi: [],
-          tajweed: null,
           note: '',
         },
       ],
@@ -641,7 +631,6 @@ describe('buildSessions — grade word', () => {
           madi: madi == null ? null : { score: madi },
           newLoh: [],
           newMadi: [],
-          tajweed: null,
           note: '',
         },
       ],
@@ -691,7 +680,6 @@ describe('SESSIONS_WINDOW', () => {
       madi: null,
       newLoh: [],
       newMadi: [],
-      tajweed: null,
       note: '',
     }));
     expect(buildSessions(baseStats({ recentSessions }))).toHaveLength(10);

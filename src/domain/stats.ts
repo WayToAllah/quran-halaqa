@@ -174,9 +174,12 @@ export function buildStudentPublicStats(
       : null,
     newLoh: (r.newLoh ?? []).filter((l) => l?.sura),
     newMadi: (r.newMadi ?? []).filter((m) => m?.sura),
-    tajweed: r.tajweed?.sura
-      ? { sura: r.tajweed.sura, from: r.tajweed.from || '', to: r.tajweed.to || '' }
-      : null,
+    // The tajweed assignment is deliberately NOT published. child.html never
+    // rendered it, and the projection dropped its score/stars/note anyway, so
+    // the published object could only ever have read "التجويد: الفاتحة (١-٧)"
+    // with no verdict attached. Its ayat still count toward totalAyat above —
+    // this hides a half-fact from parents, it does not erase the boy's work.
+    // Re-enabling it means publishing `score` too, not restoring this line.
     note: r.note || '',
   }));
 

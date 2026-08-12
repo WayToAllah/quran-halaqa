@@ -475,6 +475,56 @@ describe('buildStudentPublicStats — إعادة does not count as recited', () 
     expect(buildStudentPublicStats(zaid, withTajweed, 3, null, halaqaDates).totalAyat).toBe(7);
   });
 
+  // The parent page has never rendered the tajweed assignment, and the
+  // projection dropped its score/stars/note anyway — so the published object
+  // could only ever say "التجويد: الفاتحة (١-٧)" with no verdict attached.
+  // Publishing half a fact nobody reads is worse than publishing nothing.
+  describe('tajweed assignment is not published to parents', () => {
+    const withTajweed: SessionRecord[] = [
+      {
+        id: 't1',
+        studentId: 's_1',
+        date: '2026-07-01',
+        loh: { score: 90 },
+        tajweed: { sura: 'الفاتحة', from: '1', to: '7', score: 85, note: 'إخفاء' },
+      },
+    ];
+
+    it('omits the key from every published session', () => {
+      const out = buildStudentPublicStats(zaid, withTajweed, 3, null, halaqaDates);
+      expect(out.recentSessions[0]).not.toHaveProperty('tajweed');
+    });
+
+    it('leaks no part of the tajweed evaluation anywhere in the document', () => {
+      const out = buildStudentPublicStats(zaid, withTajweed, 3, null, halaqaDates);
+      expect(JSON.stringify(out)).not.toContain('إخفاء');
+    });
+
+    // Disabling the display must not silently restate the boy's work: the
+    // tajweed range is real recitation and still counts toward آية مُسمّعة.
+    it('still counts tajweed ayat toward totalAyat', () => {
+      expect(buildStudentPublicStats(zaid, withTajweed, 3, null, halaqaDates).totalAyat).toBe(7);
+    });
+
+    // A different field that merely shares the name — the mistake counter's
+    // tajweed tally is rendered ('١ خطأ تجويدي') and must survive.
+    it('keeps the tajweed mistake tally on the score', () => {
+      const withMistakes: SessionRecord[] = [
+        {
+          id: 'm1',
+          studentId: 's_1',
+          date: '2026-07-01',
+          loh: { score: 90, mistakes: { full: 2, tajweed: 1 } },
+        },
+      ];
+      const out = buildStudentPublicStats(zaid, withMistakes, 3, null, halaqaDates);
+      expect(out.recentSessions[0].loh).toEqual({
+        score: 90,
+        mistakes: { full: 2, tajweed: 1 },
+      });
+    });
+  });
+
   it('applies the same rule to the monthly figures, across a month boundary', () => {
     // Assigned 31 July, failed 2 August — the July number must still drop it.
     const crossing: SessionRecord[] = [

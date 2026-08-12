@@ -32,7 +32,6 @@ export const MOCK_PUBLIC_STATS: PublicStats = {
       madi: { score: 90 },
       newLoh: [{ sura: 'آل عمران', from: '1', to: '15' }],
       newMadi: [{ sura: 'البقرة', from: '280', to: '286' }],
-      tajweed: null,
       note: 'أداء ممتاز اليوم، ثبات في الحفظ',
     },
     {
@@ -41,7 +40,6 @@ export const MOCK_PUBLIC_STATS: PublicStats = {
       madi: { score: 92 },
       newLoh: [{ sura: 'آل عمران', from: '1', to: '7' }],
       newMadi: [{ sura: 'البقرة', from: '275', to: '286' }],
-      tajweed: null,
       note: '',
     },
     {
@@ -50,7 +48,6 @@ export const MOCK_PUBLIC_STATS: PublicStats = {
       madi: { score: 85 },
       newLoh: [{ sura: 'البقرة', from: '285', to: '286' }],
       newMadi: [{ sura: 'الفاتحة' }],
-      tajweed: null,
       note: '',
     },
   ],

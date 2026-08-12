@@ -69,7 +69,6 @@ describe('ParentPage', () => {
           madi: null,
           newLoh: [{ sura: 'الكهف', from: '1', to: '20' }],
           newMadi: [],
-          tajweed: null,
           note: '',
         },
       ],
@@ -206,7 +205,6 @@ describe('ParentPage — progress chart', () => {
       madi: null,
       newLoh: [],
       newMadi: [],
-      tajweed: null,
       note: '',
     });
     // The chart legend prints إعادة unconditionally, so counting occurrences
@@ -233,7 +231,6 @@ describe('ParentPage — progress chart', () => {
         madi: null,
         newLoh: [],
         newMadi: [],
-        tajweed: null,
         note: 'جلسة رقم ' + (i + 1),
       })),
     };

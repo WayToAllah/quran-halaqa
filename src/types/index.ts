@@ -158,7 +158,9 @@ export interface PublicStats {
     madi: { score: number; mistakes?: MistakeTally } | null;
     newLoh: SuraAssignment[];
     newMadi: SuraAssignment[];
-    tajweed: { sura: string; from: string; to: string } | null;
+    /** No `tajweed` here on purpose — see the projection in stats.ts. Documents
+     * published before it was withdrawn still carry the key; nothing reads it,
+     * and each student's next republish drops it. */
     note: string;
   }>;
   /** Every scored session, oldest-first, lightweight (date + two scores only)
