@@ -121,8 +121,11 @@ function pagesForAssignment(a, suraIdx, ayahCount) {
     start = pageOfAyah(lo, 1);
     end = pageOfAyah(hi, ayahCount(hi));
   } else {
-    const f = +a.from || 1;
-    const t = +a.to || f;
+    // الخانتين فاضيتين = السورة كاملة · "من" لوحدها = آية واحدة · "إلى" لوحدها = من أول السورة
+    const n = ayahCount(s1);
+    const hf = +a.from > 0, ht = +a.to > 0;
+    const f = hf ? Math.min(+a.from, n) : 1;
+    const t = ht ? Math.min(+a.to, n) : (hf ? f : n);
     start = pageOfAyah(s1, Math.min(f, t));
     end = pageOfAyah(s1, Math.max(f, t));
   }
@@ -162,7 +165,8 @@ function calc() {
   document.getElementById('pages').textContent =
     pages.length ? 'الورد ده في ' + (pages.length === 1 ? 'صفحة ' + AR(pages[0]) : AR(pages.length) + ' صفحات: ' + pages.map(AR).join('، ')) : '';
 }
-[sEl, fEl, tEl].forEach(e => e.addEventListener('input', calc));
+sEl.addEventListener('change', () => { fEl.value = 1; tEl.value = ayahCount(suraIdx(sEl.value)); calc(); });
+[fEl, tEl].forEach(e => e.addEventListener('input', calc));
 calc();
 
 function pad(p) { return String(p).padStart(3, '0'); }
