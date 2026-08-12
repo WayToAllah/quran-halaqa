@@ -218,33 +218,31 @@ function fit(sheet) {
   const BASE = 40;
   lines.forEach(el => { el.style.fontSize = BASE + 'px'; el.style.textAlignLast = 'right'; });
   const widths = lines.map(el => el.scrollWidth);
-  // typical widest line, ignoring rare outliers, so normal lines keep their natural spacing
-  const sorted = [...widths].sort((a, b) => a - b);
-  const ref = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.85))];
-  let size = Math.floor((BASE * w / ref) * 10) / 10;
-  const apply = s => lines.forEach((el, i) => {
-    // a line that would still overflow at the shared size gets its own smaller size
-    const own = widths[i] * s / BASE > w ? Math.floor((BASE * w / widths[i]) * 10) / 10 : s;
-    el.style.fontSize = own + 'px';
+  // each line gets the size that fills the width naturally, so the spaces are not stretched
+  const exact = widths.map(x => BASE * w / x);
+  const sorted = [...exact].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  // cap how much a short line may grow, so line sizes stay visually even
+  const cap = median * 1.1;
+  let sizes = exact.map(s => Math.floor(Math.min(s, cap) * 10) / 10);
+  const apply = k => lines.forEach((el, i) => {
+    el.style.fontSize = (Math.floor(sizes[i] * k * 10) / 10) + 'px';
     el.style.textAlignLast = 'justify';
   });
-  apply(size);
+  apply(1);
   const bs = sheet.querySelector('.bsm');
-  if (bs) bs.style.fontSize = (size * 0.9) + 'px';
+  const setBs = k => { if (bs) bs.style.fontSize = (median * k * 0.9) + 'px'; };
+  setBs(1);
   const avail = document.getElementById('stage').clientHeight - 10;
-  if (sheet.scrollHeight > avail) {
-    size = Math.floor(size * (avail / sheet.scrollHeight) * 10) / 10;
-    apply(size);
-    if (bs) bs.style.fontSize = (size * 0.9) + 'px';
-  }
-  // width-bound pages leave vertical slack: open the leading so the page fills it
-  const LH = 2.02, CAP = 3.1;
+  const LH = 2.02;
   lines.forEach(el => { el.style.lineHeight = LH; });
-  if (sheet.scrollHeight < avail) {
+  if (sheet.scrollHeight > avail) {
+    const k = avail / sheet.scrollHeight;
+    apply(k); setBs(k);
+  } else {
     const slack = avail - sheet.scrollHeight;
-    const perLine = slack / lines.length;
-    const px = LH * size + perLine;
-    const lh = Math.min(CAP, Math.floor((px / size) * 100) / 100);
+    const px = LH * median + slack / lines.length;
+    const lh = Math.min(3.1, Math.floor((px / median) * 100) / 100);
     lines.forEach(el => { el.style.lineHeight = lh; });
     if (sheet.scrollHeight > avail) lines.forEach(el => { el.style.lineHeight = LH; });
   }
