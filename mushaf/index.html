@@ -197,7 +197,7 @@ function pad(p) { return String(p).padStart(3, '0'); }
 
 let PAGEDATA = null;
 const fontsReady = new Map();
-const BASMALA = [0xFAD8, 0xFAD7, 0xFAD6, 0xFAD5].map(c => String.fromCharCode(c)).join('');
+const BASMALA = '\uFB51\uFB52\uFB53';
 
 async function loadData() {
   if (!PAGEDATA) PAGEDATA = await (await fetch('pages.json')).json();
@@ -206,7 +206,7 @@ async function loadData() {
 function ensureFont(p) {
   const fam = 'mp' + p;
   if (!fontsReady.has(p)) {
-    const ff = new FontFace(fam, 'url(fonts/p' + pad(p) + '.woff)');
+    const ff = new FontFace(fam, 'url(fonts/v2/p' + p + '.woff2)');
     fontsReady.set(p, ff.load().then(f => { document.fonts.add(f); return fam; }));
   }
   return fontsReady.get(p);
@@ -218,31 +218,23 @@ function fit(sheet) {
   const BASE = 40;
   lines.forEach(el => { el.style.fontSize = BASE + 'px'; el.style.textAlignLast = 'right'; });
   const widths = lines.map(el => el.scrollWidth);
-  // each line gets the size that fills the width naturally, so the spaces are not stretched
-  const exact = widths.map(x => BASE * w / x);
-  const sorted = [...exact].sort((a, b) => a - b);
-  const median = sorted[Math.floor(sorted.length / 2)];
-  // cap how much a short line may grow, so line sizes stay visually even
-  const cap = median * 1.1;
-  let sizes = exact.map(s => Math.floor(Math.min(s, cap) * 10) / 10);
-  const apply = k => lines.forEach((el, i) => {
-    el.style.fontSize = (Math.floor(sizes[i] * k * 10) / 10) + 'px';
-    el.style.textAlignLast = 'justify';
-  });
-  apply(1);
+  // one size for the whole page, set by the widest line, exactly like the printed mushaf
+  let size = Math.floor((BASE * w / Math.max(...widths)) * 10) / 10;
   const bs = sheet.querySelector('.bsm');
-  const setBs = k => { if (bs) bs.style.fontSize = (median * k * 0.9) + 'px'; };
-  setBs(1);
+  const apply = s => {
+    lines.forEach(el => { el.style.fontSize = s + 'px'; el.style.textAlignLast = 'justify'; });
+    if (bs) bs.style.fontSize = (s * 0.95) + 'px';
+  };
+  apply(size);
   const avail = document.getElementById('stage').clientHeight - 10;
   const LH = 2.02;
   lines.forEach(el => { el.style.lineHeight = LH; });
   if (sheet.scrollHeight > avail) {
-    const k = avail / sheet.scrollHeight;
-    apply(k); setBs(k);
+    size = Math.floor(size * (avail / sheet.scrollHeight) * 10) / 10;
+    apply(size);
   } else {
-    const slack = avail - sheet.scrollHeight;
-    const px = LH * median + slack / lines.length;
-    const lh = Math.min(3.1, Math.floor((px / median) * 100) / 100);
+    const px = LH * size + (avail - sheet.scrollHeight) / lines.length;
+    const lh = Math.min(3.1, Math.floor((px / size) * 100) / 100);
     lines.forEach(el => { el.style.lineHeight = lh; });
     if (sheet.scrollHeight > avail) lines.forEach(el => { el.style.lineHeight = LH; });
   }
@@ -262,7 +254,7 @@ async function render() {
     sheet.style.fontFamily = fam;
     sheet.innerHTML = data[p].map(l =>
       l.t === 'h' ? '<div class="hdr"><span>' + String.fromCharCode(0xE000 + l.n) + '</span></div>'
-      : l.t === 'b' ? '<div class="bsm">' + BASMALA + '</div>'
+      : l.t === 'b' ? '<div class="bsm" style="font-family:' + fam + '">' + BASMALA + '</div>'
       : '<div class="ln" style="font-family:' + fam + '">' + l.v + '</div>').join('');
     await document.fonts.ready;
     fit(sheet);
