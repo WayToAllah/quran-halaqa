@@ -212,7 +212,7 @@ function ensureFont(p) {
   }
   return fontsReady.get(p);
 }
-const SRC_W = 1024;
+const SRC_W = 1024, MAXK = 1.12;
 function fit(sheet) {
   const pad = 8;
   const W = sheet.clientWidth - pad * 2;
@@ -220,7 +220,7 @@ function fit(sheet) {
   if (!lines.length) return;
   const segs = [...sheet.querySelectorAll('.seg')];
   const BASE = 40;
-  segs.forEach(s => { s.style.transform = 'none'; s.style.fontSize = BASE + 'px'; });
+  segs.forEach(s => { s.style.transform = 'none'; s.style.width = 'auto'; s.style.textAlign = 'right'; s.style.textAlignLast = 'auto'; s.textContent = decodeURIComponent(s.dataset.tight); s.style.fontSize = BASE + 'px'; });
   const natural = el => { const r = document.createRange(); r.selectNodeContents(el); return r.getBoundingClientRect().width; };
   const boxOf = s => (s.dataset.x1 - s.dataset.x0) / SRC_W * W;
   const placed = segs.filter(s => s.dataset.x0 !== 'null');
@@ -228,6 +228,9 @@ function fit(sheet) {
   // one size for the page: the size at which the typical segment already fills its printed box
   const ratios = placed.map(s => boxOf(s) / nat.get(s)).sort((a, b) => a - b);
   let size = ratios.length ? Math.floor(BASE * ratios[Math.floor(ratios.length / 2)] * 10) / 10 : 20;
+  // never let the widest line spill past the page edge
+  const widest = Math.max(...segs.map(s => nat.get(s)));
+  size = Math.min(size, Math.floor((BASE * W / widest) * 10) / 10);
   const bs = sheet.querySelector('.bsm');
   const apply = sz => {
     segs.forEach(s => {
@@ -235,8 +238,22 @@ function fit(sheet) {
       const w = nat.get(s) * sz / BASE;
       if (s.dataset.x0 === 'null') { s.style.right = 'auto'; s.style.left = '0'; s.style.transform = 'none'; return; }
       s.style.right = ((SRC_W - s.dataset.x1) / SRC_W * W) + 'px';
-      const k = boxOf(s) / w;
-      s.style.transform = 'scaleX(' + Math.max(0.8, Math.min(1.25, k)).toFixed(3) + ')';
+      const box = boxOf(s);
+      let k = box / w;
+      if (k <= MAXK) {                       // the glyphs alone can fill this line
+        s.textContent = decodeURIComponent(s.dataset.tight);
+        s.style.width = 'auto'; s.style.textAlign = 'right'; s.style.textAlignLast = 'auto';
+        k = Math.max(0.9, Math.min(MAXK, k));
+      } else {                               // it cannot: put the spaces back and justify
+        s.textContent = decodeURIComponent(s.dataset.loose);
+        const r2 = document.createRange(); r2.selectNodeContents(s);
+        const wl = r2.getBoundingClientRect().width;
+        k = Math.max(0.9, Math.min(MAXK, box / wl));
+        s.style.width = (box / k) + 'px';
+        s.style.textAlign = 'justify'; s.style.textAlignLast = 'justify';
+      }
+      if (w * k > W) k = W / w;
+      s.style.transform = 'scaleX(' + k.toFixed(3) + ')';
     });
     if (bs) bs.style.fontSize = (sz * 0.95) + 'px';
     lines.forEach(l => { l.style.height = (sz * 2.0) + 'px'; });
@@ -271,8 +288,8 @@ async function render() {
     sheet.innerHTML = data[p].map(l =>
       l.t === 'h' ? '<div class="hdr"><span>' + String.fromCharCode(0xE000 + l.n) + '</span></div>'
       : l.t === 'b' ? '<div class="bsm">' + BASMALA + '</div>'
-      : '<div class="ln">' + l.segs.map(s =>
-          '<span class="seg" style="font-family:' + fam + '" data-x0="' + s.x0 + '" data-x1="' + s.x1 + '">' + s.g + '</span>').join('') + '</div>').join('');
+      : '<div class="ln"><span class="seg" style="font-family:' + fam + '" data-x0="' + l.x0 + '" data-x1="' + l.x1
+          + '" data-tight="' + encodeURIComponent(l.g) + '" data-loose="' + encodeURIComponent(l.gs) + '">' + l.g + '</span></div>').join('');
     await document.fonts.ready;
     fit(sheet);
     sheet.style.opacity = '1';
