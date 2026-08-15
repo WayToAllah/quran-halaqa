@@ -207,7 +207,7 @@ async function loadData() {
 function ensureFont(p) {
   const fam = 'mp' + p;
   if (!fontsReady.has(p)) {
-    const ff = new FontFace(fam, 'url(fonts/v2/p' + p + '.woff2)');
+    const ff = new FontFace(fam, 'url(fonts/v1/p' + p + '.woff2)');
     fontsReady.set(p, ff.load().then(f => { document.fonts.add(f); return fam; }));
   }
   return fontsReady.get(p);
