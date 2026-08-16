@@ -31,12 +31,17 @@ select,input{width:100%;height:42px;font-size:16px;font-family:inherit;padding:0
 .stage img{width:100%;max-width:520px;display:block}
 .sheet{width:100%;max-width:520px;padding:2px 10px 6px;direction:rtl}
 .ln{position:relative;white-space:nowrap;color:#1a1a1a}
-.seg{position:absolute;top:0;white-space:nowrap;transform-origin:right center}
+.seg{position:absolute;top:0;white-space:nowrap;transform-origin:right center;direction:rtl;unicode-bidi:bidi-override}
 .hdr{text-align:center;margin:0;line-height:1}
-.hdr span{font-family:'surahname';font-size:30px;color:#a98761;line-height:1.15;display:inline-block}
-.bsm{font-family:'basmala';text-align:center;line-height:1.75;color:#1a1a1a;white-space:nowrap}
-@font-face{font-family:'surahname';src:url(fonts/surahname.woff) format('woff');font-display:block}
-@font-face{font-family:'basmala';src:url(fonts/basmala.woff) format('woff');font-display:block}
+.hdr span{font-size:30px;color:#a98761;line-height:1.15;display:inline-block}
+.bsm{text-align:center;line-height:1.75;color:#1a1a1a;white-space:nowrap}
+@font-face{font-family:'h01';src:url(fonts/v4/QCF4_Hafs_01_W.woff2) format('woff2');font-display:block}
+@font-face{font-family:'h32';src:url(fonts/v4/QCF4_Hafs_32_W.woff2) format('woff2');font-display:block}
+@font-face{font-family:'h44';src:url(fonts/v4/QCF4_Hafs_44_W.woff2) format('woff2');font-display:block}
+@font-face{font-family:'h45';src:url(fonts/v4/QCF4_Hafs_45_W.woff2) format('woff2');font-display:block}
+@font-face{font-family:'h46';src:url(fonts/v4/QCF4_Hafs_46_W.woff2) format('woff2');font-display:block}
+@font-face{font-family:'h47';src:url(fonts/v4/QCF4_Hafs_47_W.woff2) format('woff2');font-display:block}
+@font-face{font-family:'bsml';src:url(fonts/v4/QCF4_QBSML.woff2) format('woff2');font-display:block}
 .miss{padding:40px 24px;text-align:center;color:#993c1d;font-size:14px;line-height:1.8}
 .nav{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:50%;background:rgba(255,252,246,.92);border:1px solid #e6d6c1;font-size:20px;color:#a98761}
 .mush{display:flex;align-items:center;justify-content:space-between;padding:3px 16px 0;font-size:11.5px;font-weight:600;color:#b0906c;letter-spacing:.2px}
@@ -197,22 +202,16 @@ calc();
 function pad(p) { return String(p).padStart(3, '0'); }
 
 let PAGEDATA = null;
-const fontsReady = new Map();
-const BASMALA = [0xFAD8, 0xFAD7, 0xFAD6, 0xFAD5].map(c => String.fromCharCode(c)).join('');
-
+const SRC_W = 1024, MAXK = 1.12;
+const FONTS = ['h01','h32','h44','h45','h46','h47','bsml'];
+function ensureFonts() {
+  return Promise.all(FONTS.map(f => document.fonts.load('20px ' + f, '\uF234')))
+    .catch(() => {});
+}
 async function loadData() {
   if (!PAGEDATA) PAGEDATA = await (await fetch('pages.json')).json();
   return PAGEDATA;
 }
-function ensureFont(p) {
-  const fam = 'mp' + p;
-  if (!fontsReady.has(p)) {
-    const ff = new FontFace(fam, 'url(fonts/v1/p' + p + '.woff2)');
-    fontsReady.set(p, ff.load().then(f => { document.fonts.add(f); return fam; }));
-  }
-  return fontsReady.get(p);
-}
-const SRC_W = 1024, MAXK = 1.12;
 function fit(sheet) {
   const pad = 8;
   const W = sheet.clientWidth - pad * 2;
@@ -281,19 +280,19 @@ async function render() {
   try {
     const data = await loadData();
     if (!data[p]) throw new Error('missing');
-    const fam = await ensureFont(p);
+    await ensureFonts();
     if (pages[idx] !== p) return;
     const sheet = st.querySelector('.sheet');
-    sheet.style.fontFamily = fam;
     sheet.innerHTML = data[p].map(l =>
-      l.t === 'h' ? '<div class="hdr"><span>' + String.fromCharCode(0xE000 + l.n) + '</span></div>'
-      : l.t === 'b' ? '<div class="bsm">' + BASMALA + '</div>'
-      : '<div class="ln"><span class="seg" style="font-family:' + fam + '" data-x0="' + l.x0 + '" data-x1="' + l.x1
-          + '" data-tight="' + encodeURIComponent(l.g) + '" data-loose="' + encodeURIComponent(l.gs) + '">' + l.g + '</span></div>').join('');
+      l.t === 'h' ? '<div class="hdr"><span style="font-family:' + l.f + '">' + l.c + '</span></div>'
+      : l.t === 'b' ? '<div class="bsm" style="font-family:' + l.f + '">' + l.c + '</div>'
+      : '<div class="ln"><span class="seg" style="font-family:' + l.f + '" data-x0="' + l.x0 + '" data-x1="' + l.x1
+        + '" data-tight="' + encodeURIComponent(l.g) + '" data-loose="' + encodeURIComponent(l.gs) + '">' + l.g + '</span></div>').join('');
     await document.fonts.ready;
     fit(sheet);
     sheet.style.opacity = '1';
   } catch (e) {
+    console.error('render failed', e);
     st.innerHTML = '<div class="miss">الصفحة ' + AR(p) + ' مش متحمّلة في النسخة التجريبية.<br>المتاح: الفاتحة + صفحات ٥٦٢–٦٠٤.</div>';
     addNav(st);
   }
@@ -323,7 +322,7 @@ document.getElementById('go').onclick = () => {
   calc();
   if (!pages.length) return;
   counts = pages.map(() => 0); idx = 0;
-  pages.forEach(pp => { try { ensureFont(pp); } catch (e) {} });
+  ensureFonts();
   document.getElementById('ward').textContent = 'اللوح، ' + sEl.value + ' ' + AR(fEl.value) + '-' + AR(tEl.value);
   document.getElementById('viewer').classList.add('on');
   render();
