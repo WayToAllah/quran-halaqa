@@ -7,7 +7,7 @@
 //  - Firebase Realtime Database itself runs over WebSocket, not fetch — untouched by this file
 //
 // Bump CACHE_NAME whenever you change this file (or want to force-refresh cached assets).
-const CACHE_NAME = 'quran-halaqa-v2';
+const CACHE_NAME = 'quran-halaqa-v3';
 
 const APP_SHELL = [
   './',
@@ -39,6 +39,11 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return; // never touch POST (e.g. Sheets sync)
 
   const url = new URL(req.url);
+
+  // The mushaf viewer is a separate page with its own fonts and data. Leaving it to
+  // the browser keeps its updates flowing and, more importantly, stops its page from
+  // being cached in place of the admin app shell below.
+  if (url.pathname.includes('/mushaf/')) return;
 
   // HTML navigation: network-first, offline fallback to cached shell
   if (req.mode === 'navigate') {
