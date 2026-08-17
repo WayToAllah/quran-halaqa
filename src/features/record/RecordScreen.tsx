@@ -30,8 +30,14 @@ import { FloatingSaveButton } from './FloatingSaveButton';
 import { useGroupAttendance } from '../../hooks/useGroupAttendance';
 import { GroupAttendanceModal } from './GroupAttendanceModal';
 import { MistakeCounterModal } from './MistakeCounterModal';
+import { MushafModal } from './MushafModal';
 import { WhatsAppModal } from './WhatsAppModal';
-import { summarizeMistakes, rebuildMistakeHistory, type MistakeKind } from '../../domain/mistakes';
+import {
+  summarizeMistakes,
+  rebuildMistakeHistory,
+  committedMistakeScore,
+  type MistakeKind,
+} from '../../domain/mistakes';
 import { StarPicker } from '../../ui/StarPicker';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useToast } from '../../ui/ToastProvider';
@@ -149,6 +155,29 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   const [lohMistakes, setLohMistakes] = useState<MistakeKind[]>([]);
   const [madiMistakes, setMadiMistakes] = useState<MistakeKind[]>([]);
   const [mistakeModal, setMistakeModal] = useState<'loh' | 'madi' | null>(null);
+  const [mushafFor, setMushafFor] = useState<'loh' | 'madi' | null>(null);
+  // A fresh token per open, so a count from a previous open cannot land on this one.
+  const [mushafToken, setMushafToken] = useState('');
+
+  function openMushaf(which: 'loh' | 'madi') {
+    setMushafToken(`${which}-${Date.now()}`);
+    setMushafFor(which);
+  }
+
+  /** The mushaf counter records plain mistakes; they join the same history the
+   *  counter modal builds, so the score comes out of one place either way. */
+  function applyMushafCount(which: 'loh' | 'madi', count: number) {
+    const add: MistakeKind[] = Array.from({ length: count }, () => 'full');
+    if (which === 'loh') {
+      const next = [...lohMistakes, ...add];
+      setLohMistakes(next);
+      setPrevLohScore(String(committedMistakeScore(next)));
+    } else {
+      const next = [...madiMistakes, ...add];
+      setMadiMistakes(next);
+      setPrevMadiScore(String(committedMistakeScore(next)));
+    }
+  }
 
   const [lohRows, setLohRows] = useState<SuraAssignment[]>([emptyRow()]);
   const [madiRows, setMadiRows] = useState<SuraAssignment[]>([emptyRow()]);
@@ -972,6 +1001,13 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
                   <button
                     type="button"
                     class="mr-auto text-xs font-semibold text-forest border border-forest/20 rounded-lg px-2.5 py-2"
+                    onClick={() => openMushaf('loh')}
+                  >
+                    📖 المصحف
+                  </button>
+                  <button
+                    type="button"
+                    class="text-xs font-semibold text-forest border border-forest/20 rounded-lg px-2.5 py-2"
                     onClick={() => setMistakeModal('loh')}
                   >
                     🧮 عدّاد الأخطاء
@@ -1031,6 +1067,13 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
                   <button
                     type="button"
                     class="mr-auto text-xs font-semibold text-forest border border-forest/20 rounded-lg px-2.5 py-2"
+                    onClick={() => openMushaf('madi')}
+                  >
+                    📖 المصحف
+                  </button>
+                  <button
+                    type="button"
+                    class="text-xs font-semibold text-forest border border-forest/20 rounded-lg px-2.5 py-2"
                     onClick={() => setMistakeModal('madi')}
                   >
                     🧮 عدّاد الأخطاء
@@ -1191,6 +1234,19 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
         >
           إلغاء التعديل
         </button>
+      )}
+
+      {mushafFor && (
+        <MushafModal
+          label={mushafFor === 'loh' ? 'اللوح' : 'الماضي'}
+          list={
+            mushafFor === 'loh' ? (editedPrevLoh ?? prevLohList) : (editedPrevMadi ?? prevMadiList)
+          }
+          studentName={selectedStudent ? getStudentName(selectedStudent) : ''}
+          token={mushafToken}
+          onCount={(count) => applyMushafCount(mushafFor, count)}
+          onClose={() => setMushafFor(null)}
+        />
       )}
 
       {mistakeModal && (
