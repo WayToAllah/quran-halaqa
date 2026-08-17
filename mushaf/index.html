@@ -33,7 +33,7 @@ select,input{width:100%;height:42px;font-size:16px;font-family:inherit;padding:0
 .ln{position:relative;white-space:nowrap;color:#1a1a1a}
 .seg{position:absolute;top:0;white-space:nowrap;transform-origin:right center;direction:rtl;unicode-bidi:bidi-override}
 .hdr{text-align:center;margin:0;line-height:1}
-.hdr span{font-size:30px;color:#a98761;line-height:1.15;display:inline-block}
+.hdr span{font-size:22px;color:#a98761;line-height:1.1;display:inline-block}
 .bsm{text-align:center;line-height:1.75;color:#1a1a1a;white-space:nowrap}
 @font-face{font-family:'h01';src:url(fonts/v4/QCF4_Hafs_01_W.woff2) format('woff2');font-display:block}
 @font-face{font-family:'h32';src:url(fonts/v4/QCF4_Hafs_32_W.woff2) format('woff2');font-display:block}
@@ -316,7 +316,7 @@ function label(p) {
 function total() {
   const t = counts.reduce((a, b) => a + b, 0);
   document.getElementById('cnt').textContent = AR(t);
-  document.getElementById('hint').textContent = t === 0 ? 'دوس على الدايرة الحمرا مع كل خطأ' : 'إجمالي أخطاء الورد ' + AR(t) + (pages.length > 1 ? '، وفي الصفحة دي ' + AR(counts[idx]) : '');
+  document.getElementById('hint').textContent = t === 0 ? 'دوس على زرار الخطأ مع كل غلطة' : 'إجمالي أخطاء الورد ' + AR(t) + (pages.length > 1 ? '، وفي الصفحة دي ' + AR(counts[idx]) : '');
 }
 document.getElementById('go').onclick = () => {
   calc();
