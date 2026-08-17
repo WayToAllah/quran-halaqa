@@ -318,6 +318,36 @@ function total() {
   document.getElementById('cnt').textContent = AR(t);
   document.getElementById('hint').textContent = t === 0 ? 'دوس على زرار الخطأ مع كل غلطة' : 'إجمالي أخطاء الورد ' + AR(t) + (pages.length > 1 ? '، وفي الصفحة دي ' + AR(counts[idx]) : '');
 }
+// ---- خارجي: يفتح الورد مباشرةً من رابط، ويرجّع العدد للتطبيق ----
+const EMBED = (() => {
+  const q = new URLSearchParams(location.search);
+  const raw = q.get('a');            // sura:from:to,sura:from:to
+  if (!raw) return null;
+  const items = raw.split(',').map(s => s.split(':')).filter(x => x[0])
+    .map(x => ({ sura: decodeURIComponent(x[0]), from: x[1] || '', to: x[2] || '' }));
+  if (!items.length) return null;
+  return { items, name: q.get('n') || '', ward: q.get('w') || '', token: q.get('id') || '' };
+})();
+function reportCount(total) {
+  if (!EMBED) return false;
+  const msg = { type: 'mushaf-count', id: EMBED.token, count: total };
+  if (window.parent && window.parent !== window) { window.parent.postMessage(msg, '*'); return true; }
+  if (window.opener) { window.opener.postMessage(msg, '*'); return true; }
+  return false;
+}
+function startEmbedded() {
+  if (!EMBED) return;
+  document.querySelector('.wrap').style.display = 'none';
+  pages = pagesForWard(EMBED.items, suraIdx, ayahCount);
+  if (!pages.length) return;
+  counts = pages.map(() => 0); idx = 0;
+  ensureFonts();
+  document.querySelector('.bar .t b').textContent = EMBED.name || 'التسميع';
+  document.getElementById('ward').textContent = EMBED.ward ||
+    EMBED.items.map(a => a.sura + (a.from && a.to ? ' ' + AR(a.from) + '-' + AR(a.to) : '')).join(' + ');
+  document.getElementById('viewer').classList.add('on');
+  render();
+}
 document.getElementById('go').onclick = () => {
   calc();
   if (!pages.length) return;
@@ -381,12 +411,14 @@ function goTo(n, dir) {
 })();
 document.getElementById('add').onclick = () => { counts[idx]++; total(); };
 document.getElementById('undo').onclick = () => { if (counts[idx] > 0) counts[idx]--; total(); };
-document.getElementById('close').onclick = () => document.getElementById('viewer').classList.remove('on');
+document.getElementById('close').onclick = () => { if (EMBED) { reportCount(counts.reduce((a,b)=>a+b,0)); return; } document.getElementById('viewer').classList.remove('on'); };
 document.getElementById('done').onclick = () => {
   const t = counts.reduce((a, b) => a + b, 0);
+  if (reportCount(t)) return;                 // opened from the app: hand the number back
   document.getElementById('viewer').classList.remove('on');
   alert('اتسجّل ' + AR(t) + ' خطأ. في النسخة النهائية الرقم ده هيتحفظ مع الجلسة.');
 };
+startEmbedded();
 </script>
 </body>
 </html>
