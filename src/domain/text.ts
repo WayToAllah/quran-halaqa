@@ -133,3 +133,30 @@ export function toArabicOrdinal(rank: number): string {
   const units = rank % 10;
   return `${AR_ORDINAL_COMPOUND_UNITS[units]} و${AR_ORDINAL_TENS[tens]}`;
 }
+
+/** The four count-dependent forms Arabic needs for a counted noun. */
+export interface ArabicPluralForms {
+  /** Standalone phrase for exactly one, e.g. 'صفحة واحدة'. */
+  one: string;
+  /** Standalone phrase for exactly two (dual), e.g. 'صفحتين'. */
+  two: string;
+  /** Noun after 3–10 (plural), e.g. 'صفحات'. */
+  few: string;
+  /** Noun after 0 and 11+ (singular), e.g. 'صفحة'. */
+  many: string;
+}
+
+/**
+ * "صفحة واحدة" / "صفحتين" / "٥ صفحات" / "١٢ صفحة".
+ *
+ * Arabic counts nouns in four different shapes and English-style "N + noun"
+ * gets three of them wrong. One and two carry the number inside the word
+ * itself, so those forms are returned WITHOUT a numeral in front — writing
+ * "١ صفحة واحدة" would be the same mistake in the other direction.
+ */
+export function arabicPlural(n: number, forms: ArabicPluralForms): string {
+  if (n === 1) return forms.one;
+  if (n === 2) return forms.two;
+  if (n >= 3 && n <= 10) return `${toArabicDigits(n)} ${forms.few}`;
+  return `${toArabicDigits(n)} ${forms.many}`;
+}

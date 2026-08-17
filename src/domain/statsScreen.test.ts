@@ -4,6 +4,7 @@ import {
   computeWeeklyBuckets,
   computeScoreDistribution,
   computeTopAyat,
+  computeTopPages,
   computeStudentStatsRows,
   sortStudentStatsRows,
   getWeekStart,
@@ -223,6 +224,127 @@ describe('computeTopAyat', () => {
       newLoh: [{ sura: 'البقرة', from: '1', to: String(i + 1) }],
     }));
     expect(computeTopAyat(many, records, 3)).toHaveLength(3);
+  });
+});
+
+describe('computeTopPages', () => {
+  it('ranks students by whole pages memorized, highest first', () => {
+    const records: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-01', newLoh: [{ sura: 'الناس' }] },
+      { id: 'r2', studentId: 's_1', date: '2026-07-08', newLoh: [{ sura: 'الفلق' }] },
+      { id: 'r3', studentId: 's_1', date: '2026-07-15', newLoh: [{ sura: 'الإخلاص' }] },
+      { id: 'r4', studentId: 's_1', date: '2026-07-22', newLoh: [{ sura: 'المسد' }] },
+      { id: 'r5', studentId: 's_1', date: '2026-07-29', newLoh: [{ sura: 'النصر' }] },
+      { id: 'r6', studentId: 's_2', date: '2026-07-01', newLoh: [{ sura: 'الفاتحة' }] },
+    ];
+    const top = computeTopPages(students, records);
+    expect(top[0]).toMatchObject({ name: 'زيد احمد', pages: 1 });
+    expect(top[1]).toMatchObject({ name: 'محمد علي', pages: 1 });
+  });
+
+  it('does not count a page that is only partly memorized', () => {
+    const records: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-01', newLoh: [{ sura: 'الناس' }] },
+    ];
+    expect(computeTopPages(students, records)).toHaveLength(0);
+  });
+
+  it('ignores الماضي — revision is not new memorization', () => {
+    const records: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-01', newMadi: [{ sura: 'الفاتحة' }] },
+    ];
+    expect(computeTopPages(students, records)).toHaveLength(0);
+  });
+
+  it('ignores التجويد, which is recitation practice rather than new ground', () => {
+    const records: SessionRecord[] = [
+      {
+        id: 'r1',
+        studentId: 's_1',
+        date: '2026-07-01',
+        tajweed: { sura: 'الفاتحة', from: '1', to: '7', score: 95, stars: 5 },
+      },
+    ];
+    expect(computeTopPages(students, records)).toHaveLength(0);
+  });
+
+  it('drops an assignment the NEXT session graded إعادة', () => {
+    const records: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-01', newLoh: [{ sura: 'الفاتحة' }] },
+      { id: 'r2', studentId: 's_1', date: '2026-07-08', loh: { score: 40, stars: 0 } },
+    ];
+    expect(computeTopPages(students, records)).toHaveLength(0);
+  });
+
+  it('keeps an assignment that passed, and one not graded yet', () => {
+    const passed: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-01', newLoh: [{ sura: 'الفاتحة' }] },
+      { id: 'r2', studentId: 's_1', date: '2026-07-08', loh: { score: 90, stars: 5 } },
+    ];
+    expect(computeTopPages(students, passed)[0].pages).toBe(1);
+
+    const ungraded: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-01', newLoh: [{ sura: 'الفاتحة' }] },
+    ];
+    expect(computeTopPages(students, ungraded)[0].pages).toBe(1);
+  });
+
+  it('counts a page once, however often it is re-assigned', () => {
+    const records: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-01', newLoh: [{ sura: 'الفاتحة' }] },
+      { id: 'r2', studentId: 's_1', date: '2026-07-08', newLoh: [{ sura: 'الفاتحة' }] },
+      {
+        id: 'r3',
+        studentId: 's_1',
+        date: '2026-07-15',
+        newLoh: [{ sura: 'الفاتحة', from: '1', to: '7' }],
+      },
+    ];
+    expect(computeTopPages(students, records)[0].pages).toBe(1);
+  });
+
+  it('credits a page to the month it was FINISHED in', () => {
+    const records: SessionRecord[] = [
+      {
+        id: 'r1',
+        studentId: 's_1',
+        date: '2026-06-24',
+        newLoh: [{ sura: 'الفاتحة', from: '1', to: '4' }],
+      },
+      {
+        id: 'r2',
+        studentId: 's_1',
+        date: '2026-07-01',
+        newLoh: [{ sura: 'الفاتحة', from: '5', to: '7' }],
+      },
+    ];
+    expect(computeTopPages(students, records, 3, '2026-06')).toHaveLength(0);
+    expect(computeTopPages(students, records, 3, '2026-07')[0].pages).toBe(1);
+    expect(computeTopPages(students, records, 3, 'all')[0].pages).toBe(1);
+  });
+
+  it('excludes students with no completed pages instead of listing zeros', () => {
+    const records: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-01', newLoh: [{ sura: 'الفاتحة' }] },
+      { id: 'r2', studentId: 's_2', date: '2026-07-01', newLoh: [{ sura: 'الناس' }] },
+    ];
+    const top = computeTopPages(students, records);
+    expect(top).toHaveLength(1);
+    expect(top[0].name).toBe('زيد احمد');
+  });
+
+  it('respects the limit parameter', () => {
+    const many: Student[] = Array.from({ length: 5 }, (_, i) => ({
+      id: `s_${i}`,
+      name: `طالب ${i}`,
+    }));
+    const records: SessionRecord[] = many.map((s, i) => ({
+      id: `r${i}`,
+      studentId: s.id,
+      date: '2026-07-01',
+      newLoh: [{ sura: 'البقرة', from: '1', to: String(30 + i * 20) }],
+    }));
+    expect(computeTopPages(many, records, 3)).toHaveLength(3);
   });
 });
 

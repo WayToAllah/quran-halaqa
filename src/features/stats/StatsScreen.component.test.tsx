@@ -90,9 +90,21 @@ describe('StatsScreen — score distribution', () => {
 });
 
 describe('StatsScreen — leaderboards', () => {
-  it('shows زيد احمد at the top of the ayat leaderboard', () => {
+  it('ranks by whole pages memorized, not ayat', () => {
     render(<StatsScreen />);
-    expect(screen.getByText(/٢٠ آية مسمّعة/)).toBeInTheDocument();
+    // زيد's البقرة 1–20 fills pages 2 and 3 (page 4 runs to ayah 24, so it is
+    // still unfinished) -> صفحتين, and NOT the 20 ayat it used to show.
+    expect(screen.getByText('🏆 الأكثر حفظاً للصفحات')).toBeInTheDocument();
+    expect(screen.getByText(/صفحتين/)).toBeInTheDocument();
+    expect(screen.queryByText(/آية مسمّعة/)).not.toBeInTheDocument();
+  });
+
+  it('leaves out محمد علي, who has no completed page', () => {
+    render(<StatsScreen />);
+    // محمد's only record is an evaluation with no newLoh at all.
+    const board = screen.getByText('🏆 الأكثر حفظاً للصفحات').parentElement;
+    expect(board?.textContent).toContain('زيد احمد');
+    expect(board?.textContent).not.toContain('محمد علي');
   });
 });
 

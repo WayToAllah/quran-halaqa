@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { esc, normAr, toArabicOrdinal, toWesternDigits, stripWhitespace } from './text';
+import {
+  arabicPlural,
+  esc,
+  normAr,
+  toArabicOrdinal,
+  toWesternDigits,
+  stripWhitespace,
+} from './text';
 
 describe('esc', () => {
   it('escapes all five HTML-significant characters', () => {
@@ -88,5 +95,25 @@ describe('stripWhitespace', () => {
   it('handles empty and missing values', () => {
     expect(stripWhitespace('')).toBe('');
     expect(stripWhitespace(undefined)).toBe('');
+  });
+});
+
+describe('arabicPlural', () => {
+  const pages = { one: 'صفحة واحدة', two: 'صفحتين', few: 'صفحات', many: 'صفحة' };
+
+  it('uses the standalone one/two forms without a numeral', () => {
+    expect(arabicPlural(1, pages)).toBe('صفحة واحدة');
+    expect(arabicPlural(2, pages)).toBe('صفحتين');
+  });
+
+  it('uses the broken plural for 3–10', () => {
+    expect(arabicPlural(3, pages)).toBe('٣ صفحات');
+    expect(arabicPlural(10, pages)).toBe('١٠ صفحات');
+  });
+
+  it('reverts to the singular for 0 and 11+', () => {
+    expect(arabicPlural(11, pages)).toBe('١١ صفحة');
+    expect(arabicPlural(0, pages)).toBe('٠ صفحة');
+    expect(arabicPlural(604, pages)).toBe('٦٠٤ صفحة');
   });
 });

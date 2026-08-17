@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'preact/hooks';
 import { useStudents } from '../../hooks/useStudents';
 import { useAllRecords } from '../../hooks/useAllRecords';
-import { esc, toArabicDigits, toArabicOrdinal } from '../../domain/text';
+import { arabicPlural, esc, toArabicDigits, toArabicOrdinal } from '../../domain/text';
 import { ATTENDANCE_BADGE_THRESHOLD, getAttendanceRanking } from '../../domain/attendance';
 import {
   computeSummaryStats,
   computeWeeklyBuckets,
   computeScoreDistribution,
-  computeTopAyat,
+  computeTopPages,
   computeStudentStatsRows,
   sortStudentStatsRows,
   countRecentlyActiveStudents,
@@ -16,6 +16,7 @@ import {
 import { MOSQUE_ID, HALAQA_ID } from '../../config';
 import { buildAttendanceCardData, buildAttendanceCardSvg } from '../../domain/attendanceCard';
 import { svgToPngBlob, shareOrDownloadPng } from './shareCard';
+import { pagesLabel } from '../../domain/pages';
 import { SearchInput } from '../../ui/SearchInput';
 
 /** Tier badge colors ported from the mockup — same lookup reused across the
@@ -52,6 +53,11 @@ const SORT_TABS: { key: StatsSortKey; label: string }[] = [
   { key: 'avg', label: 'التقييم' },
   { key: 'name', label: 'الاسم' },
 ];
+
+/** Sessions are the secondary line under a leaderboard name, so they read as
+ * prose and need the same Arabic count agreement the page total gets. */
+const sessionsLabel = (n: number) =>
+  arabicPlural(n, { one: 'جلسة واحدة', two: 'جلستين', few: 'جلسات', many: 'جلسة' });
 
 const cardCls = 'bg-white border border-hairline rounded-2xl p-[18px]';
 const cardTitleCls = 'text-[13.5px] font-extrabold text-ink-dark mb-3.5';
@@ -91,9 +97,12 @@ export function StatsScreen() {
   );
   const weeklyBuckets = useMemo(() => computeWeeklyBuckets(filteredRecords), [filteredRecords]);
   const scoreDist = useMemo(() => computeScoreDistribution(filteredRecords), [filteredRecords]);
-  const topAyat = useMemo(
-    () => computeTopAyat(students, filteredRecords, 3),
-    [students, filteredRecords],
+  // Unfiltered records on purpose: a page is cumulative, so which pages are
+  // complete is settled over the whole history and only then narrowed to the
+  // month the finishing session fell in (computeTopPages does the narrowing).
+  const topPages = useMemo(
+    () => computeTopPages(students, records, 3, monthFilter),
+    [students, records, monthFilter],
   );
   const topAttend = useMemo(
     () => getAttendanceRanking(students, filteredRecords, ATTENDANCE_BADGE_THRESHOLD).list,
@@ -255,12 +264,12 @@ export function StatsScreen() {
       </div>
 
       <div class={cardCls}>
-        <div class={cardTitleCls}>🏆 الأكثر تسميعاً للآيات</div>
-        {topAyat.length === 0 ? (
-          <div class="text-center text-sm text-taupe py-6">لا يوجد بيانات</div>
+        <div class={cardTitleCls}>🏆 الأكثر حفظاً للصفحات</div>
+        {topPages.length === 0 ? (
+          <div class="text-center text-sm text-taupe py-6">لا توجد صفحات مكتملة بعد</div>
         ) : (
           <div class="space-y-2">
-            {topAyat.map((x, i) => {
+            {topPages.map((x, i) => {
               const rc = rankStyle(i + 1);
               return (
                 <div
@@ -276,10 +285,12 @@ export function StatsScreen() {
                   <div class="flex-1 min-w-0">
                     <div class="text-sm font-bold text-ink-dark truncate">{x.name}</div>
                     <div class="text-xs text-taupe">
-                      {toArabicDigits(x.ayat)} آية مسمّعة · {toArabicDigits(x.sessionsCount)} جلسة
+                      {pagesLabel(x.pages)}، {sessionsLabel(x.sessionsCount)}
                     </div>
                   </div>
-                  <div class="font-extrabold text-[#C9A227] shrink-0">{toArabicDigits(x.ayat)}</div>
+                  <div class="font-extrabold text-[#C9A227] shrink-0">
+                    {toArabicDigits(x.pages)}
+                  </div>
                 </div>
               );
             })}

@@ -1,4 +1,5 @@
-import type { SessionRecord, Student } from '../types';
+import type { SessionRecord, Student, SuraAssignment } from '../types';
+import { completedPages, type DatedAssignment } from './pages';
 import { hasScore, scoreName } from './scoring';
 import { itemAyat } from './suras';
 import { getStudentName, recordsForStudent } from './students';
@@ -233,6 +234,79 @@ export function computeTopAyat(
     })
     .filter((x): x is TopAyatEntry => x !== null);
   return per.sort((a, b) => b.ayat - a.ayat).slice(0, limit);
+}
+
+export interface TopPagesEntry {
+  name: string;
+  /** Mushaf pages memorized end-to-end. */
+  pages: number;
+  /** Sessions inside the viewed period (context for the number, not its basis). */
+  sessionsCount: number;
+}
+
+/**
+ * Top-N students by whole mushaf pages memorized.
+ *
+ * Deliberately different from computeTopAyat on three counts, all requested:
+ *  1. **Pages, not ayat, and only whole ones.** A page counts the moment it is
+ *     finished; a part-page is worth nothing. Ten short ayat of جزء عم and ten
+ *     long ones of البقرة stop looking like the same achievement.
+ *  2. **New memorization only** (`newLoh`) — الماضي (`newMadi`) is revision of
+ *     ground already held, and counting it would credit the same page twice.
+ *     التجويد is likewise recitation practice, not new ground.
+ *  3. **إعادة is dropped**, matching the summary card and the parent page: work
+ *     the student was told to redo is not memorized yet.
+ *
+ * Pages are inherently distinct — coverage is tracked per ayah, so re-assigning
+ * the same ayat can never raise the count.
+ *
+ * `allRecords` must be the UNFILTERED history: a page is a cumulative
+ * achievement, so which pages are complete has to be worked out over the whole
+ * history and only then attributed to the month the finishing session fell in.
+ * Computing it from month-filtered records instead would erase every page whose
+ * ayat straddle the month boundary.
+ */
+export function computeTopPages(
+  students: Student[],
+  allRecords: SessionRecord[],
+  limit = 3,
+  /** 'all', or a 'YYYY-MM' month whose newly-completed pages to count. */
+  monthFilter = 'all',
+): TopPagesEntry[] {
+  const repeatMap = assignmentsGradedRepeat(allRecords);
+  const inPeriod = (date: string) => monthFilter === 'all' || date?.slice(0, 7) === monthFilter;
+
+  const per = students
+    .map((s) => {
+      const recs = recordsForStudent(s, allRecords);
+      if (!recs.length) return null;
+
+      const assignments: DatedAssignment[] = [];
+      recs.forEach((r) => {
+        if (repeatMap.get(r.id)?.loh) return;
+        // Legacy records kept the assignment on `loh` itself before newLoh
+        // existed; same fallback ayatInRecord uses.
+        const lohArr = r.newLoh?.length
+          ? r.newLoh
+          : r.loh && (r.loh as unknown as { sura?: string }).sura
+            ? [r.loh as unknown as SuraAssignment]
+            : [];
+        lohArr.forEach((item) => {
+          if (item?.sura && r.date) assignments.push({ item, date: r.date });
+        });
+      });
+
+      const pages = completedPages(assignments).filter((p) => inPeriod(p.date)).length;
+      if (!pages) return null;
+      return {
+        name: getStudentName(s),
+        pages,
+        sessionsCount: recs.filter((r) => inPeriod(r.date)).length,
+      };
+    })
+    .filter((x): x is TopPagesEntry => x !== null);
+
+  return per.sort((a, b) => b.pages - a.pages).slice(0, limit);
 }
 
 export interface StudentStatsRow {
