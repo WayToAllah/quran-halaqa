@@ -35,13 +35,6 @@ select,input{width:100%;height:42px;font-size:16px;font-family:inherit;padding:0
 .hdr{text-align:center;margin:0;line-height:1}
 .hdr span{font-size:22px;color:#a98761;line-height:1.1;display:inline-block}
 .bsm{text-align:center;line-height:1.75;color:#1a1a1a;white-space:nowrap}
-@font-face{font-family:'h01';src:url(fonts/v4/QCF4_Hafs_01_W.woff2) format('woff2');font-display:block}
-@font-face{font-family:'h32';src:url(fonts/v4/QCF4_Hafs_32_W.woff2) format('woff2');font-display:block}
-@font-face{font-family:'h44';src:url(fonts/v4/QCF4_Hafs_44_W.woff2) format('woff2');font-display:block}
-@font-face{font-family:'h45';src:url(fonts/v4/QCF4_Hafs_45_W.woff2) format('woff2');font-display:block}
-@font-face{font-family:'h46';src:url(fonts/v4/QCF4_Hafs_46_W.woff2) format('woff2');font-display:block}
-@font-face{font-family:'h47';src:url(fonts/v4/QCF4_Hafs_47_W.woff2) format('woff2');font-display:block}
-@font-face{font-family:'bsml';src:url(fonts/v4/QCF4_QBSML.woff2) format('woff2');font-display:block}
 .miss{padding:40px 24px;text-align:center;color:#993c1d;font-size:14px;line-height:1.8}
 .nav{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:50%;background:rgba(255,252,246,.92);border:1px solid #e6d6c1;font-size:20px;color:#a98761}
 .mush{display:flex;align-items:center;justify-content:space-between;padding:3px 16px 0;font-size:11.5px;font-weight:600;color:#b0906c;letter-spacing:.2px}
@@ -74,7 +67,7 @@ select,input{width:100%;height:42px;font-size:16px;font-family:inherit;padding:0
     </div>
     <div id="pages"></div>
     <button class="go" id="go">افتح الورد</button>
-    <p class="note">الصور المتاحة في التجربة: الفاتحة + جزء ٢٩ و٣٠ (صفحات ٥٦٢–٦٠٤)، وهي كل اللي الحلقة بتحفظه دلوقتي.</p>
+    <p class="note">المصحف كامل — ٦٠٤ صفحة. كل صفحة بتحمّل خطها أول مرة بس.</p>
   </div>
 </div>
 
@@ -203,15 +196,41 @@ function pad(p) { return String(p).padStart(3, '0'); }
 
 let PAGEDATA = null;
 const SRC_W = 1024, MAXK = 1.12;
-const FONTS = ['h01','h32','h44','h45','h46','h47','bsml'];
-function ensureFonts() {
-  return Promise.all(FONTS.map(f => document.fonts.load('20px ' + f, '\uF234')))
-    .catch(() => {});
+let FONTMAP = null;
+const fontLoaded = new Map();
+
+async function loadFontMap() {
+  if (!FONTMAP) FONTMAP = await (await fetch('fontmap.json')).json();
+  return FONTMAP;
 }
-async function loadData() {
-  if (!PAGEDATA) PAGEDATA = await (await fetch('pages.json')).json();
-  return PAGEDATA;
+/** Each font covers a run of pages, so a page usually needs one file, and the
+ *  file is fetched the first time a page that uses it is opened. */
+function loadFont(key) {
+  if (!fontLoaded.has(key)) {
+    const file = Object.keys(FONTMAP.fonts).find((n) => FONTMAP.fonts[n] === key) || key;
+    const ff = new FontFace(key, `url(fonts/v4/${file}${file === 'QCF4_QBSML' ? '' : '_W'}.woff2)`);
+    fontLoaded.set(key, ff.load().then((f) => { document.fonts.add(f); }).catch(() => {}));
+  }
+  return fontLoaded.get(key);
 }
+async function ensureFontsFor(p) {
+  await loadFontMap();
+  const keys = (FONTMAP.pages[p] || []).slice();
+  if (!keys.includes('bsml')) keys.push('bsml');
+  await Promise.all(keys.map(loadFont));
+}
+
+const pageCache = new Map();
+async function loadPage(p) {
+  if (!pageCache.has(p)) {
+    pageCache.set(p, fetch(`data/${p}.json`).then((r) => {
+      if (!r.ok) throw new Error('page ' + p);
+      return r.json();
+    }));
+  }
+  return pageCache.get(p);
+}
+
 function fit(sheet) {
   const pad = 8;
   const W = sheet.clientWidth - pad * 2;
@@ -278,12 +297,11 @@ async function render() {
   st.innerHTML = '<div class="sheet" style="opacity:0"></div>';
   addNav(st);
   try {
-    const data = await loadData();
-    if (!data[p]) throw new Error('missing');
-    await ensureFonts();
+    const rows = await loadPage(p);
+    await ensureFontsFor(p);
     if (pages[idx] !== p) return;
     const sheet = st.querySelector('.sheet');
-    sheet.innerHTML = data[p].map(l =>
+    sheet.innerHTML = rows.map(l =>
       l.t === 'h' ? '<div class="hdr"><span style="font-family:' + l.f + '">' + l.c + '</span></div>'
       : l.t === 'b' ? '<div class="bsm" style="font-family:' + l.f + '">' + l.c + '</div>'
       : '<div class="ln"><span class="seg" style="font-family:' + l.f + '" data-x0="' + l.x0 + '" data-x1="' + l.x1
@@ -293,7 +311,7 @@ async function render() {
     sheet.style.opacity = '1';
   } catch (e) {
     console.error('render failed', e);
-    st.innerHTML = '<div class="miss">الصفحة ' + AR(p) + ' مش متحمّلة في النسخة التجريبية.<br>المتاح: الفاتحة + صفحات ٥٦٢–٦٠٤.</div>';
+    st.innerHTML = '<div class="miss">تعذّر تحميل صفحة ' + AR(p) + '.<br>لو انت أوفلاين، افتحها مرة وانت متصل.</div>';
     addNav(st);
   }
   st.scrollTop = 0;
@@ -341,7 +359,7 @@ function startEmbedded() {
   pages = pagesForWard(EMBED.items, suraIdx, ayahCount);
   if (!pages.length) return;
   counts = pages.map(() => 0); idx = 0;
-  ensureFonts();
+  pages.forEach((pp) => ensureFontsFor(pp));
   document.querySelector('.bar .t b').textContent = EMBED.name || 'التسميع';
   document.getElementById('ward').textContent = EMBED.ward ||
     EMBED.items.map(a => a.sura + (a.from && a.to ? ' ' + AR(a.from) + '-' + AR(a.to) : '')).join(' + ');
@@ -352,7 +370,7 @@ document.getElementById('go').onclick = () => {
   calc();
   if (!pages.length) return;
   counts = pages.map(() => 0); idx = 0;
-  ensureFonts();
+  pages.forEach((pp) => ensureFontsFor(pp));
   document.getElementById('ward').textContent = 'اللوح، ' + sEl.value + ' ' + AR(fEl.value) + '-' + AR(tEl.value);
   document.getElementById('viewer').classList.add('on');
   render();
