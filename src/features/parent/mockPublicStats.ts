@@ -66,7 +66,21 @@ export const MOCK_PUBLIC_STATS: PublicStats = {
   // Two months so the ?preview page exercises the month filter; the live page
   // reads whatever stats.ts published for the real student.
   monthlyStats: {
-    '2026-06': { attendPct: 75, attendedDays: 9, totalAyat: 430, avgLoh: 78 },
-    '2026-07': { attendPct: 93, attendedDays: 14, totalAyat: 810, avgLoh: 90 },
+    '2026-06': {
+      attendPct: 75,
+      attendedDays: 9,
+      halaqaDays: 12,
+      totalAyat: 430,
+      avgLoh: 78,
+      avgMadi: 82,
+    },
+    '2026-07': {
+      attendPct: 93,
+      attendedDays: 14,
+      halaqaDays: 15,
+      totalAyat: 810,
+      avgLoh: 90,
+      avgMadi: 89,
+    },
   },
 };

@@ -170,6 +170,19 @@ export interface PublicStats {
    * 'YYYY-MM'. The chart, badges, and session list stay outside this filter. */
   monthlyStats: Record<
     string,
-    { attendPct: number; attendedDays: number; totalAyat: number; avgLoh: number | null }
+    {
+      attendPct: number;
+      attendedDays: number;
+      /** The denominator of that month's percentage — enrolled halaqa days
+       * inside the month. Optional: documents published before it existed
+       * carry the percentage alone, and the parent page then prints no
+       * fraction rather than borrowing the all-time denominator. */
+      halaqaDays?: number;
+      totalAyat: number;
+      avgLoh: number | null;
+      /** Optional for the same reason. `undefined` (never published) and
+       * `null` (published, nothing scored) both render as a dash. */
+      avgMadi?: number | null;
+    }
   >;
 }

@@ -247,10 +247,45 @@ describe('ParentPage — progress chart', () => {
     totalAyat: 1240,
     avgLoh: 86,
     monthlyStats: {
-      '2026-06': { attendPct: 70, attendedDays: 7, totalAyat: 300, avgLoh: 78 },
-      '2026-07': { attendPct: 92, attendedDays: 12, totalAyat: 540, avgLoh: 90 },
+      '2026-06': {
+        attendPct: 70,
+        attendedDays: 7,
+        halaqaDays: 10,
+        totalAyat: 300,
+        avgLoh: 78,
+        avgMadi: 74,
+      },
+      '2026-07': {
+        attendPct: 92,
+        attendedDays: 12,
+        halaqaDays: 13,
+        totalAyat: 540,
+        avgLoh: 90,
+        avgMadi: 88,
+      },
     },
   };
+
+  it('shows both averages and the attendance fraction in the grid', () => {
+    render(
+      <ParentPage
+        previewStats={{
+          ...MOCK_PUBLIC_STATS,
+          attendedDays: 23,
+          enrolledHalaqaDays: 26,
+          avgLoh: 86,
+          avgMadi: 84,
+        }}
+      />,
+    );
+    expect(screen.getByText('متوسط اللوح')).toBeInTheDocument();
+    expect(screen.getByText('متوسط الماضي')).toBeInTheDocument();
+    expect(screen.getByText('٨٤٪')).toBeInTheDocument();
+    expect(screen.getByText('٢٣ من ٢٦ يوم')).toBeInTheDocument();
+    // The day count is no longer a cell of its own — it lives under the
+    // percentage it is the numerator of.
+    expect(screen.queryByText('أيام الحضور')).not.toBeInTheDocument();
+  });
 
   it('offers no month filter for documents without monthly figures', () => {
     render(<ParentPage previewStats={{ ...MOCK_PUBLIC_STATS, monthlyStats: {} }} />);
@@ -264,6 +299,8 @@ describe('ParentPage — progress chart', () => {
     june.click();
     await waitFor(() => expect(screen.getByText('٧٠٪')).toBeInTheDocument());
     expect(screen.getByText('٣٠٠')).toBeInTheDocument();
+    expect(screen.getByText('٧ من ١٠ أيام')).toBeInTheDocument();
+    expect(screen.getByText('٧٤٪')).toBeInTheDocument();
     expect(screen.queryByText('٨٨٪')).not.toBeInTheDocument();
   });
 

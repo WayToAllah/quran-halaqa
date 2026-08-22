@@ -2,7 +2,7 @@ import type { MistakeTally, PublicStats, SuraAssignment } from '../../types';
 import { joinSuraNames } from '../../domain/suras';
 import { gregorianStr, gregorianLong } from '../../domain/dates';
 import { hijriShort } from '../../domain/hijri';
-import { toArabicDigits, formatArabicNumber } from '../../domain/text';
+import { toArabicDigits, formatArabicNumber, arabicPlural } from '../../domain/text';
 import { scoreName } from '../../domain/scoring';
 
 /**
@@ -270,7 +270,17 @@ export interface StatCell {
   label: string;
   value: string;
   color: ColorRole;
+  /** Optional second line under the label — the fraction behind a percentage,
+   * or the band name behind an average. Absent, not empty, when there is
+   * nothing to say: the cell then renders exactly as it always did. */
+  sub?: string;
 }
+
+/** Lowest average that still gets its band printed. At 70 the band is جيد;
+ * below it they are مقبول and إعادة, which is a verdict rather than a summary
+ * on a page written for a parent. Deliberately NOT tied to CHART_PASS_MARK
+ * (60) — that one decides what the chart marks as a failed session. */
+const STAT_BAND_FLOOR = 70;
 
 /** Sentinel key for the unfiltered (all-time) view of the stat grid. */
 export const ALL_MONTHS = 'all';
@@ -323,38 +333,72 @@ export function buildMonthOptions(stats: PublicStats): MonthOption[] {
  */
 export function buildStats(stats: PublicStats, month: string = ALL_MONTHS): StatCell[] {
   const m = month !== ALL_MONTHS ? stats.monthlyStats?.[month] : undefined;
-  if (m) {
-    return [
-      { label: 'نسبة الحضور', value: toArabicDigits(m.attendPct) + '٪', color: 'ink' },
-      { label: 'آية مُسمّعة', value: formatArabicNumber(m.totalAyat), color: 'accent' },
-      { label: 'أيام الحضور', value: toArabicDigits(m.attendedDays), color: 'ink' },
-      {
-        label: 'متوسط اللوح',
-        value: m.avgLoh != null ? toArabicDigits(m.avgLoh) + '٪' : '—',
-        color: 'ink',
-      },
-    ];
-  }
+  const attended = m ? m.attendedDays : (stats.attendedDays ?? stats.uniqueDays);
+  const enrolled = m ? m.halaqaDays : stats.enrolledHalaqaDays;
+  const avgLoh = m ? m.avgLoh : stats.avgLoh;
+  const avgMadi = m ? m.avgMadi : stats.avgMadi;
   return [
-    { label: 'نسبة الحضور', value: toArabicDigits(stats.attendPct) + '٪', color: 'ink' },
-    { label: 'آية مُسمّعة', value: formatArabicNumber(stats.totalAyat), color: 'accent' },
-    // Deliberately the SAME number the percentage is built from. It used to be
-    // sessionsCount, counted from a different set (recitation sessions only,
-    // not deduplicated by day) — so a boy marked present on six group-attendance
-    // days read as "١٠٠٪ حضور · ١٤ جلسة" over a 20-day window, which a parent
-    // rightly reads as a contradiction. `uniqueDays` is the fallback for
-    // documents published before attendedDays existed.
     {
-      label: 'أيام الحضور',
-      value: toArabicDigits(stats.attendedDays ?? stats.uniqueDays),
+      label: 'نسبة الحضور',
+      value: toArabicDigits(m ? m.attendPct : stats.attendPct) + '٪',
       color: 'ink',
+      ...subFor(attendanceFraction(attended, enrolled)),
     },
     {
-      label: 'متوسط اللوح',
-      value: stats.avgLoh != null ? toArabicDigits(stats.avgLoh) + '٪' : '—',
-      color: 'ink',
+      label: 'آية مُسمّعة',
+      value: formatArabicNumber(m ? m.totalAyat : stats.totalAyat),
+      color: 'accent',
     },
+    { label: 'متوسط اللوح', ...averageCell(avgLoh) },
+    { label: 'متوسط الماضي', ...averageCell(avgMadi) },
   ];
+}
+
+/** `{ sub }` only when there is one — an `undefined` value would still show up
+ * as a key, and the grid's own tests read the cell's shape. */
+function subFor(sub: string | undefined): { sub?: string } {
+  return sub ? { sub } : {};
+}
+
+/**
+ * "٢٣ من ٢٦ يوم" — the two numbers the percentage above it divides.
+ *
+ * It used to be its own cell in the grid, which said nothing the percentage
+ * didn't already say and cost a slot متوسط الماضي now uses. As a sub-line it
+ * still answers the question a percentage always raises ("من كام؟"), and both
+ * numbers keep coming from the same pair stats.ts divided, never from
+ * `uniqueDays`, which counts bonus days the denominator excludes.
+ *
+ * Nothing is printed without a denominator: a document published before
+ * `enrolledHalaqaDays` (or a month before `halaqaDays`) would otherwise read
+ * "٢٣ من ٠". The separator is the word من on purpose — a slash or a spaced
+ * middle dot between Arabic-Indic digits reorders under bidi and reads as one
+ * long numeral.
+ */
+function attendanceFraction(attended: number, enrolled: number | undefined): string | undefined {
+  if (!enrolled || enrolled <= 0) return undefined;
+  return `${toArabicDigits(attended)} من ${arabicPlural(enrolled, {
+    one: 'يوم واحد',
+    two: 'يومين',
+    few: 'أيام',
+    many: 'يوم',
+  })}`;
+}
+
+/**
+ * An average, plus the band it falls in — but only while the band is something
+ * a parent is glad to read. `scoreName` returns إعادة under 60 and جيد at 70;
+ * printing the lower bands on a page the boy reads over his father's shoulder
+ * turns a summary into a verdict, so below the pass mark the number stands
+ * alone and the session list underneath carries the detail.
+ */
+function averageCell(avg: number | null | undefined): Omit<StatCell, 'label'> {
+  if (avg == null) return { value: '—', color: 'ink' };
+  return {
+    value: toArabicDigits(avg) + '٪',
+    color: 'ink',
+    ...subFor(avg >= STAT_BAND_FLOOR ? scoreName(avg) : undefined),
+  };
 }
 
 // ---- Dates ---------------------------------------------------------------

@@ -216,6 +216,12 @@ export function buildStudentPublicStats(
     const monthAvgLoh = monthScoredLoh.length
       ? Math.round(monthScoredLoh.reduce((a, r) => a + r.loh!.score!, 0) / monthScoredLoh.length)
       : null;
+    // Same shape as the loh average above, and the same null rule: a month
+    // with nothing scored is null, not 0 — 0 is a real grade (إعادة).
+    const monthScoredMadi = monthRealRecs.filter((r) => hasScore(r.madi));
+    const monthAvgMadi = monthScoredMadi.length
+      ? Math.round(monthScoredMadi.reduce((a, r) => a + r.madi!.score!, 0) / monthScoredMadi.length)
+      : null;
     let monthAyat = 0;
     monthRealRecs.forEach((r) => {
       // repeatMap comes from the full history on purpose: an assignment given
@@ -236,8 +242,10 @@ export function buildStudentPublicStats(
     monthlyStats[month] = {
       attendPct: monthAttendPct,
       attendedDays: monthAttendedDays,
+      halaqaDays: monthHalaqaDays,
       totalAyat: monthAyat,
       avgLoh: monthAvgLoh,
+      avgMadi: monthAvgMadi,
     };
   });
 

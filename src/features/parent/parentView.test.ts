@@ -261,31 +261,69 @@ describe('buildStats', () => {
   it('renders four cells with arabic numerals and no deltas', () => {
     const cells = buildStats(baseStats());
     expect(cells).toHaveLength(4);
-    expect(cells[0]).toEqual({ label: 'نسبة الحضور', value: '٨٨٪', color: 'ink' });
+    expect(cells.map((c) => c.label)).toEqual([
+      'نسبة الحضور',
+      'آية مُسمّعة',
+      'متوسط اللوح',
+      'متوسط الماضي',
+    ]);
+    expect(cells[0].value).toBe('٨٨٪');
     expect(cells[1].value).toBe('١٬٢٤٠');
-    // no delta / comparison fields exist on the cell
-    expect(Object.keys(cells[0])).toEqual(['label', 'value', 'color']);
+    // no delta / comparison fields exist on the cell, and a cell with nothing
+    // to say underneath carries no `sub` key at all rather than an empty one
+    expect(Object.keys(cells[1])).toEqual(['label', 'value', 'color']);
   });
 
-  it('shows a dash for a missing loh average', () => {
-    const cells = buildStats(baseStats({ avgLoh: null }));
-    expect(cells[3].value).toBe('—');
+  // The day count used to be its own cell, which said exactly what the
+  // percentage next to it already said (٢٣ ÷ ٢٦ = ٨٨٪). Folding it underneath
+  // as the fraction it comes from frees the fourth slot for متوسط الماضي.
+  it('carries the attended/enrolled fraction under the percentage', () => {
+    expect(buildStats(baseStats())[0].sub).toBe('٢٣ من ٢٦ يوم');
   });
 
-  // The percentage and the day count must be two readings of ONE number.
-  // "عدد الجلسات" was counted from a different set (sessions only, undeduped)
-  // and read as a contradiction next to the percentage.
-  it('shows attended days, the same figure the percentage is built from', () => {
-    const cells = buildStats(
-      baseStats({ attendedDays: 20, enrolledHalaqaDays: 25, attendPct: 80, sessionsCount: 14 }),
+  it('pluralises the denominator the Arabic way', () => {
+    expect(buildStats(baseStats({ attendedDays: 2, enrolledHalaqaDays: 2 }))[0].sub).toBe(
+      '٢ من يومين',
     );
-    expect(cells[2]).toEqual({ label: 'أيام الحضور', value: '٢٠', color: 'ink' });
+    expect(buildStats(baseStats({ attendedDays: 3, enrolledHalaqaDays: 5 }))[0].sub).toBe(
+      '٣ من ٥ أيام',
+    );
   });
 
   it('falls back to uniqueDays for documents published before attendedDays existed', () => {
-    const stale = baseStats({ uniqueDays: 23 });
+    const stale = baseStats({ uniqueDays: 21 });
     delete (stale as Partial<PublicStats>).attendedDays;
-    expect(buildStats(stale)[2].value).toBe('٢٣');
+    expect(buildStats(stale)[0].sub).toBe('٢١ من ٢٦ يوم');
+  });
+
+  // A document published before enrolledHalaqaDays existed has no denominator
+  // to show; a fraction over zero would read as "٢٣ من صفر".
+  it('omits the fraction when there is no enrolment window', () => {
+    expect(buildStats(baseStats({ enrolledHalaqaDays: 0 }))[0].sub).toBeUndefined();
+  });
+
+  it('shows the madi average next to the loh average', () => {
+    const cells = buildStats(baseStats({ avgLoh: 86, avgMadi: 84 }));
+    expect(cells[2].value).toBe('٨٦٪');
+    expect(cells[3].value).toBe('٨٤٪');
+  });
+
+  it('shows a dash for a missing average, on either card', () => {
+    const cells = buildStats(baseStats({ avgLoh: null, avgMadi: null }));
+    expect(cells[2].value).toBe('—');
+    expect(cells[3].value).toBe('—');
+  });
+
+  // The band name tells a parent what the number means without making him
+  // learn the scale — but only while it is encouraging. Under 70 the label
+  // would read "إعادة" on a page his son can see over his shoulder.
+  it('names the band above the pass mark and stays silent below it', () => {
+    expect(buildStats(baseStats({ avgLoh: 92 }))[2].sub).toBe('ممتاز');
+    expect(buildStats(baseStats({ avgMadi: 84 }))[3].sub).toBe('جيد جداً');
+    expect(buildStats(baseStats({ avgLoh: 70 }))[2].sub).toBe('جيد');
+    expect(buildStats(baseStats({ avgLoh: 69 }))[2].sub).toBeUndefined();
+    expect(buildStats(baseStats({ avgMadi: 55 }))[3].sub).toBeUndefined();
+    expect(buildStats(baseStats({ avgLoh: null }))[2].sub).toBeUndefined();
   });
 });
 
@@ -721,21 +759,52 @@ describe('buildStats — filtered by month', () => {
     totalAyat: 1240,
     avgLoh: 86,
     monthlyStats: {
-      '2026-06': { attendPct: 70, attendedDays: 7, totalAyat: 300, avgLoh: 78 },
-      '2026-07': { attendPct: 92, attendedDays: 12, totalAyat: 540, avgLoh: null },
+      '2026-06': {
+        attendPct: 70,
+        attendedDays: 7,
+        halaqaDays: 10,
+        totalAyat: 300,
+        avgLoh: 78,
+        avgMadi: 74,
+      },
+      '2026-07': {
+        attendPct: 92,
+        attendedDays: 12,
+        halaqaDays: 13,
+        totalAyat: 540,
+        avgLoh: null,
+        avgMadi: null,
+      },
     },
   });
 
   it('reads the four cells out of monthlyStats for the chosen month', () => {
     const cells = buildStats(stats, '2026-06');
     expect(cells[0].value).toBe('٧٠٪');
+    expect(cells[0].sub).toBe('٧ من ١٠ أيام');
     expect(cells[1].value).toBe('٣٠٠');
-    expect(cells[2].value).toBe('٧');
-    expect(cells[3].value).toBe('٧٨٪');
+    expect(cells[2].value).toBe('٧٨٪');
+    expect(cells[3].value).toBe('٧٤٪');
   });
 
   it('still dashes an unscored month instead of printing zero', () => {
+    expect(buildStats(stats, '2026-07')[2].value).toBe('—');
     expect(buildStats(stats, '2026-07')[3].value).toBe('—');
+  });
+
+  // Documents published before these two fields existed keep working: the
+  // month cell falls back to a dash and drops the fraction rather than
+  // inventing a denominator out of the all-time figure.
+  it('degrades gracefully for months published before halaqaDays and avgMadi', () => {
+    const legacy = baseStats({
+      monthlyStats: {
+        '2026-05': { attendPct: 60, attendedDays: 6, totalAyat: 200, avgLoh: 80 },
+        '2026-06': { attendPct: 70, attendedDays: 7, totalAyat: 300, avgLoh: 78 },
+      },
+    });
+    const cells = buildStats(legacy, '2026-05');
+    expect(cells[0].sub).toBeUndefined();
+    expect(cells[3].value).toBe('—');
   });
 
   it('falls back to the all-time figures for الكل or an unknown month', () => {

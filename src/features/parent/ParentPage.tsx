@@ -288,6 +288,11 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
               <div style="font-size:11.5px;color:var(--text-muted);margin-top:7px;font-weight:500">
                 {st.label}
               </div>
+              {/* Second line: the fraction behind a percentage, the band behind
+                  an average. Absent cells render exactly as before. */}
+              {st.sub && (
+                <div style="font-size:11px;color:var(--text-hint);margin-top:3px">{st.sub}</div>
+              )}
             </div>
           ))}
         </div>

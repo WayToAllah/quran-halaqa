@@ -227,9 +227,24 @@ describe('buildStudentPublicStats', () => {
     expect(result.monthlyStats['2026-07']).toEqual({
       attendPct: 100, // 2 attended days / 2 halaqa days
       attendedDays: 2,
+      // The denominator of that percentage, published so the parent page can
+      // print the fraction instead of asking the reader to reconstruct it.
+      halaqaDays: 2,
       totalAyat: 20,
       avgLoh: 45,
+      avgMadi: 80,
     });
+  });
+
+  // Same rule the all-time avgMadi follows: a month with no scored madi is
+  // null, never 0 — a real 0 is إعادة and means something else entirely.
+  it('nulls a month average that has nothing scored in it', () => {
+    const noMadi: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-01', loh: { score: 80 } },
+    ];
+    const result = buildStudentPublicStats(zaid, noMadi, 1, null, ['2026-07-01']);
+    expect(result.monthlyStats['2026-07'].avgMadi).toBeNull();
+    expect(result.monthlyStats['2026-07'].avgLoh).toBe(80);
   });
 
   it('carries a whole-sura range assignment through to currentTask and recentSessions', () => {
