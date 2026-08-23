@@ -6,6 +6,8 @@ import {
   computeTopAyat,
   computeTopPages,
   computeFollowUpList,
+  computeLohSpan,
+  detectMemorizationDirection,
   computeStudentStatsRows,
   sortStudentStatsRows,
   getWeekStart,
@@ -311,12 +313,16 @@ describe('computeTopPages', () => {
     expect(computeTopPages(students, records)).toHaveLength(0);
   });
 
-  it('drops an assignment the NEXT session graded إعادة', () => {
+  it('keeps an assignment the NEXT session graded إعادة', () => {
+    // Under the path model an إعادة is a quality signal, not a retreat: the
+    // student still stands where the assignment put them, and the grade is
+    // already reflected in التقييم. Voiding the page as well punished it twice
+    // and left a hole no later session could fill.
     const records: SessionRecord[] = [
       { id: 'r1', studentId: 's_1', date: '2026-07-01', newLoh: [{ sura: 'الفاتحة' }] },
       { id: 'r2', studentId: 's_1', date: '2026-07-08', loh: { score: 40, stars: 0 } },
     ];
-    expect(computeTopPages(students, records)).toHaveLength(0);
+    expect(computeTopPages(students, records)[0].pages).toBe(1);
   });
 
   it('keeps an assignment that passed, and one not graded yet', () => {
@@ -346,7 +352,7 @@ describe('computeTopPages', () => {
     expect(computeTopPages(students, records)[0].pages).toBe(1);
   });
 
-  it('credits a page to the month it was FINISHED in', () => {
+  it('measures a month by the ground covered inside it', () => {
     const records: SessionRecord[] = [
       {
         id: 'r1',
@@ -361,8 +367,11 @@ describe('computeTopPages', () => {
         newLoh: [{ sura: 'الفاتحة', from: '5', to: '7' }],
       },
     ];
+    // June's sessions alone cover الفاتحة ١-٤ — not a whole page.
     expect(computeTopPages(students, records, 3, '2026-06')).toHaveLength(0);
-    expect(computeTopPages(students, records, 3, '2026-07')[0].pages).toBe(1);
+    // July's alone cover ٥-٧, also not a whole page on their own.
+    expect(computeTopPages(students, records, 3, '2026-07')).toHaveLength(0);
+    // End to end, the page is complete.
     expect(computeTopPages(students, records, 3, 'all')[0].pages).toBe(1);
   });
 
@@ -622,5 +631,223 @@ describe('computeFollowUpList', () => {
       date: '2026-07-22',
     }));
     expect(computeFollowUpList(roster, allPresent, 2)).toEqual([]);
+  });
+});
+
+describe('computeLohSpan', () => {
+  const yassin: Student = { id: 's_y', name: 'ياسين الشناوي' };
+  const s = (id: string, date: string, sura: string, from: string, to: string): SessionRecord => ({
+    id,
+    studentId: 's_y',
+    date,
+    newLoh: [{ sura, from, to }],
+  });
+
+  it('spans from the first session start to the last session end', () => {
+    const recs = [
+      s('r1', '2026-05-01', 'الحاقة', '38', '52'),
+      s('r2', '2026-06-01', 'الملك', '1', '30'),
+      s('r3', '2026-07-01', 'التحريم', '1', '12'),
+    ];
+    const span = computeLohSpan(yassin, recs)!;
+    expect(span.startLabel).toBe('الحاقة ٣٨');
+    expect(span.endLabel).toBe('التحريم ١٢');
+  });
+
+  it('counts pages across a gap the records never mention', () => {
+    // القلم is skipped entirely, yet it lies between the endpoints and the
+    // student demonstrably passed through it.
+    const recs = [
+      s('r1', '2026-05-01', 'الحاقة', '38', '52'),
+      s('r2', '2026-07-01', 'التحريم', '1', '12'),
+    ];
+    expect(computeLohSpan(yassin, recs)!.pages).toBe(6);
+  });
+
+  it('matches the same journey recorded session by session', () => {
+    const recs = [
+      s('r1', '2026-05-01', 'الحاقة', '38', '52'),
+      s('r2', '2026-05-08', 'القلم', '1', '52'),
+      s('r3', '2026-06-01', 'الملك', '1', '30'),
+      s('r4', '2026-07-01', 'التحريم', '1', '12'),
+    ];
+    expect(computeLohSpan(yassin, recs)!.pages).toBe(6);
+  });
+
+  it('is unaffected by an إعادة grade on the closing session', () => {
+    const recs = [
+      s('r1', '2026-05-01', 'الحاقة', '38', '52'),
+      s('r2', '2026-07-01', 'التحريم', '1', '12'),
+      { id: 'r3', studentId: 's_y', date: '2026-07-08', loh: { score: 40 } },
+    ];
+    expect(computeLohSpan(yassin, recs)!.pages).toBe(6);
+  });
+
+  it('ignores attendance-only records when locating the endpoints', () => {
+    const recs: SessionRecord[] = [
+      { id: 'att_1', studentId: 's_y', date: '2026-04-01', attendance_only: true },
+      s('r1', '2026-05-01', 'الحاقة', '38', '52'),
+      s('r2', '2026-07-01', 'التحريم', '1', '12'),
+    ];
+    expect(computeLohSpan(yassin, recs)!.startLabel).toBe('الحاقة ٣٨');
+  });
+
+  it("reports zero pages when the closing session contradicts the student's own direction", () => {
+    // Three steps confirm the halaqa's descending order, then the final
+    // session lands on المعارج — earlier on that path than where he began.
+    // The span is meaningless, and inventing a number would hide bad data.
+    const recs = [
+      s('r1', '2026-04-01', 'الحاقة', '38', '52'),
+      s('r2', '2026-05-01', 'القلم', '1', '52'),
+      s('r3', '2026-06-01', 'الملك', '1', '30'),
+      s('r4', '2026-07-01', 'المعارج', '1', '10'),
+    ];
+    const span = computeLohSpan(yassin, recs)!;
+    expect(span.direction).toBe('descending');
+    expect(span.reversed).toBe(true);
+    expect(span.pages).toBe(0);
+  });
+
+  it('treats a forward move in mushaf order as progress, not a reversal', () => {
+    const recs = [
+      s('r1', '2026-05-01', 'التحريم', '1', '12'),
+      s('r2', '2026-07-01', 'الحاقة', '38', '52'),
+    ];
+    const span = computeLohSpan(yassin, recs)!;
+    expect(span.direction).toBe('ascending');
+    expect(span.reversed).toBe(false);
+  });
+
+  it('returns null for a student with no assignments at all', () => {
+    expect(computeLohSpan(yassin, [])).toBeNull();
+  });
+
+  it('narrows to the sessions inside a month filter', () => {
+    const recs = [
+      s('r1', '2026-05-01', 'الحاقة', '38', '52'),
+      s('r2', '2026-06-01', 'القلم', '1', '52'),
+      s('r3', '2026-07-01', 'التحريم', '1', '12'),
+    ];
+    const span = computeLohSpan(yassin, recs, '2026-06')!;
+    expect(span.startLabel).toBe('القلم ١');
+    expect(span.endLabel).toBe('القلم ٥٢');
+  });
+});
+
+describe('computeTopPages — measured along the memorization path', () => {
+  const roster: Student[] = [{ id: 's_y', name: 'ياسين الشناوي' }];
+
+  it('does not lose pages to a gap in the records', () => {
+    const recs: SessionRecord[] = [
+      {
+        id: 'r1',
+        studentId: 's_y',
+        date: '2026-05-01',
+        newLoh: [{ sura: 'الحاقة', from: '38', to: '52' }],
+      },
+      {
+        id: 'r2',
+        studentId: 's_y',
+        date: '2026-07-01',
+        newLoh: [{ sura: 'التحريم', from: '1', to: '12' }],
+      },
+    ];
+    expect(computeTopPages(roster, recs, Infinity)[0].pages).toBe(6);
+  });
+
+  it('exposes the span endpoints alongside the count', () => {
+    const recs: SessionRecord[] = [
+      {
+        id: 'r1',
+        studentId: 's_y',
+        date: '2026-05-01',
+        newLoh: [{ sura: 'الحاقة', from: '38', to: '52' }],
+      },
+      {
+        id: 'r2',
+        studentId: 's_y',
+        date: '2026-07-01',
+        newLoh: [{ sura: 'التحريم', from: '1', to: '12' }],
+      },
+    ];
+    const entry = computeTopPages(roster, recs, Infinity)[0];
+    expect(entry.startLabel).toBe('الحاقة ٣٨');
+    expect(entry.endLabel).toBe('التحريم ١٢');
+  });
+});
+
+describe('detectMemorizationDirection', () => {
+  const r = (id: string, date: string, sura: string): SessionRecord => ({
+    id,
+    studentId: 's_1',
+    date,
+    newLoh: [{ sura, from: '1', to: '5' }],
+  });
+
+  it('reads moves to lower sura numbers as the halaqa default order', () => {
+    expect(
+      detectMemorizationDirection([r('a', '2026-05-01', 'الحاقة'), r('b', '2026-06-01', 'الملك')]),
+    ).toBe('descending');
+  });
+
+  it('reads moves to higher sura numbers as mushaf order', () => {
+    expect(
+      detectMemorizationDirection([
+        r('a', '2026-05-01', 'البقرة'),
+        r('b', '2026-06-01', 'آل عمران'),
+      ]),
+    ).toBe('ascending');
+  });
+
+  it('follows the majority rather than a single stray session', () => {
+    // Four forward steps in mushaf order, one session out of place.
+    const recs = [
+      r('a', '2026-01-01', 'البقرة'),
+      r('b', '2026-02-01', 'آل عمران'),
+      r('c', '2026-03-01', 'الناس'), // stray
+      r('d', '2026-04-01', 'النساء'),
+      r('e', '2026-05-01', 'المائدة'),
+      r('f', '2026-06-01', 'الأنعام'),
+    ];
+    expect(detectMemorizationDirection(recs)).toBe('ascending');
+  });
+
+  it('defaults to the halaqa order while the student is still inside one sura', () => {
+    expect(
+      detectMemorizationDirection([r('a', '2026-05-01', 'البقرة'), r('b', '2026-06-01', 'البقرة')]),
+    ).toBe('descending');
+  });
+
+  it('defaults to the halaqa order with no usable records', () => {
+    expect(detectMemorizationDirection([])).toBe('descending');
+  });
+});
+
+describe('computeLohSpan — mushaf-order students', () => {
+  const walid: Student = { id: 's_w', name: 'وليد' };
+  const r = (id: string, date: string, sura: string, f: string, t: string): SessionRecord => ({
+    id,
+    studentId: 's_w',
+    date,
+    newLoh: [{ sura, from: f, to: t }],
+  });
+
+  it('does not read a move from البقرة to آل عمران as going backwards', () => {
+    const recs = [
+      r('a', '2026-05-01', 'البقرة', '1', '10'),
+      r('b', '2026-06-01', 'آل عمران', '1', '20'),
+    ];
+    const span = computeLohSpan(walid, recs)!;
+    expect(span.reversed).toBe(false);
+    expect(span.pages).toBeGreaterThan(45);
+    expect(span.direction).toBe('ascending');
+  });
+
+  it('still measures a student who has not left البقرة yet', () => {
+    const recs = [
+      r('a', '2026-05-01', 'البقرة', '1', '10'),
+      r('b', '2026-06-01', 'البقرة', '11', '60'),
+    ];
+    expect(computeLohSpan(walid, recs)!.pages).toBe(7);
   });
 });

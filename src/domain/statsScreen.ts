@@ -1,9 +1,17 @@
 import type { SessionRecord, Student, SuraAssignment } from '../types';
-import { completedPages, type DatedAssignment } from './pages';
+import {
+  assignmentAyahSpan,
+  ayahAtLohPosition,
+  globalAyahToSuraAyah,
+  pagesInPathSpan,
+  pathPositionOfGlobal,
+  type MemorizationDirection,
+} from './pages';
 import { hasScore, scoreName } from './scoring';
-import { itemAyat } from './suras';
+import { SURAS, itemAyat } from './suras';
 import { getStudentName, recordsForStudent } from './students';
 import { EXCLUDED_HALAQA_DATES, computeAbsenceStreak, sortedHalaqaDatesDesc } from './attendance';
+import { toArabicDigits } from './text';
 import { localDateStr } from './dates';
 import { assignmentsGradedRepeat, isRepeatGrade } from './record';
 
@@ -271,6 +279,11 @@ export interface TopPagesEntry {
    * the correct render key and lookup handle for a leaderboard row. */
   id: string;
   name: string;
+  /** Endpoints of the measured span, e.g. "الحاقة ٣٨" → "التحريم ١٢". Shown
+   * in the UI so a wrong endpoint is visible instead of silently skewing the
+   * count. Empty when the student has no assignments in the period. */
+  startLabel: string;
+  endLabel: string;
   /** Mushaf pages memorized end-to-end. */
   pages: number;
   /** Sessions inside the viewed period (context for the number, not its basis). */
@@ -307,36 +320,20 @@ export function computeTopPages(
   /** 'all', or a 'YYYY-MM' month whose newly-completed pages to count. */
   monthFilter = 'all',
 ): TopPagesEntry[] {
-  const repeatMap = assignmentsGradedRepeat(allRecords);
-  const inPeriod = (date: string) => monthFilter === 'all' || date?.slice(0, 7) === monthFilter;
-
   const per = students
     .map((s) => {
-      const recs = recordsForStudent(s, allRecords);
-      if (!recs.length) return null;
-
-      const assignments: DatedAssignment[] = [];
-      recs.forEach((r) => {
-        if (repeatMap.get(r.id)?.loh) return;
-        // Legacy records kept the assignment on `loh` itself before newLoh
-        // existed; same fallback ayatInRecord uses.
-        const lohArr = r.newLoh?.length
-          ? r.newLoh
-          : r.loh && (r.loh as unknown as { sura?: string }).sura
-            ? [r.loh as unknown as SuraAssignment]
-            : [];
-        lohArr.forEach((item) => {
-          if (item?.sura && r.date) assignments.push({ item, date: r.date });
-        });
-      });
-
-      const pages = completedPages(assignments).filter((p) => inPeriod(p.date)).length;
-      if (!pages) return null;
+      const span = computeLohSpan(s, allRecords, monthFilter);
+      if (!span || !span.pages) return null;
+      const recs = recordsForStudent(s, allRecords).filter(
+        (r) => monthFilter === 'all' || r.date?.slice(0, 7) === monthFilter,
+      );
       return {
         id: s.id,
         name: getStudentName(s),
-        pages,
-        sessionsCount: recs.filter((r) => inPeriod(r.date)).length,
+        startLabel: span.startLabel,
+        endLabel: span.endLabel,
+        pages: span.pages,
+        sessionsCount: recs.length,
       };
     })
     .filter((x): x is TopPagesEntry => x !== null);
@@ -457,4 +454,128 @@ export function computeFollowUpList(
     })
     .filter((x) => x.absenceStreak >= minStreak)
     .sort((a, b) => b.absenceStreak - a.absenceStreak || a.name.localeCompare(b.name, 'ar'));
+}
+
+/**
+ * Which direction a student walks the mushaf, inferred from their own history.
+ *
+ * Most of the halaqa memorizes الفاتحة then الناس downwards, but a couple of
+ * students work forwards from البقرة. Assuming one order silently reports zero
+ * pages for the other, because every step forward looks like a step back.
+ *
+ * Every consecutive pair of sessions that changes sura casts a vote and the
+ * majority wins, so one out-of-order session — a revision, a typo — cannot
+ * flip a student's whole history. Ties and students still inside a single sura
+ * fall back to the halaqa's default order, which is also correct for them:
+ * within one sura both paths run the same way.
+ */
+export function detectMemorizationDirection(records: SessionRecord[]): MemorizationDirection {
+  const suraOf = (r: SessionRecord): number => {
+    const first = lohAssignmentsOf(r)[0];
+    if (!first?.sura) return 0;
+    const idx = SURAS.findIndex((x) => x.name === first.sura);
+    return idx < 0 ? 0 : idx + 1;
+  };
+
+  const chain = records
+    .filter((r) => !!r.date && suraOf(r) > 0)
+    .sort((a, b) => (a.date! < b.date! ? -1 : a.date! > b.date! ? 1 : 0))
+    .map(suraOf);
+
+  let ascending = 0;
+  let descending = 0;
+  for (let i = 1; i < chain.length; i++) {
+    if (chain[i] > chain[i - 1]) ascending++;
+    else if (chain[i] < chain[i - 1]) descending++;
+  }
+  return ascending > descending ? 'ascending' : 'descending';
+}
+
+export interface LohSpan {
+  /** 1-based memorization-path positions of the two endpoints. */
+  startPos: number;
+  endPos: number;
+  /** "الحاقة ٣٨" — shown so a wrong endpoint is visible rather than silently
+   * inflating or deflating the page count. */
+  startLabel: string;
+  endLabel: string;
+  pages: number;
+  /** True when the closing session sits BEFORE the opening one on the path.
+   * The span is then meaningless and pages is 0. */
+  reversed: boolean;
+  /** The order this student was found to be memorizing in. */
+  direction: MemorizationDirection;
+}
+
+/** "الحاقة ٣٨" for a path position. */
+function pathPositionLabel(pos: number, direction: MemorizationDirection): string {
+  const at = direction === 'ascending' ? globalAyahToSuraAyah(pos) : ayahAtLohPosition(pos);
+  if (!at) return '';
+  return `${SURAS[at.sura - 1].name} ${toArabicDigits(at.ayah)}`;
+}
+
+/** Assignments carried by a record, with the legacy `loh`-as-assignment shape. */
+function lohAssignmentsOf(r: SessionRecord): SuraAssignment[] {
+  if (r.attendance_only) return [];
+  if (r.newLoh?.length) return r.newLoh.filter((i) => !!i?.sura);
+  const legacy = r.loh as unknown as SuraAssignment | undefined;
+  return legacy?.sura ? [legacy] : [];
+}
+
+/**
+ * How far along the memorization path a student has travelled, measured from
+ * the first recorded session to the last.
+ *
+ * The halaqa memorizes in a fixed order, so a student is a *point* on that
+ * path and progress is the distance between where they started and where they
+ * are now. Summing individual assignments instead makes the total hostage to
+ * bookkeeping: one unrecorded week, one إعادة, or one mistyped sura name drops
+ * an ayah, and a single missing ayah voids a whole page.
+ *
+ * The trade-off is that both endpoints are trusted completely. An out-of-order
+ * assignment in the first or last session moves an endpoint and rewrites the
+ * total — which is why the labels are part of the result and shown in the UI.
+ */
+export function computeLohSpan(
+  student: Student,
+  allRecords: SessionRecord[],
+  /** 'all', or a 'YYYY-MM' month to measure the progress made within. */
+  monthFilter = 'all',
+): LohSpan | null {
+  const recs = recordsForStudent(student, allRecords)
+    .filter((r) => !!r.date && (monthFilter === 'all' || r.date.slice(0, 7) === monthFilter))
+    .filter((r) => lohAssignmentsOf(r).length > 0)
+    .sort((a, b) => (a.date! < b.date! ? -1 : a.date! > b.date! ? 1 : 0));
+  if (!recs.length) return null;
+
+  const direction = detectMemorizationDirection(recs);
+
+  const positions = (r: SessionRecord) =>
+    lohAssignmentsOf(r)
+      .map((item) => {
+        const span = assignmentAyahSpan(item);
+        if (!span) return null;
+        const a = pathPositionOfGlobal(span[0], direction);
+        const b = pathPositionOfGlobal(span[1], direction);
+        return a && b ? ([Math.min(a, b), Math.max(a, b)] as const) : null;
+      })
+      .filter((x): x is readonly [number, number] => x !== null);
+
+  const firstPositions = positions(recs[0]);
+  const lastPositions = positions(recs[recs.length - 1]);
+  if (!firstPositions.length || !lastPositions.length) return null;
+
+  const startPos = Math.min(...firstPositions.map(([lo]) => lo));
+  const endPos = Math.max(...lastPositions.map(([, hi]) => hi));
+  const reversed = endPos < startPos;
+
+  return {
+    startPos,
+    endPos,
+    startLabel: pathPositionLabel(startPos, direction),
+    endLabel: pathPositionLabel(endPos, direction),
+    pages: reversed ? 0 : pagesInPathSpan(startPos, endPos, direction).length,
+    reversed,
+    direction,
+  };
 }

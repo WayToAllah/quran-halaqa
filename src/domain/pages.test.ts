@@ -3,6 +3,10 @@ import { SURAS } from './suras';
 import {
   TOTAL_PAGES,
   TOTAL_AYAT,
+  lohPositionOf,
+  pagesInLohSpan,
+  pathPositionOf,
+  pagesInPathSpan,
   PAGE_FIRST_AYAH,
   PAGE_LAST_AYAH,
   globalAyahIndex,
@@ -222,5 +226,90 @@ describe('pagesLabel', () => {
     expect(pagesLabel(2)).toBe('صفحتين');
     expect(pagesLabel(5)).toBe('٥ صفحات');
     expect(pagesLabel(12)).toBe('١٢ صفحة');
+  });
+});
+
+describe('the memorization path (ترتيب اللوح)', () => {
+  it('starts at الفاتحة and continues with الناس, not البقرة', () => {
+    expect(lohPositionOf(1, 1)).toBe(1);
+    expect(lohPositionOf(1, 7)).toBe(7);
+    expect(lohPositionOf(114, 1)).toBe(8); // الناس immediately follows الفاتحة
+  });
+
+  it('places each sura immediately before the one numbered below it', () => {
+    // الحاقة (69) is followed on the path by القلم (68).
+    expect(lohPositionOf(68, 1)).toBe(lohPositionOf(69, 52) + 1);
+  });
+
+  it('ends at the last ayah of البقرة', () => {
+    expect(lohPositionOf(2, 286)).toBe(TOTAL_AYAT);
+  });
+
+  it('is a bijection with the global ayah ordinals', () => {
+    const seen = new Set<number>();
+    for (let s = 1; s <= 114; s++) seen.add(lohPositionOf(s, 1));
+    expect(seen.size).toBe(114);
+  });
+});
+
+describe('pagesInLohSpan', () => {
+  it('counts the pages fully inside a span, ignoring how it was recorded', () => {
+    // ياسين: الحاقة ٣٨ → آخر التحريم.
+    const from = lohPositionOf(69, 38);
+    const to = lohPositionOf(66, 12);
+    expect(pagesInLohSpan(from, to)).toEqual([560, 561, 562, 563, 564, 565]);
+  });
+
+  it('does not credit a page the span only partly covers', () => {
+    // Page 566 runs القلم ٤٣ → الحاقة ٨, which the span above never reaches.
+    expect(pagesInLohSpan(lohPositionOf(69, 38), lohPositionOf(66, 12))).not.toContain(566);
+  });
+
+  it('grows as the student advances', () => {
+    const from = lohPositionOf(69, 38);
+    const short = pagesInLohSpan(from, lohPositionOf(67, 30)); // through الملك
+    const long = pagesInLohSpan(from, lohPositionOf(66, 12)); // through التحريم
+    expect(long.length).toBeGreaterThan(short.length);
+  });
+
+  it('is empty when the end point sits before the start point', () => {
+    expect(pagesInLohSpan(lohPositionOf(66, 1), lohPositionOf(69, 38))).toEqual([]);
+  });
+
+  it('counts a single page when the span is exactly one page', () => {
+    expect(pagesInLohSpan(lohPositionOf(67, 1), lohPositionOf(67, 12))).toEqual([562]);
+  });
+});
+
+describe('memorization direction', () => {
+  it('walks descending suras for the halaqa default order', () => {
+    expect(pathPositionOf(68, 1, 'descending')).toBe(pathPositionOf(69, 52, 'descending') + 1);
+  });
+
+  it('walks ascending mushaf order for students starting at البقرة', () => {
+    expect(pathPositionOf(3, 1, 'ascending')).toBe(pathPositionOf(2, 286, 'ascending') + 1);
+  });
+
+  it('counts pages across a sura boundary in ascending order', () => {
+    // البقرة ١ → آل عمران ٢٠ is a forward run for a mushaf-order student, and
+    // must not read as going backwards.
+    const from = pathPositionOf(2, 1, 'ascending');
+    const to = pathPositionOf(3, 20, 'ascending');
+    expect(to).toBeGreaterThan(from);
+    expect(pagesInPathSpan(from, to, 'ascending').length).toBeGreaterThan(45);
+  });
+
+  it('agrees with the descending path while both stay inside one sura', () => {
+    const d = pagesInPathSpan(
+      pathPositionOf(2, 1, 'descending'),
+      pathPositionOf(2, 60, 'descending'),
+      'descending',
+    );
+    const a = pagesInPathSpan(
+      pathPositionOf(2, 1, 'ascending'),
+      pathPositionOf(2, 60, 'ascending'),
+      'ascending',
+    );
+    expect(a).toEqual(d);
   });
 });

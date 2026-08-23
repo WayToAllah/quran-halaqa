@@ -190,3 +190,146 @@ export function pagesLabel(n: number): string {
     many: 'صفحة',
   });
 }
+
+/**
+ * Suras in the order this halaqa memorizes them: الفاتحة first, then
+ * descending from الناس (114) down to البقرة (2). Mirrors LOH_ORDER in
+ * nextTask.ts — the order the teacher actually assigns in.
+ */
+const LOH_SURA_ORDER: ReadonlyArray<number> = [
+  1,
+  ...Array.from({ length: 113 }, (_, i) => 114 - i),
+];
+
+/** Global ayah ordinal at each 1-based position along the memorization path. */
+const LOH_PATH: ReadonlyArray<number> = (() => {
+  const out: number[] = [];
+  for (const sura of LOH_SURA_ORDER) {
+    for (let a = 1; a <= SURAS[sura - 1].count; a++) out.push(globalAyahIndex(sura, a));
+  }
+  return out;
+})();
+
+/** Reverse of LOH_PATH: global ayah ordinal → 1-based path position. */
+const LOH_POSITION_BY_GLOBAL: ReadonlyArray<number> = (() => {
+  const out = new Array<number>(TOTAL_AYAT + 1).fill(0);
+  LOH_PATH.forEach((g, i) => {
+    out[g] = i + 1;
+  });
+  return out;
+})();
+
+/**
+ * Which way a student walks the mushaf.
+ *
+ * 'descending' is this halaqa's default — الفاتحة, then الناس (114) down to
+ * البقرة, memorizing the short suras first. 'ascending' is plain mushaf order,
+ * used by the students who start at البقرة and work forwards. Both are real
+ * and a page count that assumes one silently reports zero for the other.
+ */
+export type MemorizationDirection = 'descending' | 'ascending';
+
+/** Position along the chosen path, 1..6236. For 'ascending' this is simply the
+ * global mushaf ordinal; for 'descending' it is the loh-order ordinal. */
+export function pathPositionOf(
+  sura: number,
+  ayah: number,
+  direction: MemorizationDirection,
+): number {
+  return direction === 'ascending' ? globalAyahIndex(sura, ayah) : lohPositionOf(sura, ayah);
+}
+
+/** Path position for a global ayah ordinal, in the given direction. */
+export function pathPositionOfGlobal(g: number, direction: MemorizationDirection): number {
+  if (g < 1 || g > TOTAL_AYAT) return 0;
+  return direction === 'ascending' ? g : LOH_POSITION_BY_GLOBAL[g];
+}
+
+/** The global ayah ordinal at a path position, in the given direction. */
+function globalAtPathPosition(pos: number, direction: MemorizationDirection): number {
+  if (pos < 1 || pos > TOTAL_AYAT) return 0;
+  return direction === 'ascending' ? pos : LOH_PATH[pos - 1];
+}
+
+/** Pages lying entirely within a span of the chosen path. See pagesInLohSpan
+ * for why endpoints, not individual assignments, define the span. */
+export function pagesInPathSpan(
+  startPos: number,
+  endPos: number,
+  direction: MemorizationDirection,
+): number[] {
+  if (!startPos || !endPos || endPos < startPos) return [];
+  const covered = new Set<number>();
+  for (let p = startPos; p <= endPos; p++) covered.add(globalAtPathPosition(p, direction));
+
+  const touched = new Set<number>();
+  for (const g of covered) touched.add(pageOfGlobalAyah(g));
+
+  const out: number[] = [];
+  for (const page of touched) {
+    let whole = true;
+    for (let g = PAGE_FIRST_AYAH[page - 1]; g <= PAGE_LAST_AYAH[page - 1]; g++) {
+      if (!covered.has(g)) {
+        whole = false;
+        break;
+      }
+    }
+    if (whole) out.push(page);
+  }
+  return out.sort((a, b) => a - b);
+}
+
+/**
+ * Where an ayah sits along the memorization path, 1..6236.
+ *
+ * This is the coordinate the halaqa actually progresses along. Global mushaf
+ * ordinals run the other way for everything after الفاتحة, so a student moving
+ * "forward" is moving *down* in sura number — comparing raw global ordinals
+ * would read that as going backwards.
+ */
+export function lohPositionOf(sura: number, ayah: number): number {
+  const g = globalAyahIndex(sura, ayah);
+  return g ? LOH_POSITION_BY_GLOBAL[g] : 0;
+}
+
+/** Path position for a global ayah ordinal, or 0 if out of range. */
+export function lohPositionOfGlobal(g: number): number {
+  return g >= 1 && g <= TOTAL_AYAT ? LOH_POSITION_BY_GLOBAL[g] : 0;
+}
+
+/** Split a global ayah ordinal back into (sura number, ayah). */
+export function globalAyahToSuraAyah(g: number): { sura: number; ayah: number } | null {
+  if (g < 1 || g > TOTAL_AYAT) return null;
+  for (let s = SURAS.length; s >= 1; s--) {
+    const start = globalAyahIndex(s, 1);
+    if (g >= start) return { sura: s, ayah: g - start + 1 };
+  }
+  return null;
+}
+
+/** The (sura number, ayah) at a path position — inverse of lohPositionOf. */
+export function ayahAtLohPosition(pos: number): { sura: number; ayah: number } | null {
+  if (pos < 1 || pos > LOH_PATH.length) return null;
+  const g = LOH_PATH[pos - 1];
+  for (let s = SURAS.length; s >= 1; s--) {
+    const start = globalAyahIndex(s, 1);
+    if (g >= start) return { sura: s, ayah: g - start + 1 };
+  }
+  return null;
+}
+
+/**
+ * Pages lying entirely within a span of the memorization path.
+ *
+ * Unlike completedPages(), this asks "how far along the path has the student
+ * travelled?" rather than "which ayat were individually written down?". A week
+ * whose session went unrecorded, an assignment marked إعادة, or a mistyped
+ * sura name cannot punch a hole in the middle of a journey the student
+ * actually made — the endpoints are what is known reliably.
+ *
+ * Returns an empty list when the end point precedes the start point, which
+ * means the recorded endpoints disagree with the memorization order.
+ */
+export function pagesInLohSpan(startPos: number, endPos: number): number[] {
+  return pagesInPathSpan(startPos, endPos, 'descending');
+}

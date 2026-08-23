@@ -376,6 +376,12 @@ export function StatsScreen() {
                     <div class="text-sm font-bold text-ink-dark truncate">{x.name}</div>
                     <div class="text-xs text-taupe">
                       {pagesLabel(x.pages)}، {sessionsLabel(x.sessionsCount)}
+                      {x.startLabel && x.endLabel && (
+                        <>
+                          {' · '}
+                          {x.startLabel} ← {x.endLabel}
+                        </>
+                      )}
                     </div>
                   </div>
                   <div class="font-extrabold text-[#C9A227] shrink-0">
