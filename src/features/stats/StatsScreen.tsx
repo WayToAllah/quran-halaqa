@@ -8,6 +8,7 @@ import {
   computeWeeklyBuckets,
   computeScoreDistribution,
   computeTopPages,
+  computeFollowUpList,
   computeStudentStatsRows,
   sortStudentStatsRows,
   countRecentlyActiveStudents,
@@ -65,6 +66,17 @@ const cardTitleCls = 'text-[13.5px] font-extrabold text-ink-dark mb-3.5';
 /** How many rows a leaderboard shows before عرض الكل is tapped. */
 const PREVIEW_COUNT = 3;
 
+/** Consecutive missed halaqa days before a student is flagged for follow-up. */
+const ABSENCE_ALERT_STREAK = 2;
+
+/** حلقة واحدة / حلقتين / ٣ حلقات / ١٢ حلقة */
+const HALAQA_FORMS = {
+  one: 'حلقة واحدة',
+  two: 'حلقتين',
+  few: 'حلقات',
+  many: 'حلقة',
+} as const;
+
 /**
  * Expand/collapse control for a leaderboard. The visible label stays short for
  * a phone, while the accessible name carries the card it belongs to — without
@@ -108,6 +120,7 @@ export function StatsScreen() {
   const [cardBusy, setCardBusy] = useState(false);
   const [pagesExpanded, setPagesExpanded] = useState(false);
   const [attendExpanded, setAttendExpanded] = useState(false);
+  const [followUpExpanded, setFollowUpExpanded] = useState(false);
 
   const availableMonths = useMemo(() => {
     const months = new Set(records.map((r) => r.date?.slice(0, 7)).filter(Boolean) as string[]);
@@ -160,6 +173,12 @@ export function StatsScreen() {
     const filtered = q ? studentRows.filter((r) => r.name.includes(q)) : studentRows;
     return sortStudentStatsRows(filtered, sortKey);
   }, [studentRows, search, sortKey]);
+
+  const followUp = useMemo(
+    () => computeFollowUpList(students, filteredRecords, ABSENCE_ALERT_STREAK),
+    [students, filteredRecords],
+  );
+  const visibleFollowUp = followUpExpanded ? followUp : followUp.slice(0, PREVIEW_COUNT);
 
   const visiblePages = pagesExpanded ? topPages : topPages.slice(0, PREVIEW_COUNT);
   const visibleAttend = attendExpanded ? topAttend : topAttend.slice(0, PREVIEW_COUNT);
@@ -437,6 +456,46 @@ export function StatsScreen() {
         />
       </div>
 
+      <div class={cardCls}>
+        <div class={cardTitleCls}>⚠️ يحتاجون متابعة</div>
+        {followUp.length === 0 ? (
+          <div class="text-xs text-taupe text-center py-3">
+            كل الطلاب حضروا آخر {arabicPlural(ABSENCE_ALERT_STREAK, HALAQA_FORMS)} — ما شاء الله
+          </div>
+        ) : (
+          <div class="space-y-2">
+            {visibleFollowUp.map((x) => (
+              <div
+                key={x.id}
+                class="flex items-center gap-3 py-1.5 border-b border-[#F5F1E5] last:border-0"
+              >
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-bold text-ink-dark truncate">{x.name}</div>
+                  <div class="text-xs text-taupe">
+                    {x.neverAttended
+                      ? 'لم يحضر ولا مرة'
+                      : `غاب آخر ${arabicPlural(x.absenceStreak, HALAQA_FORMS)} · آخر حضور ${x.lastAttended}`}
+                  </div>
+                </div>
+                <div
+                  class="w-[26px] h-[26px] rounded-full flex items-center justify-center text-xs font-extrabold shrink-0"
+                  style={{ background: '#FBEAEA', color: '#B3261E' }}
+                  title={`${toArabicDigits(x.absenceStreak)} حلقة متتالية`}
+                >
+                  {toArabicDigits(x.absenceStreak)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <ShowAllToggle
+          expanded={followUpExpanded}
+          total={followUp.length}
+          cardLabel="يحتاجون متابعة"
+          onToggle={() => setFollowUpExpanded((v) => !v)}
+        />
+      </div>
+
       <button
         type="button"
         onClick={() => setCardOpen(true)}
@@ -501,8 +560,8 @@ export function StatsScreen() {
                   />
                 </div>
                 <div class="text-[11px] text-taupe">
-                  {toArabicDigits(row.sessionsCount)} جلسة · {toArabicDigits(row.ayat)} آية · متوسط{' '}
-                  {toArabicDigits(row.avg)}٪
+                  {toArabicDigits(row.sessionsCount)} جلسة · {toArabicDigits(row.ayat)} آية ·{' '}
+                  {row.avg === null ? 'لم يُقيَّم' : `متوسط ${toArabicDigits(row.avg)}٪`}
                 </div>
               </div>
             ))}

@@ -52,6 +52,27 @@ export function computeAttendanceStreak(
  *
  * Dates are 'YYYY-MM-DD', so lexicographic `<` is chronological.
  */
+/**
+ * Mirror of computeAttendanceStreak: how many of the most recent halaqa days
+ * in a row the student missed. Counting stops at the first day they attended,
+ * so this measures a *current* lapse, not lifetime absences.
+ *
+ * A student who never attended returns the full day count — the caller is
+ * expected to distinguish that case, since a brand-new enrollee and a student
+ * who drifted away produce the same number but need very different follow-up.
+ */
+export function computeAbsenceStreak(
+  studentDatesSet: Set<string>,
+  halaqaDatesDesc: string[],
+): number {
+  let streak = 0;
+  for (const d of halaqaDatesDesc) {
+    if (studentDatesSet.has(d)) break;
+    streak++;
+  }
+  return streak;
+}
+
 export function firstRecordDate(studentRecords: SessionRecord[]): string | null {
   let earliest: string | null = null;
   for (const r of studentRecords) {

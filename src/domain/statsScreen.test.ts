@@ -5,6 +5,7 @@ import {
   computeScoreDistribution,
   computeTopAyat,
   computeTopPages,
+  computeFollowUpList,
   computeStudentStatsRows,
   sortStudentStatsRows,
   getWeekStart,
@@ -529,5 +530,97 @@ describe('leaderboard identity and limits', () => {
 
   it('still honours an explicit limit', () => {
     expect(computeTopPages(twoSameName, recs, 1)).toHaveLength(1);
+  });
+});
+
+describe('computeStudentStatsRows — students with nothing recorded', () => {
+  const roster: Student[] = [
+    { id: 's_1', name: 'زيد احمد' },
+    { id: 's_2', name: 'محمد علي' }, // never recorded anything
+  ];
+  const recs: SessionRecord[] = [
+    { id: 'r1', studentId: 's_1', date: '2026-07-01', loh: { score: 90 } },
+  ];
+
+  it('keeps a student who has no records at all', () => {
+    const rows = computeStudentStatsRows(roster, recs, 1);
+    expect(rows.map((r) => r.id)).toEqual(['s_1', 's_2']);
+  });
+
+  it('reports zeros, not fabricated activity, for that student', () => {
+    const row = computeStudentStatsRows(roster, recs, 1).find((r) => r.id === 's_2')!;
+    expect(row.sessionsCount).toBe(0);
+    expect(row.uniqueDays).toBe(0);
+    expect(row.attendPct).toBe(0);
+    expect(row.ayat).toBe(0);
+  });
+
+  it('leaves the average unset rather than reporting 0٪', () => {
+    // A student with no evaluation has no average. Reporting 0 would read as
+    // a failing grade for someone who was simply never assessed.
+    const row = computeStudentStatsRows(roster, recs, 1).find((r) => r.id === 's_2')!;
+    expect(row.avg).toBeNull();
+  });
+
+  it('leaves the average unset when records exist but none were scored', () => {
+    const unscored: SessionRecord[] = [{ id: 'r9', studentId: 's_2', date: '2026-07-01' }];
+    const row = computeStudentStatsRows(roster, [...recs, ...unscored], 1).find(
+      (r) => r.id === 's_2',
+    )!;
+    expect(row.sessionsCount).toBe(1);
+    expect(row.avg).toBeNull();
+  });
+
+  it('sorts unset averages last, never as if they were zero', () => {
+    const rows = sortStudentStatsRows(computeStudentStatsRows(roster, recs, 1), 'avg');
+    expect(rows.map((r) => r.id)).toEqual(['s_1', 's_2']);
+  });
+});
+
+describe('computeFollowUpList', () => {
+  const roster: Student[] = [
+    { id: 's_1', name: 'زيد احمد' },
+    { id: 's_2', name: 'محمد علي' },
+    { id: 's_3', name: 'عمر حسن' },
+  ];
+  // Halaqa days: 07-01, 07-08, 07-15, 07-22
+  const recs: SessionRecord[] = [
+    { id: 'a1', studentId: 's_1', date: '2026-07-01' },
+    { id: 'a2', studentId: 's_1', date: '2026-07-22' }, // present latest -> fine
+    { id: 'b1', studentId: 's_2', date: '2026-07-08' }, // missed last two
+    { id: 'c1', studentId: 's_3', date: '2026-07-15' }, // missed last one only
+  ];
+
+  it('lists only students who missed at least the alert streak', () => {
+    const list = computeFollowUpList(roster, recs, 2);
+    expect(list.map((x) => x.id)).toEqual(['s_2']);
+  });
+
+  it('reports the streak length and the last day attended', () => {
+    const [entry] = computeFollowUpList(roster, recs, 2);
+    expect(entry.absenceStreak).toBe(2);
+    expect(entry.lastAttended).toBe('2026-07-08');
+    expect(entry.neverAttended).toBe(false);
+  });
+
+  it('flags a student who never attended instead of implying a lapse', () => {
+    const withNewcomer = [...roster, { id: 's_4', name: 'انس طارق' }];
+    const entry = computeFollowUpList(withNewcomer, recs, 2).find((x) => x.id === 's_4')!;
+    expect(entry.neverAttended).toBe(true);
+    expect(entry.lastAttended).toBeNull();
+  });
+
+  it('sorts the longest absence first', () => {
+    const withNewcomer = [...roster, { id: 's_4', name: 'انس طارق' }];
+    expect(computeFollowUpList(withNewcomer, recs, 2).map((x) => x.id)).toEqual(['s_4', 's_2']);
+  });
+
+  it('returns an empty list when everyone attended the latest halaqa day', () => {
+    const allPresent: SessionRecord[] = roster.map((s, i) => ({
+      id: `p${i}`,
+      studentId: s.id,
+      date: '2026-07-22',
+    }));
+    expect(computeFollowUpList(roster, allPresent, 2)).toEqual([]);
   });
 });

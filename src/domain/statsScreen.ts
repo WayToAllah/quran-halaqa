@@ -3,7 +3,7 @@ import { completedPages, type DatedAssignment } from './pages';
 import { hasScore, scoreName } from './scoring';
 import { itemAyat } from './suras';
 import { getStudentName, recordsForStudent } from './students';
-import { EXCLUDED_HALAQA_DATES } from './attendance';
+import { EXCLUDED_HALAQA_DATES, computeAbsenceStreak, sortedHalaqaDatesDesc } from './attendance';
 import { localDateStr } from './dates';
 import { assignmentsGradedRepeat, isRepeatGrade } from './record';
 
@@ -351,43 +351,51 @@ export interface StudentStatsRow {
   sessionsCount: number;
   uniqueDays: number;
   attendPct: number;
-  avg: number;
+  /** `null` when the student has no scored session — distinct from a real 0
+   * (إعادة). Rendering 0 for an unassessed student reads as a failing grade. */
+  avg: number | null;
   ayat: number;
 }
 
 export type StatsSortKey = 'attend' | 'ayat' | 'avg' | 'name';
 
-/** Per-student breakdown table backing the "تفصيل الطلاب" list — every
- * numeric field always has a value (no nulls), matching the screen's
- * "always show a number" display philosophy (see computeSummaryStats). */
+/** Per-student breakdown table backing the "تفصيل الطلاب" list.
+ *
+ * Every student on the roster gets a row, including those with no records in
+ * the period. A student who never turned up is the one a teacher most needs
+ * to see, and silently dropping them made the list a roll of the active only. */
 export function computeStudentStatsRows(
   students: Student[],
   records: SessionRecord[],
   totalHalaqaDays: number,
 ): StudentStatsRow[] {
-  return students
-    .map((s) => {
-      const recs = recordsForStudent(s, records);
-      if (!recs.length) return null;
-      const scoredLoh = recs.filter((r) => hasScore(r.loh));
-      const avg = scoredLoh.length
-        ? Math.round(scoredLoh.reduce((a, r) => a + r.loh!.score!, 0) / scoredLoh.length)
-        : Math.round((recs.reduce((a, r) => a + (r.loh?.stars ?? 0), 0) / recs.length) * 20);
-      const ayat = recs.reduce((sum, r) => sum + ayatInRecord(r), 0);
-      const uniqueDays = new Set(recs.map((r) => r.date)).size;
-      const attendPct =
-        totalHalaqaDays > 0 ? Math.min(100, Math.round((uniqueDays / totalHalaqaDays) * 100)) : 0;
-      return {
-        id: s.id,
-        name: getStudentName(s),
-        sessionsCount: recs.length,
-        uniqueDays,
-        attendPct,
-        avg,
-        ayat,
-      };
-    })
-    .filter((x): x is StudentStatsRow => x !== null);
+  return students.map((s) => {
+    const recs = recordsForStudent(s, records);
+    const scoredLoh = recs.filter((r) => hasScore(r.loh));
+    const starred = recs.filter((r) => (r.loh?.stars ?? 0) > 0);
+    let avg: number | null = null;
+    if (scoredLoh.length) {
+      avg = Math.round(scoredLoh.reduce((a, r) => a + r.loh!.score!, 0) / scoredLoh.length);
+    } else if (starred.length) {
+      // Older records carry stars without a numeric score; approximate.
+      avg = Math.round(
+        (starred.reduce((a, r) => a + (r.loh?.stars ?? 0), 0) / starred.length) * 20,
+      );
+    }
+    const ayat = recs.reduce((sum, r) => sum + ayatInRecord(r), 0);
+    const uniqueDays = new Set(recs.map((r) => r.date)).size;
+    const attendPct =
+      totalHalaqaDays > 0 ? Math.min(100, Math.round((uniqueDays / totalHalaqaDays) * 100)) : 0;
+    return {
+      id: s.id,
+      name: getStudentName(s),
+      sessionsCount: recs.length,
+      uniqueDays,
+      attendPct,
+      avg,
+      ayat,
+    };
+  });
 }
 
 export function sortStudentStatsRows(
@@ -397,8 +405,56 @@ export function sortStudentStatsRows(
   const sortFns: Record<StatsSortKey, (a: StudentStatsRow, b: StudentStatsRow) => number> = {
     attend: (a, b) => b.attendPct - a.attendPct,
     ayat: (a, b) => b.ayat - a.ayat,
-    avg: (a, b) => b.avg - a.avg,
+    // Unset averages sort last in either direction — they are missing data,
+    // not a low score.
+    avg: (a, b) => (b.avg ?? -1) - (a.avg ?? -1),
     name: (a, b) => a.name.localeCompare(b.name, 'ar'),
   };
   return [...rows].sort(sortFns[key]);
+}
+
+export interface FollowUpEntry {
+  id: string;
+  name: string;
+  /** Consecutive most-recent halaqa days missed. */
+  absenceStreak: number;
+  /** Last halaqa day attended, or null if they never have. */
+  lastAttended: string | null;
+  neverAttended: boolean;
+}
+
+/**
+ * Students who have missed the last `minStreak` halaqa days in a row.
+ *
+ * The counterpart to the leaderboards: those rank who is doing best, this
+ * surfaces who has quietly stopped coming. Sorted by longest absence first,
+ * so the most urgent name is at the top.
+ */
+export function computeFollowUpList(
+  students: Student[],
+  records: SessionRecord[],
+  minStreak = 2,
+): FollowUpEntry[] {
+  const halaqaDatesDesc = sortedHalaqaDatesDesc(records);
+  if (!halaqaDatesDesc.length) return [];
+
+  return students
+    .map((s) => {
+      const dates = new Set(
+        recordsForStudent(s, records)
+          .map((r) => r.date)
+          .filter((d): d is string => !!d),
+      );
+      const attendedHalaqaDays = halaqaDatesDesc.filter((d) => dates.has(d));
+      const absenceStreak = computeAbsenceStreak(dates, halaqaDatesDesc);
+      return {
+        id: s.id,
+        name: getStudentName(s),
+        absenceStreak,
+        lastAttended: attendedHalaqaDays[0] ?? null,
+        neverAttended: attendedHalaqaDays.length === 0,
+      };
+    })
+    .filter((x) => x.absenceStreak >= minStreak)
+    .sort((a, b) => b.absenceStreak - a.absenceStreak || a.name.localeCompare(b.name, 'ar'));
 }

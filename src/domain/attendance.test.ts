@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   ATTENDANCE_BADGE_THRESHOLD,
   EXCLUDED_HALAQA_DATES,
+  computeAbsenceStreak,
   computeAttendanceStreak,
   enrolledHalaqaDates,
   firstRecordDate,
@@ -169,5 +170,32 @@ describe('enrolledHalaqaDates', () => {
     const recs: SessionRecord[] = [{ id: 'r1', date: '2026-07-01' }];
     const dup = ['2026-07-03', '2026-07-03', '2026-07-01'];
     expect(enrolledHalaqaDates(recs, dup)).toEqual(['2026-07-03', '2026-07-01']);
+  });
+});
+
+describe('computeAbsenceStreak', () => {
+  const days = ['2026-07-22', '2026-07-15', '2026-07-08', '2026-07-01']; // desc
+
+  it('counts consecutive most-recent halaqa days the student missed', () => {
+    const attended = new Set(['2026-07-08', '2026-07-01']);
+    expect(computeAbsenceStreak(attended, days)).toBe(2);
+  });
+
+  it('is zero when the student attended the latest halaqa day', () => {
+    expect(computeAbsenceStreak(new Set(['2026-07-22']), days)).toBe(0);
+  });
+
+  it('stops at the first attended day rather than counting total absences', () => {
+    // Missed the newest day, attended the one before, missed two older ones.
+    const attended = new Set(['2026-07-15']);
+    expect(computeAbsenceStreak(attended, days)).toBe(1);
+  });
+
+  it('counts every halaqa day for a student who never attended', () => {
+    expect(computeAbsenceStreak(new Set(), days)).toBe(4);
+  });
+
+  it('is zero when there are no halaqa days at all', () => {
+    expect(computeAbsenceStreak(new Set(), [])).toBe(0);
   });
 });
