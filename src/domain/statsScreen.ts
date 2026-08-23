@@ -536,17 +536,53 @@ function lohAssignmentsOf(r: SessionRecord): SuraAssignment[] {
  * assignment in the first or last session moves an endpoint and rewrites the
  * total — which is why the labels are part of the result and shown in the UI.
  */
+/**
+ * Ids of records whose loh assignment has since been recited and graded.
+ *
+ * A session's `newLoh` is homework for NEXT time; the grade arrives in the
+ * following session's `loh`. Counting the closing assignment as memorized
+ * would credit a student for pages they have not stood up and recited yet.
+ *
+ * Any grade counts, including إعادة: the question is whether the assignment
+ * was recited, not how well. Quality is already reflected in التقييم.
+ *
+ * Built from the student's full history, never a filtered slice — the session
+ * that grades June's last assignment usually falls in July.
+ */
+function gradedAssignmentIds(studentRecords: SessionRecord[]): Set<string> {
+  const chain = studentRecords
+    .filter((r) => !r.attendance_only && !!r.date)
+    .sort((a, b) => (a.date! < b.date! ? -1 : a.date! > b.date! ? 1 : 0));
+
+  const out = new Set<string>();
+  chain.forEach((r, i) => {
+    const grader = chain[i + 1];
+    const loh = grader?.loh;
+    if (loh && (hasScore(loh) || (loh.stars ?? 0) > 0)) out.add(r.id);
+  });
+  return out;
+}
+
 export function computeLohSpan(
   student: Student,
   allRecords: SessionRecord[],
   /** 'all', or a 'YYYY-MM' month to measure the progress made within. */
   monthFilter = 'all',
 ): LohSpan | null {
-  const recs = recordsForStudent(student, allRecords)
+  const studentRecords = recordsForStudent(student, allRecords);
+  const graded = gradedAssignmentIds(studentRecords);
+
+  const recs = studentRecords
     .filter((r) => !!r.date && (monthFilter === 'all' || r.date.slice(0, 7) === monthFilter))
     .filter((r) => lohAssignmentsOf(r).length > 0)
     .sort((a, b) => (a.date! < b.date! ? -1 : a.date! > b.date! ? 1 : 0));
   if (!recs.length) return null;
+
+  // The span ends at the last assignment actually recited, not the one still
+  // pending. The start stays put: that is where the student began, whether or
+  // not the opening session was ever graded.
+  const lastRecited = [...recs].reverse().find((r) => graded.has(r.id));
+  if (!lastRecited) return null;
 
   const direction = detectMemorizationDirection(recs);
 
@@ -562,7 +598,7 @@ export function computeLohSpan(
       .filter((x): x is readonly [number, number] => x !== null);
 
   const firstPositions = positions(recs[0]);
-  const lastPositions = positions(recs[recs.length - 1]);
+  const lastPositions = positions(lastRecited);
   if (!firstPositions.length || !lastPositions.length) return null;
 
   const startPos = Math.min(...firstPositions.map(([lo]) => lo));

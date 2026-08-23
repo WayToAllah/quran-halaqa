@@ -38,7 +38,9 @@ const records: SessionRecord[] = [
   ...sessions('s_2', 3, { sura: 'البقرة', from: '1', to: '40' }),
   ...sessions('s_3', 3, { sura: 'البقرة', from: '1', to: '25' }),
   ...sessions('s_4', 2, { sura: 'البقرة', from: '1', to: '20' }),
-  ...sessions('s_5', 1, { sura: 'البقرة', from: '1', to: '10' }),
+  // Two sessions minimum: an assignment only counts once a later session has
+  // graded it, so a single-session student would have no measurable progress.
+  ...sessions('s_5', 2, { sura: 'البقرة', from: '1', to: '10' }),
 ];
 
 vi.mock('../../hooks/useStudents', () => ({

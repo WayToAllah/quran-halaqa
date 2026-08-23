@@ -281,6 +281,9 @@ describe('computeTopPages', () => {
       { id: 'r4', studentId: 's_1', date: '2026-07-22', newLoh: [{ sura: 'المسد' }] },
       { id: 'r5', studentId: 's_1', date: '2026-07-29', newLoh: [{ sura: 'النصر' }] },
       { id: 'r6', studentId: 's_2', date: '2026-07-01', newLoh: [{ sura: 'الفاتحة' }] },
+      // Closing sessions that grade the assignments above as recited.
+      { id: 'g1', studentId: 's_1', date: '2026-08-05', loh: { score: 90 } },
+      { id: 'g2', studentId: 's_2', date: '2026-08-05', loh: { score: 90 } },
     ];
     const top = computeTopPages(students, records);
     expect(top[0]).toMatchObject({ name: 'زيد احمد', pages: 1 });
@@ -332,10 +335,11 @@ describe('computeTopPages', () => {
     ];
     expect(computeTopPages(students, passed)[0].pages).toBe(1);
 
+    // Not yet recited: the assignment stands, but it is homework, not memory.
     const ungraded: SessionRecord[] = [
       { id: 'r1', studentId: 's_1', date: '2026-07-01', newLoh: [{ sura: 'الفاتحة' }] },
     ];
-    expect(computeTopPages(students, ungraded)[0].pages).toBe(1);
+    expect(computeTopPages(students, ungraded)).toHaveLength(0);
   });
 
   it('counts a page once, however often it is re-assigned', () => {
@@ -348,6 +352,7 @@ describe('computeTopPages', () => {
         date: '2026-07-15',
         newLoh: [{ sura: 'الفاتحة', from: '1', to: '7' }],
       },
+      { id: 'r4', studentId: 's_1', date: '2026-07-22', loh: { score: 90 } },
     ];
     expect(computeTopPages(students, records)[0].pages).toBe(1);
   });
@@ -366,6 +371,7 @@ describe('computeTopPages', () => {
         date: '2026-07-01',
         newLoh: [{ sura: 'الفاتحة', from: '5', to: '7' }],
       },
+      { id: 'r3', studentId: 's_1', date: '2026-07-08', loh: { score: 90 } },
     ];
     // June's sessions alone cover الفاتحة ١-٤ — not a whole page.
     expect(computeTopPages(students, records, 3, '2026-06')).toHaveLength(0);
@@ -379,6 +385,8 @@ describe('computeTopPages', () => {
     const records: SessionRecord[] = [
       { id: 'r1', studentId: 's_1', date: '2026-07-01', newLoh: [{ sura: 'الفاتحة' }] },
       { id: 'r2', studentId: 's_2', date: '2026-07-01', newLoh: [{ sura: 'الناس' }] },
+      { id: 'g1', studentId: 's_1', date: '2026-07-08', loh: { score: 90 } },
+      { id: 'g2', studentId: 's_2', date: '2026-07-08', loh: { score: 90 } },
     ];
     const top = computeTopPages(students, records);
     expect(top).toHaveLength(1);
@@ -390,12 +398,15 @@ describe('computeTopPages', () => {
       id: `s_${i}`,
       name: `طالب ${i}`,
     }));
-    const records: SessionRecord[] = many.map((s, i) => ({
-      id: `r${i}`,
-      studentId: s.id,
-      date: '2026-07-01',
-      newLoh: [{ sura: 'البقرة', from: '1', to: String(30 + i * 20) }],
-    }));
+    const records: SessionRecord[] = many.flatMap((s, i) => [
+      {
+        id: `r${i}`,
+        studentId: s.id,
+        date: '2026-07-01',
+        newLoh: [{ sura: 'البقرة', from: '1', to: String(30 + i * 20) }],
+      },
+      { id: `g${i}`, studentId: s.id, date: '2026-07-08', loh: { score: 90 } },
+    ]);
     expect(computeTopPages(many, records, 3)).toHaveLength(3);
   });
 });
@@ -510,6 +521,9 @@ describe('leaderboard identity and limits', () => {
       date: '2026-07-01',
       newLoh: [{ sura: 'البقرة', from: '1', to: '20' }],
     },
+    // Sessions confirming both assignments were recited.
+    { id: 'g1', studentId: 's_1', date: '2026-07-08', loh: { score: 90 } },
+    { id: 'g2', studentId: 's_2', date: '2026-07-08', loh: { score: 90 } },
   ];
 
   it('carries the stable student id on page leaderboard entries', () => {
@@ -528,12 +542,15 @@ describe('leaderboard identity and limits', () => {
       id: `s_${i}`,
       name: `طالب ${i}`,
     }));
-    const manyRecs: SessionRecord[] = many.map((s, i) => ({
-      id: `r_${i}`,
-      studentId: s.id,
-      date: '2026-07-01',
-      newLoh: [{ sura: 'البقرة', from: '1', to: String(30 + i * 5) }],
-    }));
+    const manyRecs: SessionRecord[] = many.flatMap((s, i) => [
+      {
+        id: `r_${i}`,
+        studentId: s.id,
+        date: '2026-07-01',
+        newLoh: [{ sura: 'البقرة', from: '1', to: String(30 + i * 5) }],
+      },
+      { id: `g_${i}`, studentId: s.id, date: '2026-07-08', loh: { score: 90 } },
+    ]);
     expect(computeTopPages(many, manyRecs, Infinity)).toHaveLength(7);
   });
 
@@ -636,12 +653,22 @@ describe('computeFollowUpList', () => {
 
 describe('computeLohSpan', () => {
   const yassin: Student = { id: 's_y', name: 'ياسين الشناوي' };
+  /** A session that assigns new work AND grades the previous assignment —
+   * the shape every real session has. */
   const s = (id: string, date: string, sura: string, from: string, to: string): SessionRecord => ({
     id,
     studentId: 's_y',
     date,
     newLoh: [{ sura, from, to }],
+    loh: { score: 90 },
   });
+
+  /** Adds the session that grades the closing assignment, so the fixture
+   * describes work already recited rather than homework still pending. */
+  const recited = (recs: SessionRecord[]): SessionRecord[] => [
+    ...recs,
+    { id: 'g_end', studentId: 's_y', date: '2026-12-01', loh: { score: 90 } },
+  ];
 
   it('spans from the first session start to the last session end', () => {
     const recs = [
@@ -649,7 +676,7 @@ describe('computeLohSpan', () => {
       s('r2', '2026-06-01', 'الملك', '1', '30'),
       s('r3', '2026-07-01', 'التحريم', '1', '12'),
     ];
-    const span = computeLohSpan(yassin, recs)!;
+    const span = computeLohSpan(yassin, recited(recs))!;
     expect(span.startLabel).toBe('الحاقة ٣٨');
     expect(span.endLabel).toBe('التحريم ١٢');
   });
@@ -661,7 +688,7 @@ describe('computeLohSpan', () => {
       s('r1', '2026-05-01', 'الحاقة', '38', '52'),
       s('r2', '2026-07-01', 'التحريم', '1', '12'),
     ];
-    expect(computeLohSpan(yassin, recs)!.pages).toBe(6);
+    expect(computeLohSpan(yassin, recited(recs))!.pages).toBe(6);
   });
 
   it('matches the same journey recorded session by session', () => {
@@ -671,7 +698,7 @@ describe('computeLohSpan', () => {
       s('r3', '2026-06-01', 'الملك', '1', '30'),
       s('r4', '2026-07-01', 'التحريم', '1', '12'),
     ];
-    expect(computeLohSpan(yassin, recs)!.pages).toBe(6);
+    expect(computeLohSpan(yassin, recited(recs))!.pages).toBe(6);
   });
 
   it('is unaffected by an إعادة grade on the closing session', () => {
@@ -680,7 +707,7 @@ describe('computeLohSpan', () => {
       s('r2', '2026-07-01', 'التحريم', '1', '12'),
       { id: 'r3', studentId: 's_y', date: '2026-07-08', loh: { score: 40 } },
     ];
-    expect(computeLohSpan(yassin, recs)!.pages).toBe(6);
+    expect(computeLohSpan(yassin, recited(recs))!.pages).toBe(6);
   });
 
   it('ignores attendance-only records when locating the endpoints', () => {
@@ -689,7 +716,7 @@ describe('computeLohSpan', () => {
       s('r1', '2026-05-01', 'الحاقة', '38', '52'),
       s('r2', '2026-07-01', 'التحريم', '1', '12'),
     ];
-    expect(computeLohSpan(yassin, recs)!.startLabel).toBe('الحاقة ٣٨');
+    expect(computeLohSpan(yassin, recited(recs))!.startLabel).toBe('الحاقة ٣٨');
   });
 
   it("reports zero pages when the closing session contradicts the student's own direction", () => {
@@ -702,7 +729,7 @@ describe('computeLohSpan', () => {
       s('r3', '2026-06-01', 'الملك', '1', '30'),
       s('r4', '2026-07-01', 'المعارج', '1', '10'),
     ];
-    const span = computeLohSpan(yassin, recs)!;
+    const span = computeLohSpan(yassin, recited(recs))!;
     expect(span.direction).toBe('descending');
     expect(span.reversed).toBe(true);
     expect(span.pages).toBe(0);
@@ -713,7 +740,7 @@ describe('computeLohSpan', () => {
       s('r1', '2026-05-01', 'التحريم', '1', '12'),
       s('r2', '2026-07-01', 'الحاقة', '38', '52'),
     ];
-    const span = computeLohSpan(yassin, recs)!;
+    const span = computeLohSpan(yassin, recited(recs))!;
     expect(span.direction).toBe('ascending');
     expect(span.reversed).toBe(false);
   });
@@ -728,7 +755,7 @@ describe('computeLohSpan', () => {
       s('r2', '2026-06-01', 'القلم', '1', '52'),
       s('r3', '2026-07-01', 'التحريم', '1', '12'),
     ];
-    const span = computeLohSpan(yassin, recs, '2026-06')!;
+    const span = computeLohSpan(yassin, recited(recs), '2026-06')!;
     expect(span.startLabel).toBe('القلم ١');
     expect(span.endLabel).toBe('القلم ٥٢');
   });
@@ -750,7 +777,9 @@ describe('computeTopPages — measured along the memorization path', () => {
         studentId: 's_y',
         date: '2026-07-01',
         newLoh: [{ sura: 'التحريم', from: '1', to: '12' }],
+        loh: { score: 90 },
       },
+      { id: 'g1', studentId: 's_y', date: '2026-08-01', loh: { score: 90 } },
     ];
     expect(computeTopPages(roster, recs, Infinity)[0].pages).toBe(6);
   });
@@ -768,7 +797,9 @@ describe('computeTopPages — measured along the memorization path', () => {
         studentId: 's_y',
         date: '2026-07-01',
         newLoh: [{ sura: 'التحريم', from: '1', to: '12' }],
+        loh: { score: 90 },
       },
+      { id: 'g1', studentId: 's_y', date: '2026-08-01', loh: { score: 90 } },
     ];
     const entry = computeTopPages(roster, recs, Infinity)[0];
     expect(entry.startLabel).toBe('الحاقة ٣٨');
@@ -830,14 +861,19 @@ describe('computeLohSpan — mushaf-order students', () => {
     studentId: 's_w',
     date,
     newLoh: [{ sura, from: f, to: t }],
+    loh: { score: 90 },
   });
+  const recited = (recs: SessionRecord[]): SessionRecord[] => [
+    ...recs,
+    { id: 'g_w', studentId: 's_w', date: '2026-12-01', loh: { score: 90 } },
+  ];
 
   it('does not read a move from البقرة to آل عمران as going backwards', () => {
     const recs = [
       r('a', '2026-05-01', 'البقرة', '1', '10'),
       r('b', '2026-06-01', 'آل عمران', '1', '20'),
     ];
-    const span = computeLohSpan(walid, recs)!;
+    const span = computeLohSpan(walid, recited(recs))!;
     expect(span.reversed).toBe(false);
     expect(span.pages).toBeGreaterThan(45);
     expect(span.direction).toBe('ascending');
@@ -848,6 +884,68 @@ describe('computeLohSpan — mushaf-order students', () => {
       r('a', '2026-05-01', 'البقرة', '1', '10'),
       r('b', '2026-06-01', 'البقرة', '11', '60'),
     ];
-    expect(computeLohSpan(walid, recs)!.pages).toBe(7);
+    expect(computeLohSpan(walid, recited(recs))!.pages).toBe(7);
+  });
+});
+
+describe('computeLohSpan — only what has actually been recited', () => {
+  const st: Student = { id: 's_g', name: 'طالب' };
+  /** A session that assigns `sura f-t` and grades the PREVIOUS assignment. */
+  const sess = (
+    id: string,
+    date: string,
+    assign: [string, string, string] | null,
+    grade: number | null,
+  ): SessionRecord => ({
+    id,
+    studentId: 's_g',
+    date,
+    ...(assign ? { newLoh: [{ sura: assign[0], from: assign[1], to: assign[2] }] } : {}),
+    ...(grade === null ? {} : { loh: { score: grade } }),
+  });
+
+  it('ignores the closing assignment, which has not been recited yet', () => {
+    const recs = [
+      sess('r1', '2026-05-01', ['الحاقة', '38', '52'], null),
+      sess('r2', '2026-05-08', ['القلم', '1', '52'], 90), // grades الحاقة
+      sess('r3', '2026-05-15', ['الملك', '1', '30'], 85), // grades القلم
+      // الملك is assigned but never graded — next week has not happened.
+    ];
+    const span = computeLohSpan(st, recs)!;
+    expect(span.endLabel).toBe('القلم ٥٢');
+  });
+
+  it('extends the span once the pending assignment is graded', () => {
+    const recs = [
+      sess('r1', '2026-05-01', ['الحاقة', '38', '52'], null),
+      sess('r2', '2026-05-08', ['القلم', '1', '52'], 90),
+      sess('r3', '2026-05-15', ['الملك', '1', '30'], 85),
+      sess('r4', '2026-05-22', null, 80), // grades الملك
+    ];
+    expect(computeLohSpan(st, recs)!.endLabel).toBe('الملك ٣٠');
+  });
+
+  it('accepts an إعادة as having been recited', () => {
+    // The student stood and recited; the grade says how well, not whether.
+    const recs = [
+      sess('r1', '2026-05-01', ['الحاقة', '38', '52'], null),
+      sess('r2', '2026-05-08', ['القلم', '1', '52'], 40),
+    ];
+    expect(computeLohSpan(st, recs)!.endLabel).toBe('الحاقة ٥٢');
+  });
+
+  it('returns null while nothing has been recited yet', () => {
+    const recs = [sess('r1', '2026-05-01', ['الحاقة', '38', '52'], null)];
+    expect(computeLohSpan(st, recs)).toBeNull();
+  });
+
+  it('looks past the month boundary for the grade', () => {
+    // June's closing assignment is graded in July; that grade still confirms it.
+    const recs = [
+      sess('r1', '2026-06-01', ['الحاقة', '38', '52'], null),
+      sess('r2', '2026-06-08', ['القلم', '1', '52'], 90),
+      sess('r3', '2026-07-01', null, 85),
+    ];
+    expect(computeLohSpan(st, recs, '2026-06')!.endLabel).toBe('القلم ٥٢');
   });
 });
