@@ -42,6 +42,11 @@ export interface SummaryStats {
   madiAyat: number;
   avgLoh: number;
   totalHalaqaDays: number;
+  /** Mean number of DISTINCT students present per halaqa day. Unrounded on
+   * purpose — the screen decides how to render it. Denominator is exactly
+   * `totalHalaqaDays`, so a day whose only record has no student still drags
+   * the average down rather than silently vanishing. */
+  avgDailyAttendance: number;
 }
 
 /**
@@ -106,13 +111,38 @@ export function computeSummaryStats(
   );
   const totalAyat = lohAyat + madiAyat + tajweedAyat;
 
-  const totalHalaqaDays = new Set(
-    records
-      .map((r) => r.date)
-      .filter((d): d is string => !!d && !EXCLUDED_HALAQA_DATES.includes(d)),
-  ).size;
+  // One pass builds both the halaqa-day set and the per-day attendee sets, so
+  // the average can never be divided by a different day count than the one
+  // shown as إجمالي أيام الحلقة. Presence is per student per day: two records
+  // for the same student on one date (a session plus a group-attendance mark)
+  // is still one attendee.
+  const presentByDay = new Map<string, Set<string>>();
+  records.forEach((r) => {
+    const d = r.date;
+    if (!d || EXCLUDED_HALAQA_DATES.includes(d)) return;
+    let present = presentByDay.get(d);
+    if (!present) {
+      present = new Set<string>();
+      presentByDay.set(d, present);
+    }
+    const key = r.studentId || r.student;
+    if (key) present.add(key);
+  });
+  const totalHalaqaDays = presentByDay.size;
+  const avgDailyAttendance = totalHalaqaDays
+    ? Array.from(presentByDay.values()).reduce((a, s) => a + s.size, 0) / totalHalaqaDays
+    : 0;
 
-  return { totalSessions, activeStudents, totalAyat, lohAyat, madiAyat, avgLoh, totalHalaqaDays };
+  return {
+    totalSessions,
+    activeStudents,
+    totalAyat,
+    lohAyat,
+    madiAyat,
+    avgLoh,
+    totalHalaqaDays,
+    avgDailyAttendance,
+  };
 }
 
 /**

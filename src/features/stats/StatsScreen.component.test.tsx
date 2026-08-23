@@ -30,6 +30,9 @@ vi.mock('../../hooks/useAllRecords', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // A test that fakes time and then fails never reaches its own
+  // useRealTimers(), and leaked fake timers hang every later userEvent test.
+  vi.useRealTimers();
 });
 
 describe('StatsScreen — summary cards', () => {
@@ -61,6 +64,30 @@ describe('StatsScreen — summary cards', () => {
     // recently active = 1 (only زيد، محمد's last session is too old)
     const activeCard = screen.getByText('طالب نشط (آخر شهر)').previousSibling;
     expect(activeCard?.textContent).toBe('١');
+    vi.useRealTimers();
+  });
+
+  it('shows متوسط الحضور اليومي with the percentage of active students beneath it', () => {
+    // today = 2026-07-20 -> only زيد counts as active (denominator = 1).
+    // 3 halaqa days, one student present on each -> average = 1 student/day.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-20T12:00:00'));
+    render(<StatsScreen />);
+    const label = screen.getByText('متوسط الحضور اليومي');
+    expect(label.previousSibling?.textContent).toBe('١');
+    expect(label.nextSibling?.textContent).toBe('١٠٠٪ من النشطين');
+    vi.useRealTimers();
+  });
+
+  it('omits the percentage when there are no recently active students', () => {
+    // today = 2027-01-01 -> every session is far outside the 30-day window,
+    // so the denominator is 0 and a percentage would be meaningless.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2027-01-01T12:00:00'));
+    render(<StatsScreen />);
+    const label = screen.getByText('متوسط الحضور اليومي');
+    expect(label.previousSibling?.textContent).toBe('١');
+    expect(label.nextSibling).toBeNull();
     vi.useRealTimers();
   });
 });

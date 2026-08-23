@@ -118,6 +118,16 @@ export function StatsScreen() {
     return sortStudentStatsRows(filtered, sortKey);
   }, [studentRows, search, sortKey]);
 
+  // Share of the currently active roster that turns up on a typical halaqa
+  // day. Denominator is the recently-active count, not every registered
+  // student, so students who stopped coming months ago don't permanently
+  // depress the figure. `null` when nobody is active — a percentage of zero
+  // students says nothing, so the card shows the raw average alone.
+  const dailyAttendancePct =
+    recentlyActive > 0
+      ? Math.min(100, Math.round((summary.avgDailyAttendance / recentlyActive) * 100))
+      : null;
+
   const maxWeekly = Math.max(1, ...weeklyBuckets.map((w) => w.count));
   const busiestWeekIdx = weeklyBuckets.reduce(
     (best, w, i) => (w.count > (weeklyBuckets[best]?.count ?? -1) ? i : best),
@@ -184,6 +194,15 @@ export function StatsScreen() {
             lbl: 'طالب نشط (آخر شهر)',
             color: '#0F3D2E',
           },
+          {
+            num: toArabicDigits(Math.round(summary.avgDailyAttendance)),
+            lbl: 'متوسط الحضور اليومي',
+            color: '#C9A227',
+            sub:
+              dailyAttendancePct === null
+                ? undefined
+                : `${toArabicDigits(dailyAttendancePct)}٪ من النشطين`,
+          },
           { num: toArabicDigits(summary.totalAyat), lbl: 'إجمالي الآيات', color: '#C9A227' },
           { num: toArabicDigits(summary.avgLoh) + '٪', lbl: 'متوسط اللوح', color: '#0F3D2E' },
           { num: toArabicDigits(summary.lohAyat), lbl: 'آيات لوح', color: '#C9A227' },
@@ -197,6 +216,7 @@ export function StatsScreen() {
               {c.num}
             </div>
             <div class="text-[11px] text-taupe mt-1.5 font-semibold">{c.lbl}</div>
+            {c.sub && <div class="text-[10px] text-taupe/70 mt-0.5 font-semibold">{c.sub}</div>}
           </div>
         ))}
       </div>

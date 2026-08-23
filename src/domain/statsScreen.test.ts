@@ -83,6 +83,48 @@ describe('computeSummaryStats', () => {
     ];
     expect(computeSummaryStats(records).totalHalaqaDays).toBe(1);
   });
+
+  it('averages the distinct students present per halaqa day', () => {
+    const records: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-01' },
+      { id: 'r2', studentId: 's_2', date: '2026-07-01' },
+      { id: 'r3', studentId: 's_1', date: '2026-07-02' },
+    ];
+    // day 1 -> 2 present, day 2 -> 1 present => 1.5
+    expect(computeSummaryStats(records).avgDailyAttendance).toBe(1.5);
+  });
+
+  it('counts a student once per day even with several records that day', () => {
+    const records: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-01' },
+      { id: 'att_1', studentId: 's_1', date: '2026-07-01' },
+    ];
+    expect(computeSummaryStats(records).avgDailyAttendance).toBe(1);
+  });
+
+  it('excludes EXCLUDED_HALAQA_DATES from the daily attendance average', () => {
+    const records: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-06-04' }, // excluded bonus day
+      { id: 'r2', studentId: 's_2', date: '2026-06-04' },
+      { id: 'r3', studentId: 's_1', date: '2026-07-01' },
+    ];
+    // only 2026-07-01 counts, with a single student present
+    expect(computeSummaryStats(records).avgDailyAttendance).toBe(1);
+  });
+
+  it('divides by the same day count as totalHalaqaDays when a record has no student', () => {
+    const records: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-01' },
+      { id: 'r2', date: '2026-07-02' }, // orphan record: day exists, nobody present
+    ];
+    const s = computeSummaryStats(records);
+    expect(s.totalHalaqaDays).toBe(2);
+    expect(s.avgDailyAttendance).toBe(0.5);
+  });
+
+  it('returns 0 when there are no halaqa days', () => {
+    expect(computeSummaryStats([]).avgDailyAttendance).toBe(0);
+  });
 });
 
 describe('countRecentlyActiveStudents', () => {
