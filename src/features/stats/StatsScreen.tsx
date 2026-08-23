@@ -62,6 +62,41 @@ const sessionsLabel = (n: number) =>
 const cardCls = 'bg-white border border-hairline rounded-2xl p-[18px]';
 const cardTitleCls = 'text-[13.5px] font-extrabold text-ink-dark mb-3.5';
 
+/** How many rows a leaderboard shows before عرض الكل is tapped. */
+const PREVIEW_COUNT = 3;
+
+/**
+ * Expand/collapse control for a leaderboard. The visible label stays short for
+ * a phone, while the accessible name carries the card it belongs to — without
+ * that, every leaderboard on the screen would expose an identically-named
+ * button to screen readers and tests.
+ */
+function ShowAllToggle({
+  expanded,
+  total,
+  cardLabel,
+  onToggle,
+}: {
+  expanded: boolean;
+  total: number;
+  cardLabel: string;
+  onToggle: () => void;
+}) {
+  if (total <= PREVIEW_COUNT) return null;
+  const text = expanded ? 'عرض أقل' : `عرض الكل (${toArabicDigits(total)})`;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={`${text} — ${cardLabel}`}
+      aria-expanded={expanded}
+      class="w-full mt-2.5 py-2 rounded-full text-xs font-bold text-forest border border-hairline"
+    >
+      {text}
+    </button>
+  );
+}
+
 export function StatsScreen() {
   const { students, loaded: studentsLoaded } = useStudents(MOSQUE_ID, HALAQA_ID);
   const { records, loaded: recordsLoaded } = useAllRecords(MOSQUE_ID, HALAQA_ID);
@@ -71,6 +106,8 @@ export function StatsScreen() {
   const [search, setSearch] = useState('');
   const [cardOpen, setCardOpen] = useState(false);
   const [cardBusy, setCardBusy] = useState(false);
+  const [pagesExpanded, setPagesExpanded] = useState(false);
+  const [attendExpanded, setAttendExpanded] = useState(false);
 
   const availableMonths = useMemo(() => {
     const months = new Set(records.map((r) => r.date?.slice(0, 7)).filter(Boolean) as string[]);
@@ -100,12 +137,18 @@ export function StatsScreen() {
   // Unfiltered records on purpose: a page is cumulative, so which pages are
   // complete is settled over the whole history and only then narrowed to the
   // month the finishing session fell in (computeTopPages does the narrowing).
+  // Full ranked lists, sliced at render time. The leaderboards are a preview
+  // by default and expand in place — with ~50 students, showing everything up
+  // front would bury تفصيل الطلاب under four long lists.
   const topPages = useMemo(
-    () => computeTopPages(students, records, 3, monthFilter),
+    () => computeTopPages(students, records, Infinity, monthFilter),
     [students, records, monthFilter],
   );
+  // No minPct filter: students below the نجم الحضور line are the ones a
+  // teacher most needs to see. The threshold survives as a visual marker in
+  // the expanded list instead of as a filter that hides them.
   const topAttend = useMemo(
-    () => getAttendanceRanking(students, filteredRecords, ATTENDANCE_BADGE_THRESHOLD).list,
+    () => getAttendanceRanking(students, filteredRecords).list,
     [students, filteredRecords],
   );
   const studentRows = useMemo(
@@ -117,6 +160,14 @@ export function StatsScreen() {
     const filtered = q ? studentRows.filter((r) => r.name.includes(q)) : studentRows;
     return sortStudentStatsRows(filtered, sortKey);
   }, [studentRows, search, sortKey]);
+
+  const visiblePages = pagesExpanded ? topPages : topPages.slice(0, PREVIEW_COUNT);
+  const visibleAttend = attendExpanded ? topAttend : topAttend.slice(0, PREVIEW_COUNT);
+  /** Index of the first student under the نجم الحضور line, or -1. Only ever
+   * reached in the expanded list, since the preview is the top of the table. */
+  const firstBelowThreshold = visibleAttend.findIndex(
+    (x) => x.attendPct < ATTENDANCE_BADGE_THRESHOLD,
+  );
 
   // Share of the currently active roster that turns up on a typical halaqa
   // day. Denominator is the recently-active count, not every registered
@@ -289,11 +340,11 @@ export function StatsScreen() {
           <div class="text-center text-sm text-taupe py-6">لا توجد صفحات مكتملة بعد</div>
         ) : (
           <div class="space-y-2">
-            {topPages.map((x, i) => {
+            {visiblePages.map((x, i) => {
               const rc = rankStyle(i + 1);
               return (
                 <div
-                  key={x.name}
+                  key={x.id}
                   class="flex items-center gap-3 py-1.5 border-b border-[#F5F1E5] last:border-0"
                 >
                   <div
@@ -316,6 +367,12 @@ export function StatsScreen() {
             })}
           </div>
         )}
+        <ShowAllToggle
+          expanded={pagesExpanded}
+          total={topPages.length}
+          cardLabel="الأكثر حفظاً للصفحات"
+          onToggle={() => setPagesExpanded((v) => !v)}
+        />
       </div>
 
       <div class={cardCls}>
@@ -324,35 +381,60 @@ export function StatsScreen() {
           <div class="text-center text-sm text-taupe py-6">لا يوجد بيانات</div>
         ) : (
           <div class="space-y-2">
-            {topAttend.map((x) => {
+            {visibleAttend.map((x, i) => {
               const rc = rankStyle(x.rank);
+              const below = x.attendPct < ATTENDANCE_BADGE_THRESHOLD;
               return (
-                <div
-                  key={x.name}
-                  class="flex items-center gap-3 py-1.5 border-b border-[#F5F1E5] last:border-0"
-                >
-                  <div
-                    class="w-[26px] h-[26px] rounded-full flex items-center justify-center text-xs font-extrabold shrink-0"
-                    style={{ background: rc.bg, color: rc.color }}
-                    title={`المركز ${toArabicOrdinal(x.rank)}`}
-                  >
-                    {toArabicDigits(x.rank)}
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <div class="text-sm font-bold text-ink-dark truncate">{x.name}</div>
-                    <div class="text-xs text-taupe">
-                      المركز {toArabicOrdinal(x.rank)} · {toArabicDigits(x.uniqueDays)} يوم حضور من{' '}
-                      {toArabicDigits(summary.totalHalaqaDays)}
+                <div key={x.id}>
+                  {i === firstBelowThreshold && (
+                    <div class="flex items-center gap-2 py-2">
+                      <div class="flex-1 h-px bg-[#F1ECDD]" />
+                      <div class="text-[10px] font-bold text-taupe">
+                        أقل من {toArabicDigits(ATTENDANCE_BADGE_THRESHOLD)}٪
+                      </div>
+                      <div class="flex-1 h-px bg-[#F1ECDD]" />
                     </div>
-                  </div>
-                  <div class="font-extrabold text-forest shrink-0">
-                    {toArabicDigits(x.attendPct)}٪
+                  )}
+                  <div class="flex items-center gap-3 py-1.5 border-b border-[#F5F1E5] last:border-0">
+                    <div
+                      class="w-[26px] h-[26px] rounded-full flex items-center justify-center text-xs font-extrabold shrink-0"
+                      style={{ background: rc.bg, color: rc.color }}
+                      title={`المركز ${toArabicOrdinal(x.rank)}`}
+                    >
+                      {toArabicDigits(x.rank)}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div
+                        class={
+                          'text-sm font-bold truncate ' +
+                          (below ? 'text-[#5B5646]' : 'text-ink-dark')
+                        }
+                      >
+                        {x.name}
+                      </div>
+                      <div class="text-xs text-taupe">
+                        المركز {toArabicOrdinal(x.rank)} · {toArabicDigits(x.uniqueDays)} يوم حضور
+                        من {toArabicDigits(summary.totalHalaqaDays)}
+                      </div>
+                    </div>
+                    <div
+                      class="font-extrabold shrink-0"
+                      style={{ color: attendBarColor(x.attendPct) }}
+                    >
+                      {toArabicDigits(x.attendPct)}٪
+                    </div>
                   </div>
                 </div>
               );
             })}
           </div>
         )}
+        <ShowAllToggle
+          expanded={attendExpanded}
+          total={topAttend.length}
+          cardLabel="الأكثر حضوراً"
+          onToggle={() => setAttendExpanded((v) => !v)}
+        />
       </div>
 
       <button
@@ -399,7 +481,7 @@ export function StatsScreen() {
         ) : (
           <div class="divide-y divide-[#F5F1E5]">
             {visibleRows.map((row) => (
-              <div key={row.name} class="py-3">
+              <div key={row.id} class="py-3">
                 <div class="flex items-center justify-between mb-1.5">
                   <div class="text-sm font-bold text-ink-dark">{row.name}</div>
                   <div

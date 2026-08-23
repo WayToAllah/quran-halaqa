@@ -481,3 +481,53 @@ describe('computeSummaryStats — إعادة does not count as recited', () => {
     expect(computeSummaryStats(t).totalAyat).toBe(7);
   });
 });
+
+describe('leaderboard identity and limits', () => {
+  const twoSameName: Student[] = [
+    { id: 's_1', name: 'محمد علي' },
+    { id: 's_2', name: 'محمد علي' },
+  ];
+  const recs: SessionRecord[] = [
+    {
+      id: 'r1',
+      studentId: 's_1',
+      date: '2026-07-01',
+      newLoh: [{ sura: 'البقرة', from: '1', to: '60' }],
+    },
+    {
+      id: 'r2',
+      studentId: 's_2',
+      date: '2026-07-01',
+      newLoh: [{ sura: 'البقرة', from: '1', to: '20' }],
+    },
+  ];
+
+  it('carries the stable student id on page leaderboard entries', () => {
+    // Names collide, so the id is the only thing that can tell the rows apart.
+    const top = computeTopPages(twoSameName, recs, Infinity);
+    expect(top.map((x) => x.id)).toEqual(['s_1', 's_2']);
+  });
+
+  it('carries the stable student id on breakdown rows', () => {
+    const rows = computeStudentStatsRows(twoSameName, recs, 1);
+    expect(rows.map((x) => x.id)).toEqual(['s_1', 's_2']);
+  });
+
+  it('returns every qualifying student when no limit is given', () => {
+    const many: Student[] = Array.from({ length: 7 }, (_, i) => ({
+      id: `s_${i}`,
+      name: `طالب ${i}`,
+    }));
+    const manyRecs: SessionRecord[] = many.map((s, i) => ({
+      id: `r_${i}`,
+      studentId: s.id,
+      date: '2026-07-01',
+      newLoh: [{ sura: 'البقرة', from: '1', to: String(30 + i * 5) }],
+    }));
+    expect(computeTopPages(many, manyRecs, Infinity)).toHaveLength(7);
+  });
+
+  it('still honours an explicit limit', () => {
+    expect(computeTopPages(twoSameName, recs, 1)).toHaveLength(1);
+  });
+});

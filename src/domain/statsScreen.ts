@@ -267,6 +267,9 @@ export function computeTopAyat(
 }
 
 export interface TopPagesEntry {
+  /** Stable student id. Names collide and change, so this — not the name — is
+   * the correct render key and lookup handle for a leaderboard row. */
+  id: string;
   name: string;
   /** Mushaf pages memorized end-to-end. */
   pages: number;
@@ -299,6 +302,7 @@ export interface TopPagesEntry {
 export function computeTopPages(
   students: Student[],
   allRecords: SessionRecord[],
+  /** Pass `Infinity` for the whole ranked list (the screen's عرض الكل view). */
   limit = 3,
   /** 'all', or a 'YYYY-MM' month whose newly-completed pages to count. */
   monthFilter = 'all',
@@ -329,6 +333,7 @@ export function computeTopPages(
       const pages = completedPages(assignments).filter((p) => inPeriod(p.date)).length;
       if (!pages) return null;
       return {
+        id: s.id,
         name: getStudentName(s),
         pages,
         sessionsCount: recs.filter((r) => inPeriod(r.date)).length,
@@ -340,6 +345,8 @@ export function computeTopPages(
 }
 
 export interface StudentStatsRow {
+  /** Stable student id — see TopPagesEntry.id. */
+  id: string;
   name: string;
   sessionsCount: number;
   uniqueDays: number;
@@ -371,6 +378,7 @@ export function computeStudentStatsRows(
       const attendPct =
         totalHalaqaDays > 0 ? Math.min(100, Math.round((uniqueDays / totalHalaqaDays) * 100)) : 0;
       return {
+        id: s.id,
         name: getStudentName(s),
         sessionsCount: recs.length,
         uniqueDays,
