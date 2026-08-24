@@ -325,14 +325,26 @@ export function StatsScreen() {
                 ? undefined
                 : `${toArabicDigits(dailyAttendancePct)}٪ من النشطين`,
           },
-          { num: toArabicDigits(summary.totalAyat), lbl: 'إجمالي الآيات', color: '#C9A227' },
+          // The two averages sit side by side, and so do the two ayat counts —
+          // an odd card count in a 2-column grid would strand one of them
+          // alone on the last row, so the total spans the full width.
           { num: toArabicDigits(summary.avgLoh) + '٪', lbl: 'متوسط اللوح', color: '#0F3D2E' },
-          { num: toArabicDigits(summary.lohAyat), lbl: 'آيات لوح', color: '#C9A227' },
-          { num: toArabicDigits(summary.madiAyat), lbl: 'آيات ماضي', color: '#0F3D2E' },
+          { num: toArabicDigits(summary.avgMadi) + '٪', lbl: 'متوسط الماضي', color: '#C9A227' },
+          { num: toArabicDigits(summary.lohAyat), lbl: 'آيات لوح', color: '#0F3D2E' },
+          { num: toArabicDigits(summary.madiAyat), lbl: 'آيات ماضي', color: '#C9A227' },
+          {
+            num: toArabicDigits(summary.totalAyat),
+            lbl: 'إجمالي الآيات',
+            color: '#0F3D2E',
+            wide: true,
+          },
         ].map((c) => (
           <div
             key={c.lbl}
-            class="bg-white border border-hairline rounded-2xl py-4 px-3 text-center"
+            class={
+              'bg-white border border-hairline rounded-2xl py-4 px-3 text-center' +
+              (c.wide ? ' col-span-2' : '')
+            }
           >
             <div class="text-[24px] font-black leading-none" style={{ color: c.color }}>
               {c.num}

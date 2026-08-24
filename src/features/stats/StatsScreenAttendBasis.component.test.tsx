@@ -15,12 +15,19 @@ const students: Student[] = [
 const DAYS = ['2026-07-01', '2026-07-08', '2026-07-15', '2026-07-22'];
 
 const records: SessionRecord[] = [
-  ...DAYS.map((date, i) => ({ id: `r_1_${i}`, studentId: 's_1', date, loh: { score: 90 } })),
+  ...DAYS.map((date, i) => ({
+    id: `r_1_${i}`,
+    studentId: 's_1',
+    date,
+    loh: { score: 90 },
+    madi: { score: 60 },
+  })),
   ...DAYS.slice(2).map((date, i) => ({
     id: `r_2_${i}`,
     studentId: 's_2',
     date,
     loh: { score: 90 },
+    madi: { score: 60 },
   })),
 ];
 
@@ -75,5 +82,21 @@ describe('StatsScreen — أساس حساب الحضور', () => {
 
     await userEvent.click(halaqaTab);
     expect(attendCard().textContent).toContain('٥٠٪');
+  });
+});
+
+describe('StatsScreen — بطاقات المتوسطات', () => {
+  it('shows متوسط الماضي alongside متوسط اللوح', () => {
+    render(<StatsScreen />);
+    expect(screen.getByText('متوسط اللوح')).toBeTruthy();
+    expect(screen.getByText('متوسط الماضي')).toBeTruthy();
+  });
+
+  it('reports the two averages independently', () => {
+    render(<StatsScreen />);
+    const loh = screen.getByText('متوسط اللوح').parentElement as HTMLElement;
+    const madi = screen.getByText('متوسط الماضي').parentElement as HTMLElement;
+    expect(loh.textContent).toContain('٩٠٪'); // every loh score is 90
+    expect(madi.textContent).toContain('٦٠٪'); // every madi score is 60
   });
 });

@@ -49,6 +49,7 @@ export interface SummaryStats {
   lohAyat: number;
   madiAyat: number;
   avgLoh: number;
+  avgMadi: number;
   totalHalaqaDays: number;
   /** Mean number of DISTINCT students present per halaqa day. Unrounded on
    * purpose — the screen decides how to render it. Denominator is exactly
@@ -81,6 +82,16 @@ export function computeSummaryStats(
     ? Math.round(scoredLoh.reduce((a, r) => a + r.loh!.score!, 0) / scoredLoh.length)
     : totalSessions
       ? Math.round((records.reduce((a, r) => a + (r.loh?.stars ?? 0), 0) / totalSessions) * 20)
+      : 0;
+
+  // Same rule as avgLoh, applied to الماضي: only evaluated sessions count, a
+  // real 0 (إعادة) is an evaluation and must drag the average down, while
+  // score: null means nobody graded it and is skipped entirely.
+  const scoredMadi = records.filter((r) => hasScore(r.madi));
+  const avgMadi = scoredMadi.length
+    ? Math.round(scoredMadi.reduce((a, r) => a + r.madi!.score!, 0) / scoredMadi.length)
+    : totalSessions
+      ? Math.round((records.reduce((a, r) => a + (r.madi?.stars ?? 0), 0) / totalSessions) * 20)
       : 0;
 
   // Work graded إعادة doesn't count as recited. The grade for an assignment
@@ -148,6 +159,7 @@ export function computeSummaryStats(
     lohAyat,
     madiAyat,
     avgLoh,
+    avgMadi,
     totalHalaqaDays,
     avgDailyAttendance,
   };

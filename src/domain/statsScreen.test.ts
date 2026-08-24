@@ -62,6 +62,39 @@ describe('computeSummaryStats', () => {
     expect(computeSummaryStats(records).avgLoh).toBe(80); // 4 * 20
   });
 
+  it('includes a genuine zero madi score in avgMadi (not skipped)', () => {
+    const records: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-01', madi: { score: 0 } },
+      { id: 'r2', studentId: 's_1', date: '2026-07-02', madi: { score: 100 } },
+    ];
+    expect(computeSummaryStats(records).avgMadi).toBe(50);
+  });
+
+  it('falls back to a stars-based estimate for madi when nothing is scored yet', () => {
+    const records: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-01', madi: { stars: 4 } },
+    ];
+    expect(computeSummaryStats(records).avgMadi).toBe(80);
+  });
+
+  it('averages madi independently of loh', () => {
+    const records: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-01', loh: { score: 100 }, madi: { score: 60 } },
+      { id: 'r2', studentId: 's_1', date: '2026-07-02', loh: { score: 80 }, madi: { score: 70 } },
+    ];
+    const s = computeSummaryStats(records);
+    expect(s.avgLoh).toBe(90);
+    expect(s.avgMadi).toBe(65);
+  });
+
+  it('ignores unevaluated madi (score null) instead of counting it as zero', () => {
+    const records: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-01', madi: { score: 90, stars: 5 } },
+      { id: 'r2', studentId: 's_1', date: '2026-07-02', madi: { score: null } },
+    ];
+    expect(computeSummaryStats(records).avgMadi).toBe(90);
+  });
+
   it('sums loh + madi + tajweed ayat into totalAyat', () => {
     const records: SessionRecord[] = [
       {
