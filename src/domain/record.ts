@@ -116,6 +116,44 @@ export function isRowComplete(row: SuraAssignment): boolean {
   return true;
 }
 
+/**
+ * Whether the teacher has put ANYTHING into this row.
+ *
+ * The counterpart to isRowComplete(): together they separate "blank, ignore
+ * it" from "started but unfinished, say something". `draft` carries text the
+ * sura picker could not resolve to a real sura — without it a mistyped name
+ * is indistinguishable from an untouched row, which is precisely how a
+ * half-filled row used to vanish on save.
+ */
+export function isRowStarted(row: SuraAssignment): boolean {
+  return !!(row.sura || row.draft || row.toSura || row.toSuraDraft || row.from || row.to);
+}
+
+/**
+ * The first row the teacher began filling in but that can't be saved, or null
+ * when every started row is complete.
+ *
+ * Returned instead of a bare boolean so the caller can name the offending row
+ * — "السورة الأولى" is findable on screen in a way that "فيه سطر ناقص" is not,
+ * and these rows are exactly the ones the teacher believes they already
+ * entered.
+ */
+export function firstIncompleteRow(
+  rows: SuraAssignment[],
+): { index: number; reason: string } | null {
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (!isRowStarted(row) || isRowComplete(row)) continue;
+    // No sura at all: either nothing was picked, or what was typed never
+    // matched. Otherwise it's a range whose end sura is still missing.
+    return {
+      index: i,
+      reason: row.sura ? 'سورة النهاية مش متحددة' : 'اسم السورة مش متحدد',
+    };
+  }
+  return null;
+}
+
 /** Normalizes an entry row into the exact shape persisted to the DB. A range
  * row saves as `{sura, toSura, range:true}` with no ayah numbers; an ordinary
  * row saves as `{sura, from, to}` with no range fields. This prevents a stale
@@ -142,8 +180,34 @@ export function cleanAssignmentRow(row: SuraAssignment): SuraAssignment {
  */
 export function rowsSignature(rows: SuraAssignment[]): string {
   return JSON.stringify(
-    rows.map((r) => [r.sura ?? '', r.from ?? '', r.to ?? '', r.toSura ?? '', r.range ? 1 : 0]),
+    rows.map((r) => [
+      r.sura ?? '',
+      r.from ?? '',
+      r.to ?? '',
+      r.toSura ?? '',
+      r.range ? 1 : 0,
+      // Unresolved typing is the teacher's work too — a row holding "بقرة"
+      // and nothing else must not read as pristine when they switch students.
+      r.draft ?? '',
+      r.toSuraDraft ?? '',
+    ]),
   );
+}
+
+/**
+ * Signature of a loh/madi assignment PAIR as it would be persisted.
+ *
+ * Rows are cleaned and incomplete ones dropped first, so this answers "would
+ * saving this change anything?" rather than "did any keystroke happen?" —
+ * typing a correction and then undoing it leaves the signature where it
+ * started. Used to tell a real correction to a past session apart from a
+ * phantom one, at a point where the past session itself is no longer in hand
+ * to compare against.
+ */
+export function assignmentPairSignature(loh: SuraAssignment[], madi: SuraAssignment[]): string {
+  const sig = (rows: SuraAssignment[]) =>
+    rowsSignature(rows.filter(isRowComplete).map(cleanAssignmentRow));
+  return sig(loh) + '|' + sig(madi);
 }
 
 /**

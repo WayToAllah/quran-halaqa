@@ -35,6 +35,21 @@ export interface SuraAssignment {
   toSura?: string;
   /** True when this is a whole-sura range (`sura`..`toSura`), not an ayah range. */
   range?: boolean;
+  /**
+   * UI-only: the raw text sitting in the sura picker while it still doesn't
+   * name a real sura. **Never persisted** — cleanAssignmentRow() rebuilds the
+   * saved shape from scratch and simply doesn't copy it.
+   *
+   * It exists so a half-typed row can be told apart from an untouched blank
+   * one. The picker commits `sura: ''` for anything it can't resolve, so a
+   * mistyped name ("بقرة" instead of "البقرة") left a row that looked exactly
+   * like a row the teacher never touched — and the save filtered it out
+   * silently, storing a session short of what was actually assigned.
+   */
+  draft?: string;
+  /** UI-only, same contract as `draft` — for the "إلى سورة" picker in
+   * whole-sura range mode. Never persisted. */
+  toSuraDraft?: string;
 }
 
 /** Evaluation of a *previous* session's assignment. `score` is null/undefined

@@ -6,6 +6,9 @@ import {
   extractAssignedSuras,
   validateAyahRange,
   isRowComplete,
+  isRowStarted,
+  firstIncompleteRow,
+  assignmentPairSignature,
   cleanAssignmentRow,
   cleanTajweed,
   rowsSignature,
@@ -347,5 +350,88 @@ describe('sessionGrading', () => {
 
   it('returns null when nothing follows the session', () => {
     expect(sessionGrading(jul25, [jul20, jul25])).toBeNull();
+  });
+});
+
+describe('isRowStarted', () => {
+  it('is false for an untouched blank row', () => {
+    expect(isRowStarted({ sura: '', from: '', to: '' })).toBe(false);
+  });
+
+  it('is true for text the picker could not resolve to a sura', () => {
+    // The picker commits sura:'' for anything it can't match, so without the
+    // draft this row is byte-identical to a blank one.
+    expect(isRowStarted({ sura: '', draft: 'بقرة' })).toBe(true);
+  });
+
+  it('is true for an unresolved end sura in range mode', () => {
+    expect(isRowStarted({ sura: '', toSuraDraft: 'فلق', range: true })).toBe(true);
+  });
+
+  it('is true when only ayah numbers were typed', () => {
+    expect(isRowStarted({ sura: '', from: '3' })).toBe(true);
+  });
+});
+
+describe('firstIncompleteRow', () => {
+  it('ignores blank rows entirely', () => {
+    expect(firstIncompleteRow([{ sura: 'الناس' }, { sura: '', from: '', to: '' }])).toBeNull();
+  });
+
+  it('reports an unresolved sura name and where it is', () => {
+    expect(firstIncompleteRow([{ sura: 'الناس' }, { sura: '', draft: 'بقرة' }])).toEqual({
+      index: 1,
+      reason: 'اسم السورة مش متحدد',
+    });
+  });
+
+  it('reports a range that has a start but no end sura', () => {
+    expect(firstIncompleteRow([{ sura: 'الناس', range: true }])).toEqual({
+      index: 0,
+      reason: 'سورة النهاية مش متحددة',
+    });
+  });
+
+  it('returns the FIRST offender, not the last', () => {
+    const bad = firstIncompleteRow([
+      { sura: '', draft: 'أ' },
+      { sura: '', draft: 'ب' },
+    ]);
+    expect(bad?.index).toBe(0);
+  });
+
+  it('passes a fully complete set', () => {
+    expect(
+      firstIncompleteRow([
+        { sura: 'الناس', from: '1', to: '6' },
+        { sura: 'الفلق', toSura: 'المسد', range: true },
+      ]),
+    ).toBeNull();
+  });
+});
+
+describe('assignmentPairSignature', () => {
+  it('ignores drafts and other UI-only fields', () => {
+    expect(assignmentPairSignature([{ sura: 'الناس', draft: 'نا' }], [])).toBe(
+      assignmentPairSignature([{ sura: 'الناس' }], []),
+    );
+  });
+
+  it('drops incomplete rows, so half-typing changes nothing on its own', () => {
+    expect(assignmentPairSignature([{ sura: 'الناس' }, { sura: '', draft: 'بق' }], [])).toBe(
+      assignmentPairSignature([{ sura: 'الناس' }], []),
+    );
+  });
+
+  it('changes when a stored end ayah is really corrected', () => {
+    expect(assignmentPairSignature([{ sura: 'البقرة', from: '1', to: '10' }], [])).not.toBe(
+      assignmentPairSignature([{ sura: 'البقرة', from: '1', to: '5' }], []),
+    );
+  });
+
+  it('keeps the two sides apart', () => {
+    expect(assignmentPairSignature([{ sura: 'الناس' }], [])).not.toBe(
+      assignmentPairSignature([], [{ sura: 'الناس' }]),
+    );
   });
 });

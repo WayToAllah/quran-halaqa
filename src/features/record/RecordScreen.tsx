@@ -17,6 +17,8 @@ import {
   extractAssignedSuras,
   validateAyahRange,
   isRowComplete,
+  firstIncompleteRow,
+  assignmentPairSignature,
   cleanAssignmentRow,
   cleanTajweed,
   rowsSignature,
@@ -92,6 +94,11 @@ function tierBadge(state: ScoreFieldState): { label: string; bg: string; color: 
 
 const emptyRow = (): SuraAssignment => ({ sura: '', from: '', to: '' });
 
+/** How a sura row is titled on screen. Shared with the save-time error message
+ * so "السورة الأولى" in the toast is literally the heading the teacher is
+ * being sent to look at, instead of a row number they have to count out. */
+const rowLabel = (i: number) => (i === 0 ? 'السورة الأولى' : `سورة ${i + 1}`);
+
 interface Props {
   /** When set, the screen opens in edit mode pre-filled with this record and
    * saving overwrites it (same id/studentId) instead of creating a new one. */
@@ -145,10 +152,18 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   // screen and wipe a correction the teacher has already typed. Tagging the
   // edits and ignoring them when the tag doesn't match is a pure derivation
   // with no such race.
+  //
+  // Both sides are seeded from the stored assignment the moment the first
+  // correction is typed, and `baseline` records what that stored assignment
+  // would save as. That pair is what makes "is there really a correction
+  // here?" answerable later WITHOUT evalSource — which is already gone by the
+  // time the student picker needs the answer, because typing a new name nulls
+  // selectedStudent and the previous session goes with it.
   const [prevEdits, setPrevEdits] = useState<{
     sourceId: string;
     loh: SuraAssignment[] | null;
     madi: SuraAssignment[] | null;
+    baseline: string;
   } | null>(null);
   // Mistake-counter history per evaluation. Preserved so reopening the counter
   // shows the same taps; committed to the record's loh/madi.mistakes on save.
@@ -219,6 +234,13 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   } | null>(null);
   // Guards the edit-prefill effect so it fires once per distinct record id.
   const consumedEditIdRef = useRef<string | null>(null);
+  // The date picker is shared by the whole recording run, but opening a saved
+  // session for edit moves it to THAT session's date — and used to leave it
+  // there. Every student recorded afterwards then silently landed on the old
+  // session's day. `before` is the run's date, `applied` is what edit mode set,
+  // so leaving edit mode can put the run's date back without overriding a date
+  // the teacher deliberately changed while editing.
+  const editDateRef = useRef<{ before: string; applied: string } | null>(null);
   // Who the fields on screen currently describe. Not the same as
   // `selectedStudent`, which the picker nulls the moment the teacher starts
   // typing a new name — by the time an option is clicked it is already gone.
@@ -280,9 +302,27 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     const sourceId = evalSource?.id;
     if (!sourceId) return;
     setPrevEdits((cur) => {
-      const base = cur && cur.sourceId === sourceId ? cur : { sourceId, loh: null, madi: null };
+      const base =
+        cur && cur.sourceId === sourceId
+          ? cur
+          : {
+              sourceId,
+              loh: prevLohList,
+              madi: prevMadiList,
+              baseline: assignmentPairSignature(prevLohList, prevMadiList),
+            };
       return { ...base, [which]: rows };
     });
+  }
+
+  /** True when the evaluation card holds a correction that would actually
+   * change the stored past session — typing "5" and then putting "10" back
+   * leaves nothing to warn about. */
+  function hasPrevCorrection(): boolean {
+    if (!prevEdits) return false;
+    return (
+      assignmentPairSignature(prevEdits.loh ?? [], prevEdits.madi ?? []) !== prevEdits.baseline
+    );
   }
   const prevLohInfo = fmtSuraInfo(effectivePrevLoh);
   const prevMadiInfo = fmtSuraInfo(effectivePrevMadi);
@@ -316,6 +356,11 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   function clearSessionFields() {
     setPrevLohScore('');
     setPrevMadiScore('');
+    // Safe to clear here — this runs only on a deliberate action (switching
+    // student, resetting after a save), never from an effect, so it can't be
+    // the mid-typing wipe the sourceId tagging exists to prevent. Left behind,
+    // a stale correction would keep reporting unsaved work on the NEXT switch.
+    setPrevEdits(null);
     setLohMistakes([]);
     setMadiMistakes([]);
     setLohRows([emptyRow()]);
@@ -339,6 +384,10 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     if (lohMistakes.length || madiMistakes.length) return true;
     if (note.trim()) return true;
     if (tajweedEnabled) return true;
+    // A correction to the PAST session is unsaved work too — it only reaches
+    // Firestore when today's session is saved, so switching students used to
+    // throw it away with no warning at all.
+    if (hasPrevCorrection()) return true;
     if (rowsSignature(lohRows) !== pristineRowsRef.current.loh) return true;
     if (rowsSignature(madiRows) !== pristineRowsRef.current.madi) return true;
     return false;
@@ -408,8 +457,13 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     // Allow the same record to be re-opened for edit later (e.g. cancel then
     // tap ✏️ again on the same session).
     consumedEditIdRef.current = null;
-    // date is deliberately NOT reset — matches the live app: the admin
-    // usually records several students in a row for the same session date.
+    // The date is deliberately NOT reset to today — matches the live app: the
+    // admin usually records several students in a row for one session date.
+    // But if EDIT MODE moved it, hand the run's own date back, unless the
+    // teacher has since chosen a different one themselves.
+    const moved = editDateRef.current;
+    editDateRef.current = null;
+    if (moved && date === moved.applied) setDate(moved.before);
   }
 
   /** Loads a saved record into the form for editing — resolves the current
@@ -433,7 +487,13 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
       null;
     setSelectedStudent(student);
     setStudentQuery(student ? getStudentName(student) : (r.student ?? ''));
-    if (r.date) setDate(r.date);
+    if (r.date && r.date !== date) {
+      // Keep the FIRST date we moved away from: editing a second record
+      // without leaving edit mode must still return to the recording run's
+      // own date, not to the previous record's.
+      editDateRef.current = { before: editDateRef.current?.before ?? date, applied: r.date };
+      setDate(r.date);
+    }
 
     setPrevLohScore(r.loh?.score != null ? String(r.loh.score) : '');
     setPrevMadiScore(r.madi?.score != null ? String(r.madi.score) : '');
@@ -567,6 +627,26 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
 
   function continueSaveAfterDuplicateCheck() {
     if (!selectedStudent) return; // narrows for TS; handleSave already checked this
+
+    // A row the teacher started but that can't be saved used to be dropped
+    // silently by the filter below — most often a sura name typed but never
+    // matched (the picker commits '' for anything it can't resolve), so the
+    // session saved short of what was actually assigned and nothing said so.
+    // Stop instead, and name the row.
+    const sections: { name: string; rows: SuraAssignment[]; label: (i: number) => string }[] = [
+      { name: 'اللوح', rows: lohRows, label: rowLabel },
+      { name: 'الماضي', rows: madiRows, label: rowLabel },
+      ...(tajweedEnabled
+        ? [{ name: 'التجويد', rows: [tajweed], label: () => 'سورة التجويد' }]
+        : []),
+    ];
+    for (const section of sections) {
+      const bad = firstIncompleteRow(section.rows);
+      if (bad) {
+        showToast(`${section.name} — ${section.label(bad.index)}: ${bad.reason}`, true);
+        return;
+      }
+    }
 
     const activeLohRows = lohRows.filter(isRowComplete).map(cleanAssignmentRow);
     const activeMadiRows = madiRows.filter(isRowComplete).map(cleanAssignmentRow);
@@ -1103,7 +1183,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
           {lohRows.map((row, i) => (
             <SuraRow
               key={i}
-              label={i === 0 ? 'السورة الأولى' : `سورة ${i + 1}`}
+              label={rowLabel(i)}
               value={row}
               onChange={(v) => setLohRows((rows) => rows.map((r, idx) => (idx === i ? v : r)))}
               onRemove={
@@ -1128,7 +1208,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
           {madiRows.map((row, i) => (
             <SuraRow
               key={i}
-              label={i === 0 ? 'السورة الأولى' : `سورة ${i + 1}`}
+              label={rowLabel(i)}
               value={row}
               onChange={(v) => setMadiRows((rows) => rows.map((r, idx) => (idx === i ? v : r)))}
               onRemove={

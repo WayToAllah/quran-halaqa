@@ -237,11 +237,15 @@ describe('RecordScreen — correcting a previous session range from the eval car
     await userEvent.clear(box);
     await userEvent.type(box, '2');
 
-    // Switch to a student with no previous session at all, then save.
+    // Switch to a student with no previous session at all, then save. The
+    // correction now counts as unsaved work, so the switch is confirmed
+    // first — and confirming discards it outright rather than merely leaving
+    // it inert, which is what the assertion below still checks.
     const picker = screen.getByPlaceholderText('ابحث أو اختر اسم الطالب…');
     await userEvent.clear(picker);
     await userEvent.type(picker, 'سالم');
     await userEvent.click(await screen.findByRole('button', { name: 'سالم' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'ابدأ من جديد' }));
     // Give the new session some content so the "جلسة فارغة" confirm doesn't
     // stand between us and the save under test.
     await userEvent.type(screen.getByPlaceholderText(/ملاحظة/), 'حضر');

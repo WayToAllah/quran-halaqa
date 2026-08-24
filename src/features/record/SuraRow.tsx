@@ -32,9 +32,10 @@ export function SuraRow({ value, onChange, onRemove, label, allowRange = true }:
     if (isRange) {
       // Leaving range mode: drop the end sura so it can't linger in a saved
       // per-sura row.
-      const { toSura: _drop, range: _r, ...rest } = value;
+      const { toSura: _drop, range: _r, toSuraDraft: _d, ...rest } = value;
       void _drop;
       void _r;
+      void _d;
       onChange({ ...rest });
     } else {
       // Entering range mode: clear ayah numbers (a whole-sura range has none).
@@ -91,7 +92,7 @@ export function SuraRow({ value, onChange, onRemove, label, allowRange = true }:
           <SuraCombobox
             value={value.sura || ''}
             placeholder="اكتب اسم السورة…"
-            onCommit={(name) => onChange({ ...value, sura: name })}
+            onCommit={(name, raw) => onChange({ ...value, sura: name, draft: name ? '' : raw })}
           />
         </div>
         {isRange && (
@@ -100,7 +101,9 @@ export function SuraRow({ value, onChange, onRemove, label, allowRange = true }:
             <SuraCombobox
               value={value.toSura || ''}
               placeholder="اكتب سورة النهاية…"
-              onCommit={(name) => onChange({ ...value, toSura: name })}
+              onCommit={(name, raw) =>
+                onChange({ ...value, toSura: name, toSuraDraft: name ? '' : raw })
+              }
             />
           </div>
         )}
@@ -159,7 +162,10 @@ function selectedInfoOf(sura?: string): SuraInfo | undefined {
 interface ComboProps {
   value: string;
   placeholder: string;
-  onCommit: (name: string) => void;
+  /** `name` is the resolved sura ('' while the text matches nothing); `raw` is
+   * what is actually in the box. The caller keeps `raw` so an unresolved row
+   * can still be recognised as started — see SuraAssignment.draft. */
+  onCommit: (name: string, raw: string) => void;
 }
 
 /** A searchable sura combobox. Emits the committed sura name (empty string
@@ -193,14 +199,14 @@ function SuraCombobox({ value, placeholder, onCommit }: ComboProps) {
   function commitSura(name: string) {
     setQuery(name);
     setOpen(false);
-    onCommit(name);
+    onCommit(name, name);
   }
 
   function handleInput(text: string) {
     setQuery(text);
     setOpen(true);
     const exact = findSuraByName(text);
-    onCommit(exact ? exact.name : '');
+    onCommit(exact ? exact.name : '', text);
   }
 
   return (
