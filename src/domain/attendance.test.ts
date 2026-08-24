@@ -7,6 +7,7 @@ import {
   enrolledHalaqaDates,
   firstRecordDate,
   getAttendanceRanking,
+  getPersonalAttendanceRanking,
   rankBadgeEmoji,
   sortedHalaqaDatesDesc,
 } from './attendance';
@@ -197,5 +198,83 @@ describe('computeAbsenceStreak', () => {
 
   it('is zero when there are no halaqa days at all', () => {
     expect(computeAbsenceStreak(new Set(), [])).toBe(0);
+  });
+});
+
+describe('getPersonalAttendanceRanking', () => {
+  const students: Student[] = [
+    { id: 's_1', name: 'أحمد' }, // enrolled from the start
+    { id: 's_2', name: 'محمد' }, // joined late
+  ];
+  const halaqa: SessionRecord[] = [
+    { id: 'r1', studentId: 's_1', date: '2026-07-01' },
+    { id: 'r2', studentId: 's_1', date: '2026-07-02' },
+    { id: 'r3', studentId: 's_1', date: '2026-07-04' },
+    { id: 'r4', studentId: 's_2', date: '2026-07-04' },
+  ];
+
+  it('measures each student against the halaqa days since they joined, not all of them', () => {
+    const { list } = getPersonalAttendanceRanking(students, halaqa, halaqa);
+    const ahmed = list.find((x) => x.id === 's_1')!;
+    const mohamed = list.find((x) => x.id === 's_2')!;
+    // 3 halaqa days exist; أحمد attended all 3.
+    expect(ahmed).toMatchObject({ attendedDays: 3, enrolledDays: 3, attendPct: 100 });
+    // محمد's first day is 07-04, so only that one day is his denominator.
+    expect(mohamed).toMatchObject({ attendedDays: 1, enrolledDays: 1, attendPct: 100 });
+  });
+
+  it('takes the enrolment date from the FULL history, not the filtered window', () => {
+    // Viewing July only, but أحمد has been around since June.
+    const july = halaqa.filter((r) => r.date!.startsWith('2026-07'));
+    const all: SessionRecord[] = [{ id: 'r0', studentId: 's_1', date: '2026-06-01' }, ...halaqa];
+    // A June-only halaqa day must not leak into the July denominator.
+    const { list } = getPersonalAttendanceRanking(students, july, all);
+    expect(list.find((x) => x.id === 's_1')!.enrolledDays).toBe(3);
+  });
+
+  it('does not count a day the student had not joined yet even if he attended later', () => {
+    const recs: SessionRecord[] = [
+      { id: 'a', studentId: 's_1', date: '2026-07-01' },
+      { id: 'b', studentId: 's_1', date: '2026-07-02' },
+      { id: 'c', studentId: 's_1', date: '2026-07-03' },
+      { id: 'd', studentId: 's_2', date: '2026-07-02' },
+    ];
+    const { list } = getPersonalAttendanceRanking(students, recs, recs);
+    const mohamed = list.find((x) => x.id === 's_2')!;
+    expect(mohamed.enrolledDays).toBe(2); // 07-02 and 07-03
+    expect(mohamed.attendedDays).toBe(1);
+    expect(mohamed.attendPct).toBe(50);
+  });
+
+  it('excludes EXCLUDED_HALAQA_DATES from the denominator', () => {
+    const recs: SessionRecord[] = [
+      { id: 'a', studentId: 's_1', date: '2026-07-01' },
+      { id: 'b', studentId: 's_1', date: EXCLUDED_HALAQA_DATES[0] },
+      { id: 'c', studentId: 's_2', date: '2026-07-01' },
+      { id: 'd', studentId: 's_2', date: EXCLUDED_HALAQA_DATES[0] },
+    ];
+    const { list } = getPersonalAttendanceRanking(students, recs, recs);
+    expect(list.every((x) => x.enrolledDays === 1)).toBe(true);
+  });
+
+  it('ranks densely — ties share a rank with no gap after them', () => {
+    const recs: SessionRecord[] = [
+      { id: 'a', studentId: 's_1', date: '2026-07-01' },
+      { id: 'b', studentId: 's_1', date: '2026-07-02' },
+      { id: 'c', studentId: 's_2', date: '2026-07-01' },
+      { id: 'd', studentId: 's_2', date: '2026-07-02' },
+      { id: 'e', studentId: 's_3', date: '2026-07-01' },
+    ];
+    const withThird = [...students, { id: 's_3', name: 'زيد' } as Student];
+    const { list } = getPersonalAttendanceRanking(withThird, recs, recs);
+    expect(list.find((x) => x.id === 's_1')!.rank).toBe(1);
+    expect(list.find((x) => x.id === 's_2')!.rank).toBe(1);
+    expect(list.find((x) => x.id === 's_3')!.rank).toBe(2);
+  });
+
+  it('leaves out students with no record inside the window', () => {
+    const withGhost = [...students, { id: 's_9', name: 'شبح' } as Student];
+    const { list } = getPersonalAttendanceRanking(withGhost, halaqa, halaqa);
+    expect(list.some((x) => x.id === 's_9')).toBe(false);
   });
 });

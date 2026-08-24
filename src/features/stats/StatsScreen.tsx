@@ -2,7 +2,11 @@ import { useMemo, useState } from 'preact/hooks';
 import { useStudents } from '../../hooks/useStudents';
 import { useAllRecords } from '../../hooks/useAllRecords';
 import { arabicPlural, esc, toArabicDigits, toArabicOrdinal } from '../../domain/text';
-import { ATTENDANCE_BADGE_THRESHOLD, getAttendanceRanking } from '../../domain/attendance';
+import {
+  ATTENDANCE_BADGE_THRESHOLD,
+  getAttendanceRanking,
+  getPersonalAttendanceRanking,
+} from '../../domain/attendance';
 import {
   computeSummaryStats,
   computeWeeklyBuckets,
@@ -41,6 +45,24 @@ const RANK_FALLBACK = { bg: '#F5F1E5', color: '#8A8372' };
 function rankStyle(rank: number) {
   return RANK_COLORS[rank - 1] ?? RANK_FALLBACK;
 }
+
+type AttendBasis = 'halaqa' | 'personal';
+
+/** Row shape shared by both attendance bases; `days`/`ofDays` are the numerator
+ * and denominator behind the percentage, whichever basis produced them. */
+interface AttendRow {
+  id: string;
+  name: string;
+  rank: number;
+  attendPct: number;
+  days: number;
+  ofDays: number;
+}
+
+const ATTEND_BASIS_TABS: { key: AttendBasis; label: string }[] = [
+  { key: 'halaqa', label: 'على مستوى الحلقة' },
+  { key: 'personal', label: 'منذ انضمامه' },
+];
 
 function attendBarColor(pct: number): string {
   if (pct >= 80) return '#0F3D2E';
@@ -120,6 +142,7 @@ export function StatsScreen() {
   const [cardBusy, setCardBusy] = useState(false);
   const [pagesExpanded, setPagesExpanded] = useState(false);
   const [attendExpanded, setAttendExpanded] = useState(false);
+  const [attendBasis, setAttendBasis] = useState<AttendBasis>('halaqa');
   const [followUpExpanded, setFollowUpExpanded] = useState(false);
 
   const availableMonths = useMemo(() => {
@@ -164,6 +187,35 @@ export function StatsScreen() {
     () => getAttendanceRanking(students, filteredRecords).list,
     [students, filteredRecords],
   );
+  // Second argument is the window, third is the FULL history — the join date
+  // has to come from outside the selected month or every veteran restarts at
+  // his first day in it and scores a free 100%.
+  const topAttendPersonal = useMemo(
+    () => getPersonalAttendanceRanking(students, filteredRecords, records).list,
+    [students, filteredRecords, records],
+  );
+  /** Both rankings flattened to one row shape so the card renders once. */
+  const attendRows = useMemo<AttendRow[]>(
+    () =>
+      attendBasis === 'halaqa'
+        ? topAttend.map((x) => ({
+            id: x.id,
+            name: x.name,
+            rank: x.rank,
+            attendPct: x.attendPct,
+            days: x.uniqueDays,
+            ofDays: summary.totalHalaqaDays,
+          }))
+        : topAttendPersonal.map((x) => ({
+            id: x.id,
+            name: x.name,
+            rank: x.rank,
+            attendPct: x.attendPct,
+            days: x.attendedDays,
+            ofDays: x.enrolledDays,
+          })),
+    [attendBasis, topAttend, topAttendPersonal, summary.totalHalaqaDays],
+  );
   const studentRows = useMemo(
     () => computeStudentStatsRows(students, filteredRecords, summary.totalHalaqaDays),
     [students, filteredRecords, summary.totalHalaqaDays],
@@ -181,7 +233,7 @@ export function StatsScreen() {
   const visibleFollowUp = followUpExpanded ? followUp : followUp.slice(0, PREVIEW_COUNT);
 
   const visiblePages = pagesExpanded ? topPages : topPages.slice(0, PREVIEW_COUNT);
-  const visibleAttend = attendExpanded ? topAttend : topAttend.slice(0, PREVIEW_COUNT);
+  const visibleAttend = attendExpanded ? attendRows : attendRows.slice(0, PREVIEW_COUNT);
   /** Index of the first student under the نجم الحضور line, or -1. Only ever
    * reached in the expanded list, since the preview is the top of the table. */
   const firstBelowThreshold = visibleAttend.findIndex(
@@ -402,7 +454,30 @@ export function StatsScreen() {
 
       <div class={cardCls}>
         <div class={cardTitleCls}>✅ الأكثر حضوراً</div>
-        {topAttend.length === 0 ? (
+        <div class="flex gap-1.5 mb-3">
+          {ATTEND_BASIS_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              aria-pressed={attendBasis === tab.key}
+              class={
+                'flex-1 py-1.5 rounded-full text-xs font-bold border ' +
+                (attendBasis === tab.key
+                  ? 'bg-forest text-parchment border-forest'
+                  : 'border-hairline text-taupe')
+              }
+              onClick={() => setAttendBasis(tab.key)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <div class="text-[11px] text-taupe mb-2.5">
+          {attendBasis === 'halaqa'
+            ? 'النسبة من كل أيام الحلقة — مقياس واحد للجميع'
+            : 'النسبة من أيام الحلقة بعد انضمام الطالب — زي صفحة ولي الأمر'}
+        </div>
+        {attendRows.length === 0 ? (
           <div class="text-center text-sm text-taupe py-6">لا يوجد بيانات</div>
         ) : (
           <div class="space-y-2">
@@ -438,8 +513,8 @@ export function StatsScreen() {
                         {x.name}
                       </div>
                       <div class="text-xs text-taupe">
-                        المركز {toArabicOrdinal(x.rank)} · {toArabicDigits(x.uniqueDays)} يوم حضور
-                        من {toArabicDigits(summary.totalHalaqaDays)}
+                        المركز {toArabicOrdinal(x.rank)} · {toArabicDigits(x.days)} يوم حضور من{' '}
+                        {toArabicDigits(x.ofDays)}
                       </div>
                     </div>
                     <div
@@ -456,7 +531,7 @@ export function StatsScreen() {
         )}
         <ShowAllToggle
           expanded={attendExpanded}
-          total={topAttend.length}
+          total={attendRows.length}
           cardLabel="الأكثر حضوراً"
           onToggle={() => setAttendExpanded((v) => !v)}
         />

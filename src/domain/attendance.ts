@@ -110,6 +110,72 @@ export function enrolledHalaqaDates(
   });
 }
 
+export interface PersonalAttendanceRankEntry {
+  id: string;
+  name: string;
+  /** Enrolled halaqa days the student actually turned up for. */
+  attendedDays: number;
+  /** Halaqa days inside the window from the student's join date onward. */
+  enrolledDays: number;
+  attendPct: number;
+  rank: number;
+}
+
+/**
+ * Attendance % measured against each student's OWN enrolment window — the same
+ * basis the parent page uses (see buildStats in stats.ts) — as opposed to
+ * getAttendanceRanking, which measures everyone against every halaqa day so
+ * the admin leaderboard stays a single comparable scale.
+ *
+ * `windowRecords` is the period-filtered set (what the month chips produce);
+ * `allRecords` is the UNFILTERED history and is used for one thing only:
+ * finding when each student joined. Deriving the join date from the filtered
+ * set would restart every long-standing student's window at their first
+ * attendance inside the selected month and hand them a free 100%.
+ *
+ * Population matches getAttendanceRanking: a student with no record at all
+ * inside the window is left out rather than shown at 0%, so toggling between
+ * the two views changes the percentages, not the names.
+ */
+export function getPersonalAttendanceRanking(
+  students: Student[],
+  windowRecords: SessionRecord[],
+  allRecords: SessionRecord[],
+): { list: PersonalAttendanceRankEntry[] } {
+  const windowDates = sortedHalaqaDatesDesc(windowRecords);
+
+  const per = students
+    .map((s) => {
+      const recs = recordsForStudent(s, windowRecords);
+      if (!recs.length) return null;
+      const enrolled = enrolledHalaqaDates(recordsForStudent(s, allRecords), windowDates);
+      const enrolledDays = enrolled.length;
+      const studentDates = new Set(recs.map((r) => r.date));
+      const attendedDays = enrolled.filter((d) => studentDates.has(d)).length;
+      const attendPct =
+        enrolledDays > 0 ? Math.min(100, Math.round((attendedDays / enrolledDays) * 100)) : 0;
+      return { id: s.id, name: getStudentName(s), attendedDays, enrolledDays, attendPct };
+    })
+    .filter((x): x is Omit<PersonalAttendanceRankEntry, 'rank'> => x !== null);
+
+  // الأيام المحضورة معيار ثانوي للعرض فقط: نسبة ١٠٠٪ على ٢٠ يوم تسبق ١٠٠٪ على
+  // يومين، من غير ما تفرق في رقم المركز.
+  per.sort(
+    (a, b) =>
+      b.attendPct - a.attendPct ||
+      b.attendedDays - a.attendedDays ||
+      a.name.localeCompare(b.name, 'ar'),
+  );
+
+  const uniquePcts = [...new Set(per.map((x) => x.attendPct))].sort((a, b) => b - a);
+  const rankByPct: Record<number, number> = {};
+  uniquePcts.forEach((pct, i) => {
+    rankByPct[pct] = i + 1;
+  });
+
+  return { list: per.map((x) => ({ ...x, rank: rankByPct[x.attendPct] })) };
+}
+
 export interface AttendanceRankEntry {
   /** Stable student id — the correct key for any rank lookup (names can
    * collide or change; see studentMatch() in students.ts for the principle). */
