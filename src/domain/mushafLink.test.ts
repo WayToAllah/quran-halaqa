@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mushafWardParam, mushafLink, readMushafCount } from './mushafLink';
+import { mushafWardParam, mushafLink, readMushafCount, isMushafReady } from './mushafLink';
 
 describe('mushafWardParam', () => {
   it('encodes a single assignment as sura:from:to', () => {
@@ -84,5 +84,21 @@ describe('readMushafCount', () => {
 
   it('floors a fractional count', () => {
     expect(readMushafCount({ ...ok, count: 3.7 }, 'r_9')).toBe(3);
+  });
+});
+
+describe('isMushafReady', () => {
+  it('accepts the viewer saying it is showing the ward', () => {
+    expect(isMushafReady({ type: 'mushaf-ready', id: 'r_9' }, 'r_9')).toBe(true);
+  });
+
+  it('ignores a ready from another open of the viewer', () => {
+    expect(isMushafReady({ type: 'mushaf-ready', id: 'r_10' }, 'r_9')).toBe(false);
+  });
+
+  it('ignores anything that is not the ready message', () => {
+    expect(isMushafReady({ type: 'mushaf-count', id: 'r_9', count: 1 }, 'r_9')).toBe(false);
+    expect(isMushafReady('hello', 'r_9')).toBe(false);
+    expect(isMushafReady(null, 'r_9')).toBe(false);
   });
 });

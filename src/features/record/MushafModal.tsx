@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { mushafLink, readMushafCount } from '../../domain/mushafLink';
+import { mushafLink, readMushafCount, isMushafReady } from '../../domain/mushafLink';
 import type { SuraAssignment } from '../../types';
 
 interface Props {
@@ -26,14 +26,18 @@ export function MushafModal({ label, list, studentName, token, onCount, onClose 
   const src = mushafLink(list, { name: studentName, ward: label, token });
   const closedRef = useRef(false);
   // The viewer draws its own header with the name and the ward, so this frame
-  // adds none of its own. Until the iframe is up there is nothing on screen to
-  // close with, hence the temporary button.
+  // adds none of its own. Until the viewer reports that it is showing the ward
+  // there may be nothing on screen to close with, hence the temporary button.
   const [viewerUp, setViewerUp] = useState(false);
 
   useEffect(() => {
     function onMessage(e: MessageEvent) {
       // Only same-origin messages are ours; the viewer is served from this site.
       if (e.origin !== window.location.origin) return;
+      if (isMushafReady(e.data, token)) {
+        setViewerUp(true);
+        return;
+      }
       const count = readMushafCount(e.data, token);
       if (count === null || closedRef.current) return;
       closedRef.current = true;
@@ -60,13 +64,7 @@ export function MushafModal({ label, list, studentName, token, onCount, onClose 
           </button>
         </div>
       )}
-      <iframe
-        title="المصحف"
-        src={src}
-        class="flex-1 w-full border-0"
-        data-testid="mushaf-frame"
-        onLoad={() => setViewerUp(true)}
-      />
+      <iframe title="المصحف" src={src} class="flex-1 w-full border-0" data-testid="mushaf-frame" />
     </div>
   );
 }

@@ -64,3 +64,16 @@ export function readMushafCount(data: unknown, token: string): number | null {
   if (!Number.isFinite(n) || n < 0) return null;
   return Math.floor(n);
 }
+
+/**
+ * The viewer says this once it is actually showing the ward. It is not the same
+ * as the iframe loading: the viewer can come up and still fail to place the
+ * ward (an unknown sura name), in which case it falls back to its own picker
+ * and stays silent — and the app must keep offering a way out.
+ */
+export function isMushafReady(data: unknown, token: string): boolean {
+  if (!data || typeof data !== 'object') return false;
+  const msg = data as { type?: unknown; id?: unknown };
+  if (msg.type !== 'mushaf-ready') return false;
+  return String(msg.id ?? '') === token;
+}

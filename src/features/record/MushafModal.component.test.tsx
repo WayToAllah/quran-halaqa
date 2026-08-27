@@ -42,10 +42,29 @@ describe('MushafModal', () => {
     expect(screen.queryByText('اللوح')).toBeNull();
   });
 
-  it('drops its own close button once the viewer is up, so only one is on screen', async () => {
+  it('drops its own close button once the viewer says it is showing the ward', async () => {
     renderModal();
-    fireEvent.load(screen.getByTestId('mushaf-frame'));
+    postFromViewer({ type: 'mushaf-ready', id: 'r_9' });
     await waitFor(() => expect(screen.queryByLabelText('إغلاق المصحف')).toBeNull());
+  });
+
+  it('keeps a way out when the viewer loads but cannot place the ward', async () => {
+    const user = userEvent.setup();
+    const { onClose, onCount } = renderModal();
+    // The frame is up, but no ward: the viewer falls back to its picker and
+    // never reports ready, so the teacher must still be able to back out.
+    fireEvent.load(screen.getByTestId('mushaf-frame'));
+    await new Promise((r) => setTimeout(r, 10));
+    await user.click(screen.getByLabelText('إغلاق المصحف'));
+    expect(onClose).toHaveBeenCalled();
+    expect(onCount).not.toHaveBeenCalled();
+  });
+
+  it('ignores a ready meant for an earlier open', async () => {
+    renderModal({ token: 'r_9' });
+    postFromViewer({ type: 'mushaf-ready', id: 'r_OLD' });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(screen.getByLabelText('إغلاق المصحف')).toBeInTheDocument();
   });
 
   it('hands the count back and closes when the viewer reports it', async () => {
