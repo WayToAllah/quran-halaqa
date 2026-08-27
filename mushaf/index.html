@@ -164,7 +164,23 @@ const JUZ_NAME = ['الأول','الثاني','الثالث','الرابع','ا�
 'الحادي عشر','الثاني عشر','الثالث عشر','الرابع عشر','الخامس عشر','السادس عشر','السابع عشر','الثامن عشر','التاسع عشر','العشرون',
 'الحادي والعشرون','الثاني والعشرون','الثالث والعشرون','الرابع والعشرون','الخامس والعشرون','السادس والعشرون','السابع والعشرون','الثامن والعشرون','التاسع والعشرون','الثلاثون'];
 const juzOfPage = p => { let n = 1; JUZ_START.forEach((j, i) => { if (pageOfAyah(j[0], j[1]) <= p) n = i + 1; }); return n; };
-const suraOfPage = p => SURAS[Math.floor(PAGE_STARTS[p - 1] / 1000) - 1][0];
+// أسماء كل السور المطبوعة في الصفحة، بالترتيب. الصفحة بتبدأ عند آية معروفة،
+// وبتنتهي عند الآية اللي قبل بداية الصفحة اللي بعدها — فلو الصفحة الجاية بتبدأ
+// من أول سورة، السورة دي مش محسوبة على الصفحة الحالية.
+// ١٧ سورة (الناس، الفلق، المسد… وكلها في جزء عمّ) مش بتبدأ صفحة أصلًا، وكانت
+// بتختفي من الهيدر لما كنا بنعرض سورة البداية بس.
+function surasOnPage(p) {
+  const start = PAGE_STARTS[p - 1];
+  if (start === undefined) return [];
+  const next = PAGE_STARTS[p];
+  const first = Math.floor(start / 1000);
+  const last = next === undefined
+    ? SURAS.length
+    : Math.floor(next / 1000) - (next % 1000 === 1 ? 1 : 0);
+  const out = [];
+  for (let i = first; i <= last; i++) out.push(SURAS[i - 1][0]);
+  return out;
+}
 const AR = n => String(n).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
 const suraIdx = name => { const i = SURAS.findIndex(x => x[0] === name); return i < 0 ? 0 : i + 1; };
 const ayahCount = i => SURAS[i - 1][1];
@@ -328,7 +344,7 @@ function addNav(st) {
 function label(p) {
   document.getElementById('pnum').textContent = pages.length > 1 ? AR(idx + 1) + '/' + AR(pages.length) : '';
   document.getElementById('mjuz').textContent = 'الجزء ' + JUZ_NAME[juzOfPage(p) - 1];
-  document.getElementById('msura').textContent = suraOfPage(p);
+  document.getElementById('msura').textContent = surasOnPage(p).join(' · ');
   document.getElementById('mpage').textContent = AR(p);
 }
 function total() {
