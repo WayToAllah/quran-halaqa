@@ -361,8 +361,10 @@ function startEmbedded() {
   counts = pages.map(() => 0); idx = 0;
   pages.forEach((pp) => ensureFontsFor(pp));
   document.querySelector('.bar .t b').textContent = EMBED.name || 'التسميع';
-  document.getElementById('ward').textContent = EMBED.ward ||
-    EMBED.items.map(a => a.sura + (a.from && a.to ? ' ' + AR(a.from) + '-' + AR(a.to) : '')).join(' + ');
+  const wardText = EMBED.items
+    .map(a => a.sura + (a.from && a.to ? ' ' + AR(a.from) + '-' + AR(a.to) : ''))
+    .join(' + ');
+  document.getElementById('ward').textContent = EMBED.ward ? EMBED.ward + '، ' + wardText : wardText;
   document.getElementById('viewer').classList.add('on');
   render();
 }
