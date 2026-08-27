@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { mushafLink, readMushafCount } from '../../domain/mushafLink';
 import type { SuraAssignment } from '../../types';
 
@@ -25,6 +25,10 @@ interface Props {
 export function MushafModal({ label, list, studentName, token, onCount, onClose }: Props) {
   const src = mushafLink(list, { name: studentName, ward: label, token });
   const closedRef = useRef(false);
+  // The viewer draws its own header with the name and the ward, so this frame
+  // adds none of its own. Until the iframe is up there is nothing on screen to
+  // close with, hence the temporary button.
+  const [viewerUp, setViewerUp] = useState(false);
 
   useEffect(() => {
     function onMessage(e: MessageEvent) {
@@ -44,21 +48,25 @@ export function MushafModal({ label, list, studentName, token, onCount, onClose 
 
   return (
     <div class="fixed inset-0 z-50 bg-[#FFF9F1] flex flex-col" dir="rtl">
-      <div class="flex items-center gap-3 px-4 py-2 border-b border-hairline bg-white">
-        <button
-          type="button"
-          class="text-2xl leading-none text-[#5B5646] px-1"
-          aria-label="إغلاق المصحف"
-          onClick={onClose}
-        >
-          &times;
-        </button>
-        <div class="min-w-0">
-          <div class="font-extrabold text-ink-dark text-[13.5px] truncate">{studentName}</div>
-          <div class="text-[11px] text-taupe truncate">{label}</div>
+      {!viewerUp && (
+        <div class="flex items-center px-4 py-2 border-b border-hairline bg-white">
+          <button
+            type="button"
+            class="text-2xl leading-none text-[#5B5646] px-1"
+            aria-label="إغلاق المصحف"
+            onClick={onClose}
+          >
+            &times;
+          </button>
         </div>
-      </div>
-      <iframe title="المصحف" src={src} class="flex-1 w-full border-0" data-testid="mushaf-frame" />
+      )}
+      <iframe
+        title="المصحف"
+        src={src}
+        class="flex-1 w-full border-0"
+        data-testid="mushaf-frame"
+        onLoad={() => setViewerUp(true)}
+      />
     </div>
   );
 }

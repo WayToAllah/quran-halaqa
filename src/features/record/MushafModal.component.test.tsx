@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/preact';
+import { render, screen, waitFor, fireEvent } from '@testing-library/preact';
 import userEvent from '@testing-library/user-event';
 import { MushafModal } from './MushafModal';
 import type { SuraAssignment } from '../../types';
@@ -36,10 +36,16 @@ describe('MushafModal', () => {
     expect(frame.getAttribute('src')).toContain('id=r_9');
   });
 
-  it('shows the student and which ward is open', () => {
+  it('leaves the name and the ward to the viewer instead of repeating them above it', () => {
     renderModal();
-    expect(screen.getByText('زيد احمد')).toBeInTheDocument();
-    expect(screen.getByText('اللوح')).toBeInTheDocument();
+    expect(screen.queryByText('زيد احمد')).toBeNull();
+    expect(screen.queryByText('اللوح')).toBeNull();
+  });
+
+  it('drops its own close button once the viewer is up, so only one is on screen', async () => {
+    renderModal();
+    fireEvent.load(screen.getByTestId('mushaf-frame'));
+    await waitFor(() => expect(screen.queryByLabelText('إغلاق المصحف')).toBeNull());
   });
 
   it('hands the count back and closes when the viewer reports it', async () => {
@@ -71,7 +77,7 @@ describe('MushafModal', () => {
     expect(onCount).toHaveBeenCalledWith(2);
   });
 
-  it('closes without a count when the teacher backs out', async () => {
+  it('still offers a way out while the viewer has not loaded yet', async () => {
     const user = userEvent.setup();
     const { onClose, onCount } = renderModal();
     await user.click(screen.getByLabelText('إغلاق المصحف'));
