@@ -362,6 +362,14 @@ const EMBED = (() => {
   if (!items.length) return null;
   return { items, name: q.get('n') || '', ward: q.get('w') || '', token: q.get('id') || '' };
 })();
+/** Told to the app once the ward is actually on screen. Separate from the
+ * iframe loading: the viewer can come up and still fail to place the ward. */
+function announceReady() {
+  if (!EMBED) return;
+  const msg = { type: 'mushaf-ready', id: EMBED.token };
+  if (window.parent && window.parent !== window) window.parent.postMessage(msg, '*');
+  else if (window.opener) window.opener.postMessage(msg, '*');
+}
 function reportCount(total) {
   if (!EMBED) return false;
   const msg = { type: 'mushaf-count', id: EMBED.token, count: total };
@@ -371,9 +379,19 @@ function reportCount(total) {
 }
 function startEmbedded() {
   if (!EMBED) return;
-  document.querySelector('.wrap').style.display = 'none';
   pages = pagesForWard(EMBED.items, suraIdx, ayahCount);
-  if (!pages.length) return;
+  if (!pages.length) {
+    // اسم السورة مش مطابق للقائمة، أو الورد من غير سورة. الشاشة كانت بتفضل
+    // بيضا من غير أي كلمة — دلوقتي شاشة الاختيار بتفضل شغالة والمحفّظ يكمّل.
+    const names = EMBED.items.map(a => a.sura).filter(Boolean).join(' + ');
+    const w = document.querySelector('.wrap');
+    w.querySelector('h1').textContent = 'مش لاقي الورد ده في المصحف';
+    w.querySelector('.sub').textContent = names
+      ? 'مقدرتش أحدد صفحات: ' + names + ' — اختار السورة من هنا وكمّل عادي.'
+      : 'الورد مفيهوش سورة مكتوبة — اختار السورة من هنا وكمّل عادي.';
+    return;
+  }
+  document.querySelector('.wrap').style.display = 'none';
   counts = pages.map(() => 0); idx = 0;
   pages.forEach((pp) => ensureFontsFor(pp));
   document.querySelector('.bar .t b').textContent = EMBED.name || 'التسميع';
@@ -383,6 +401,7 @@ function startEmbedded() {
   document.getElementById('ward').textContent = EMBED.ward ? EMBED.ward + '، ' + wardText : wardText;
   document.getElementById('viewer').classList.add('on');
   render();
+  announceReady();
 }
 document.getElementById('go').onclick = () => {
   calc();
@@ -392,6 +411,7 @@ document.getElementById('go').onclick = () => {
   document.getElementById('ward').textContent = 'اللوح، ' + sEl.value + ' ' + AR(fEl.value) + '-' + AR(tEl.value);
   document.getElementById('viewer').classList.add('on');
   render();
+  announceReady();
   if (pages.length > 1) flash('اسحب يمين للصفحة اللي بعدها');
 };
 function flash(msg) {
