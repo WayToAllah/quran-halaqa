@@ -193,7 +193,9 @@ SURAS.forEach(([n, c], i) => {
 });
 sEl.value = 'النبأ'; fEl.value = 1; tEl.value = 40;
 
-let pages = [], counts = [], idx = 0;
+// pages بيبدأ بصفحات الورد وبيتمدّد وانت بتقلّب برّاه. ward بيفضل صفحات
+// الورد الأصلية عشان نعرف إحنا جوّه ولا برّه.
+let pages = [], counts = [], idx = 0, ward = [];
 function calc() {
   const a = { sura: sEl.value, from: fEl.value, to: tEl.value };
   const max = ayahCount(suraIdx(a.sura));
@@ -334,15 +336,16 @@ async function render() {
   total();
 }
 function addNav(st) {
-  if (pages.length < 2) return;
-  if (idx > 0) st.insertAdjacentHTML('beforeend', '<button class="nav r" id="prev">&#8250;</button>');
-  if (idx < pages.length - 1) st.insertAdjacentHTML('beforeend', '<button class="nav l" id="next">&#8249;</button>');
+  if (idx > 0 || pages[0] > 1) st.insertAdjacentHTML('beforeend', '<button class="nav r" id="prev">&#8250;</button>');
+  if (idx < pages.length - 1 || pages[pages.length - 1] < 604) st.insertAdjacentHTML('beforeend', '<button class="nav l" id="next">&#8249;</button>');
   const pv = document.getElementById('prev'), nx = document.getElementById('next');
   if (pv) pv.onclick = () => goTo(idx - 1, -1);
   if (nx) nx.onclick = () => goTo(idx + 1, 1);
 }
 function label(p) {
-  document.getElementById('pnum').textContent = pages.length > 1 ? AR(idx + 1) + '/' + AR(pages.length) : '';
+  const w = ward.indexOf(p);
+  document.getElementById('pnum').textContent =
+    w < 0 ? 'خارج الورد' : ward.length > 1 ? AR(w + 1) + '/' + AR(ward.length) : '';
   document.getElementById('mjuz').textContent = 'الجزء ' + JUZ_NAME[juzOfPage(p) - 1];
   document.getElementById('msura').textContent = surasOnPage(p).join(' · ');
   document.getElementById('mpage').textContent = AR(p);
@@ -350,7 +353,7 @@ function label(p) {
 function total() {
   const t = counts.reduce((a, b) => a + b, 0);
   document.getElementById('cnt').textContent = AR(t);
-  document.getElementById('hint').textContent = t === 0 ? 'دوس على زرار الخطأ مع كل غلطة' : 'إجمالي أخطاء الورد ' + AR(t) + (pages.length > 1 ? '، وفي الصفحة دي ' + AR(counts[idx]) : '');
+  document.getElementById('hint').textContent = t === 0 ? 'دوس على زرار الخطأ مع كل غلطة' : 'إجمالي الأخطاء ' + AR(t) + (pages.length > 1 ? '، وفي الصفحة دي ' + AR(counts[idx]) : '');
 }
 // ---- خارجي: يفتح الورد مباشرةً من رابط، ويرجّع العدد للتطبيق ----
 const EMBED = (() => {
@@ -392,7 +395,7 @@ function startEmbedded() {
     return;
   }
   document.querySelector('.wrap').style.display = 'none';
-  counts = pages.map(() => 0); idx = 0;
+  counts = pages.map(() => 0); idx = 0; ward = pages.slice();
   pages.forEach((pp) => ensureFontsFor(pp));
   document.querySelector('.bar .t b').textContent = EMBED.name || 'التسميع';
   const wardText = EMBED.items
@@ -406,13 +409,13 @@ function startEmbedded() {
 document.getElementById('go').onclick = () => {
   calc();
   if (!pages.length) return;
-  counts = pages.map(() => 0); idx = 0;
+  counts = pages.map(() => 0); idx = 0; ward = pages.slice();
   pages.forEach((pp) => ensureFontsFor(pp));
   document.getElementById('ward').textContent = 'اللوح، ' + sEl.value + ' ' + AR(fEl.value) + '-' + AR(tEl.value);
   document.getElementById('viewer').classList.add('on');
   render();
   announceReady();
-  if (pages.length > 1) flash('اسحب يمين للصفحة اللي بعدها');
+  flash(pages.length > 1 ? 'اسحب يمين للصفحة اللي بعدها' : 'اسحب يمين وشمال تتنقل في المصحف');
 };
 function flash(msg) {
   const s = document.getElementById('shint');
@@ -420,8 +423,17 @@ function flash(msg) {
   clearTimeout(s._t); s._t = setTimeout(() => s.classList.remove('on'), 1100);
 }
 function goTo(n, dir) {
-  if (n < 0) { flash('دي أول صفحة في الورد'); return; }
-  if (n > pages.length - 1) { flash('دي آخر صفحة في الورد'); return; }
+  // برّه حدود الورد بنمدّ المصفوفة صفحة صفحة، فالمحفّظ يقدر يقلّب في المصحف
+  // كله. الحدود الحقيقية الوحيدة هي أول وآخر صفحة في المصحف.
+  if (n < 0) {
+    const before = pages[0] - 1;
+    if (before < 1) { flash('دي أول صفحة في المصحف'); return; }
+    pages.unshift(before); counts.unshift(0); ensureFontsFor(before); n = 0;
+  } else if (n > pages.length - 1) {
+    const after = pages[pages.length - 1] + 1;
+    if (after > 604) { flash('دي آخر صفحة في المصحف'); return; }
+    pages.push(after); counts.push(0); ensureFontsFor(after);
+  }
   idx = n; render();
   const img = document.querySelector('.stage .sheet') || document.querySelector('.stage img');
   if (img) {
@@ -435,7 +447,7 @@ function goTo(n, dir) {
   const st = document.getElementById('stage');
   let x0 = 0, y0 = 0, dx = 0, dy = 0, active = false;
   st.addEventListener('touchstart', e => {
-    if (e.touches.length !== 1 || pages.length < 2) return;
+    if (e.touches.length !== 1) return;
     active = true; dx = dy = 0;
     x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
   }, { passive: true });
@@ -460,7 +472,7 @@ function goTo(n, dir) {
     }
   }, { passive: true });
   document.addEventListener('keydown', e => {
-    if (!document.getElementById('viewer').classList.contains('on') || pages.length < 2) return;
+    if (!document.getElementById('viewer').classList.contains('on')) return;
     if (e.key === 'ArrowLeft') goTo(idx + 1, 1);
     if (e.key === 'ArrowRight') goTo(idx - 1, -1);
   });
