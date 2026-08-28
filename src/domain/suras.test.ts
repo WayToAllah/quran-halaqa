@@ -29,6 +29,16 @@ describe('SURAS', () => {
     expect(findSuraByName('البقرة')).toMatchObject({ pageStart: 2, pageEnd: 49 });
     expect(findSuraByName('الكهف')).toMatchObject({ pageStart: 293, pageEnd: 304 });
   });
+  it('ends a sura on the page holding its last ayah, even when shared', () => {
+    // النساء 176 is the first line of page 106, which is also where المائدة
+    // begins. Both suras list 106; the range means "the sura appears on these
+    // pages", not "these pages are only this sura".
+    expect(findSuraByName('النساء')).toMatchObject({ pageStart: 77, pageEnd: 106 });
+    expect(findSuraByName('المائدة')).toMatchObject({ pageStart: 106 });
+    expect(findSuraByName('الأحقاف')).toMatchObject({ pageEnd: 506 });
+    expect(findSuraByName('البينة')).toMatchObject({ pageEnd: 599 });
+    expect(findSuraByName('الفلق')).toMatchObject({ pageStart: 604, pageEnd: 604 });
+  });
   it('every page range is valid (1..604, start ≤ end)', () => {
     for (const s of SURAS) {
       expect(s.pageStart).toBeGreaterThanOrEqual(1);

@@ -87,35 +87,18 @@ describe('agreement with the SURAS table', () => {
     });
   });
 
-  it("SURAS' pageEnd disagrees on exactly the 16 known suras, and nowhere else", () => {
-    // SURAS.pageEnd is display-only ("صفحات 2-49") and is off by one page for
-    // 16 suras — it rounds to the page a sura visually ends near, while this
-    // table says which page its LAST AYAH actually sits on (e.g. النساء 176 is
-    // the first line of page 106, not the end of 105). The page table is the
-    // one verified ayah-by-ayah, so it wins here; this test pins the known
-    // divergence so a future fix to either table is a deliberate decision and
-    // not a silent drift.
-    const disagreeing = SURAS.filter((s, i) => pageOfAyah(i + 1, s.count) !== s.pageEnd).map(
-      (s) => s.name,
-    );
-    expect(disagreeing).toEqual([
-      'النساء',
-      'يونس',
-      'هود',
-      'الرعد',
-      'الحجر',
-      'مريم',
-      'الشورى',
-      'الأحقاف',
-      'الطور',
-      'الحشر',
-      'الانشقاق',
-      'البروج',
-      'الغاشية',
-      'البلد',
-      'البينة',
-      'العاديات',
-    ]);
+  it("every sura's last ayah lands on its recorded pageEnd", () => {
+    // These two tables used to disagree on 16 suras. The divergence was a
+    // convention mismatch, not a data error: SURAS was inherited from
+    // production, where a sura that ends on a page it shares with the next one
+    // was sometimes credited to the earlier page and sometimes to the later.
+    // 58 of the 113 sura boundaries share a page, so both suras legitimately
+    // list it — النساء is 77-106 and المائدة starts at 106. The page table is
+    // the one verified ayah-by-ayah, so SURAS was corrected to match it, and
+    // this now holds for all 114.
+    SURAS.forEach((s, i) => {
+      expect([s.name, pageOfAyah(i + 1, s.count)]).toEqual([s.name, s.pageEnd]);
+    });
   });
 });
 
