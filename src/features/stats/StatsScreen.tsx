@@ -12,6 +12,7 @@ import {
   computeWeeklyBuckets,
   computeScoreDistribution,
   computeTopPages,
+  sumMemorizedPages,
   computeFollowUpList,
   computeStudentStatsRows,
   sortStudentStatsRows,
@@ -180,6 +181,9 @@ export function StatsScreen() {
     () => computeTopPages(students, records, Infinity, monthFilter),
     [students, records, monthFilter],
   );
+  // Headline for the pages leaderboard below it. Derived from the same rows so
+  // the total and the ranking are always the same computation.
+  const totalPages = useMemo(() => sumMemorizedPages(topPages), [topPages]);
   // No minPct filter: students below the نجم الحضور line are the ones a
   // teacher most needs to see. The threshold survives as a visual marker in
   // the expanded list instead of as a filter that hides them.
@@ -325,9 +329,9 @@ export function StatsScreen() {
                 ? undefined
                 : `${toArabicDigits(dailyAttendancePct)}٪ من النشطين`,
           },
-          // The two averages sit side by side, and so do the two ayat counts —
-          // an odd card count in a 2-column grid would strand one of them
-          // alone on the last row, so the total spans the full width.
+          // The two averages sit side by side, and so do the two ayat counts.
+          // The two totals pair off on the last row, which is why neither is
+          // full-width: an odd card count would strand one of them alone.
           { num: toArabicDigits(summary.avgLoh) + '٪', lbl: 'متوسط اللوح', color: '#0F3D2E' },
           { num: toArabicDigits(summary.avgMadi) + '٪', lbl: 'متوسط الماضي', color: '#C9A227' },
           { num: toArabicDigits(summary.lohAyat), lbl: 'آيات لوح', color: '#0F3D2E' },
@@ -336,15 +340,20 @@ export function StatsScreen() {
             num: toArabicDigits(summary.totalAyat),
             lbl: 'إجمالي الآيات',
             color: '#0F3D2E',
-            wide: true,
+          },
+          // Whole pages of new memorization (اللوح) summed over every student —
+          // الماضي and التجويد are revision of ground already held, so they are
+          // out by the same rule the leaderboard uses.
+          {
+            num: toArabicDigits(totalPages),
+            lbl: 'إجمالي الصفحات المحفوظة',
+            color: '#C9A227',
+            sub: 'لوح فقط، لكل الطلاب',
           },
         ].map((c) => (
           <div
             key={c.lbl}
-            class={
-              'bg-white border border-hairline rounded-2xl py-4 px-3 text-center' +
-              (c.wide ? ' col-span-2' : '')
-            }
+            class="bg-white border border-hairline rounded-2xl py-4 px-3 text-center"
           >
             <div class="text-[24px] font-black leading-none" style={{ color: c.color }}>
               {c.num}

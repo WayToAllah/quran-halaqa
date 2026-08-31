@@ -12,6 +12,7 @@ import {
   sortStudentStatsRows,
   getWeekStart,
   countRecentlyActiveStudents,
+  sumMemorizedPages,
 } from './statsScreen';
 import type { SessionRecord, Student } from '../types';
 
@@ -980,5 +981,50 @@ describe('computeLohSpan — only what has actually been recited', () => {
       sess('r3', '2026-07-01', null, 85),
     ];
     expect(computeLohSpan(st, recs, '2026-06')!.endLabel).toBe('القلم ٥٢');
+  });
+});
+
+describe('sumMemorizedPages', () => {
+  const roster: Student[] = [
+    { id: 's_a', name: 'ياسين الشناوي' },
+    { id: 's_b', name: 'عمر خالد' },
+  ];
+
+  it('is zero for an empty leaderboard', () => {
+    expect(sumMemorizedPages([])).toBe(0);
+  });
+
+  it('adds every row, not just the visible top three', () => {
+    const rows = [
+      { id: 's_1', name: 'أ', startLabel: '', endLabel: '', pages: 6, sessionsCount: 2 },
+      { id: 's_2', name: 'ب', startLabel: '', endLabel: '', pages: 3, sessionsCount: 1 },
+      { id: 's_3', name: 'ج', startLabel: '', endLabel: '', pages: 1, sessionsCount: 1 },
+      { id: 's_4', name: 'د', startLabel: '', endLabel: '', pages: 2, sessionsCount: 1 },
+    ];
+    expect(sumMemorizedPages(rows)).toBe(12);
+  });
+
+  it('totals the halaqa across students — the same page held by two students counts twice', () => {
+    // Both students memorized the identical span, so the halaqa total is double
+    // one student's achievement rather than a distinct-pages-of-the-mushaf count.
+    const recs: SessionRecord[] = ['s_a', 's_b'].flatMap((sid) => [
+      {
+        id: `r1_${sid}`,
+        studentId: sid,
+        date: '2026-05-01',
+        newLoh: [{ sura: 'الحاقة', from: '38', to: '52' }],
+      },
+      {
+        id: `r2_${sid}`,
+        studentId: sid,
+        date: '2026-07-01',
+        newLoh: [{ sura: 'التحريم', from: '1', to: '12' }],
+        loh: { score: 90 },
+      },
+      { id: `g1_${sid}`, studentId: sid, date: '2026-08-01', loh: { score: 90 } },
+    ]);
+    const rows = computeTopPages(roster, recs, Infinity);
+    expect(rows.map((r) => r.pages)).toEqual([6, 6]);
+    expect(sumMemorizedPages(rows)).toBe(12);
   });
 });

@@ -353,6 +353,25 @@ export function computeTopPages(
   return per.sort((a, b) => b.pages - a.pages).slice(0, limit);
 }
 
+/**
+ * Pages memorized by the halaqa as a whole, for the period the rows were built
+ * for.
+ *
+ * This is a sum of individual achievements, NOT the count of distinct mushaf
+ * pages the halaqa collectively covers: two students who memorized the same
+ * page contribute two. That is the intended reading — the number answers "how
+ * much memorizing happened here", and every student's page is their own.
+ *
+ * Takes the already-computed leaderboard rather than students+records so the
+ * screen never pays for a second pass over every student's history, and so the
+ * headline total can never disagree with the ranking printed under it. Pass the
+ * UNSLICED list (`computeTopPages(..., Infinity, ...)`); a top-3 slice would
+ * total three students.
+ */
+export function sumMemorizedPages(entries: TopPagesEntry[]): number {
+  return entries.reduce((a, e) => a + e.pages, 0);
+}
+
 export interface StudentStatsRow {
   /** Stable student id — see TopPagesEntry.id. */
   id: string;
