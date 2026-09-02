@@ -80,6 +80,12 @@ describe('buildPagesCardData', () => {
 });
 
 describe('buildPagesCardSvg', () => {
+  it('wears the same star icon as the attendance card, not a book', () => {
+    const svg = buildPagesCardSvg(buildPagesCardData(students, records));
+    expect(svg).toContain('🌟 نجوم الحفظ');
+    expect(svg).not.toContain('📖');
+  });
+
   it('uses the same live card design as the attendance one', () => {
     const svg = buildPagesCardSvg(buildPagesCardData(students, records));
     expect(svg.startsWith('<svg')).toBe(true);

@@ -51,7 +51,7 @@ export function buildPagesCardData(
     pages: e.pages,
   }));
   return {
-    title: '📖 نجوم الحفظ',
+    title: '🌟 نجوم الحفظ',
     periodLabel: opts.periodLabel ?? 'كل الفترة',
     totalPages: entries.reduce((n, e) => n + e.pages, 0),
     count: entries.length,
@@ -87,7 +87,7 @@ export function pagesCardText(data: PagesCardData): string {
   );
   return [
     'السلام عليكم ورحمة الله وبركاته 🌿',
-    `📖 *نجوم الحفظ* — ${data.periodLabel}`,
+    `🌟 *نجوم الحفظ* — ${data.periodLabel}`,
     '─'.repeat(18),
     '',
     ...lines,
