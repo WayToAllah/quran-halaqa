@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { useStudents } from '../../hooks/useStudents';
 import { useAllRecords } from '../../hooks/useAllRecords';
 import { arabicPlural, esc, toArabicDigits, toArabicOrdinal } from '../../domain/text';
@@ -26,7 +26,7 @@ import {
   attendanceCardSize,
 } from '../../domain/attendanceCard';
 import { buildPagesCardData, buildPagesCardSvg, pagesCardSize } from '../../domain/pagesCard';
-import { svgToPngBlob, shareOrDownloadPng } from './shareCard';
+import { svgToPngBlob, sharePng, type ShareResult } from './shareCard';
 import { pagesLabel } from '../../domain/pages';
 import { SearchInput } from '../../ui/SearchInput';
 
@@ -147,6 +147,10 @@ export function StatsScreen() {
   const [cardOpen, setCardOpen] = useState(false);
   const [cardBusy, setCardBusy] = useState(false);
   const [pagesCardOpen, setPagesCardOpen] = useState(false);
+  const [cardPng, setCardPng] = useState<Blob | null>(null);
+  const [pagesCardPng, setPagesCardPng] = useState<Blob | null>(null);
+  const [shareNote, setShareNote] = useState('');
+  const [pagesShareNote, setPagesShareNote] = useState('');
   const [pagesCardBusy, setPagesCardBusy] = useState(false);
   const [pagesExpanded, setPagesExpanded] = useState(false);
   const [attendExpanded, setAttendExpanded] = useState(false);
@@ -287,30 +291,59 @@ export function StatsScreen() {
   );
   const pagesCardSvg = useMemo(() => buildPagesCardSvg(pagesCardData), [pagesCardData]);
 
-  async function handleSharePagesCard() {
+  // The PNG is rasterized as soon as a preview opens, not on the tap.
+  // navigator.share only runs while the browser still counts the tap as
+  // recent, and awaiting the canvas work first spends that window — which is
+  // exactly why sharing used to succeed once and then quietly stop.
+  useEffect(() => {
+    if (!cardOpen) return;
+    let live = true;
+    setCardBusy(true);
+    const { width, height } = attendanceCardSize(cardData);
+    svgToPngBlob(cardSvg, width, height)
+      .then((png) => live && setCardPng(png))
+      .catch((err) => console.error('attendance card render failed:', err))
+      .finally(() => live && setCardBusy(false));
+    return () => {
+      live = false;
+    };
+  }, [cardOpen, cardSvg, cardData]);
+
+  useEffect(() => {
+    if (!pagesCardOpen) return;
+    let live = true;
     setPagesCardBusy(true);
-    try {
-      const { width, height } = pagesCardSize(pagesCardData);
-      const png = await svgToPngBlob(pagesCardSvg, width, height);
-      await shareOrDownloadPng(png, 'نجوم-الحفظ.png');
-    } catch (err) {
-      console.error('share pages card failed:', err);
-    } finally {
-      setPagesCardBusy(false);
-    }
+    const { width, height } = pagesCardSize(pagesCardData);
+    svgToPngBlob(pagesCardSvg, width, height)
+      .then((png) => live && setPagesCardPng(png))
+      .catch((err) => console.error('pages card render failed:', err))
+      .finally(() => live && setPagesCardBusy(false));
+    return () => {
+      live = false;
+    };
+  }, [pagesCardOpen, pagesCardSvg, pagesCardData]);
+
+  /** Turn a share outcome into what the user should see. A cancel is a
+   * choice, not an error, so it says nothing. */
+  function shareMessage(result: ShareResult): string {
+    if (result === 'unsupported')
+      return 'المتصفح ده مش بيدعم مشاركة الصور — جرّب من تطبيق الموبايل';
+    if (result === 'failed') return 'المشاركة ماتمّتش، جرّب تاني';
+    return '';
   }
 
-  async function handleShareCard() {
-    setCardBusy(true);
-    try {
-      const { width, height } = attendanceCardSize(cardData);
-      const png = await svgToPngBlob(cardSvg, width, height);
-      await shareOrDownloadPng(png, 'نجوم-الحضور.png');
-    } catch (err) {
-      console.error('share card failed:', err);
-    } finally {
-      setCardBusy(false);
-    }
+  function handleSharePagesCard() {
+    if (!pagesCardPng) return;
+    setPagesShareNote('');
+    sharePng(pagesCardPng, 'نجوم-الحفظ.png', 'نجوم الحفظ').then((r) =>
+      setPagesShareNote(shareMessage(r)),
+    );
+  }
+
+  function handleShareCard() {
+    if (!cardPng) return;
+    setShareNote('');
+    sharePng(cardPng, 'نجوم-الحضور.png', 'نجوم الحضور').then((r) => setShareNote(shareMessage(r)));
   }
 
   const loaded = studentsLoaded && recordsLoaded;
@@ -513,7 +546,11 @@ export function StatsScreen() {
 
       <button
         type="button"
-        onClick={() => setPagesCardOpen(true)}
+        onClick={() => {
+          setPagesShareNote('');
+          setPagesCardPng(null);
+          setPagesCardOpen(true);
+        }}
         disabled={pagesCardData.count === 0}
         class="w-full rounded-2xl p-4 font-extrabold text-parchment shadow-[0_8px_20px_rgba(15,61,46,0.28)] disabled:opacity-40 disabled:cursor-not-allowed"
         style={{ background: 'linear-gradient(165deg, #0F3D2E, #0A2E22)' }}
@@ -648,7 +685,11 @@ export function StatsScreen() {
 
       <button
         type="button"
-        onClick={() => setCardOpen(true)}
+        onClick={() => {
+          setShareNote('');
+          setCardPng(null);
+          setCardOpen(true);
+        }}
         disabled={cardData.count === 0}
         class="w-full rounded-2xl p-4 font-extrabold text-parchment shadow-[0_8px_20px_rgba(15,61,46,0.28)] disabled:opacity-40 disabled:cursor-not-allowed"
         style={{ background: 'linear-gradient(165deg, #0F3D2E, #0A2E22)' }}
@@ -729,6 +770,9 @@ export function StatsScreen() {
             onClick={(e) => e.stopPropagation()}
           >
             <div class="font-extrabold text-ink-dark">بطاقة نجوم الحفظ</div>
+            {pagesShareNote && (
+              <div class="text-xs font-semibold text-[#B3261E]">{pagesShareNote}</div>
+            )}
             <div
               class="rounded-xl overflow-hidden border border-hairline"
               dangerouslySetInnerHTML={{ __html: pagesCardSvg }}
@@ -737,10 +781,11 @@ export function StatsScreen() {
               <button
                 type="button"
                 onClick={handleSharePagesCard}
-                disabled={pagesCardBusy}
-                class="flex-1 py-2.5 rounded-xl bg-forest text-parchment font-bold text-sm disabled:opacity-50"
+                disabled={pagesCardBusy || !pagesCardPng}
+                class="flex-1 py-2.5 rounded-xl text-white font-bold text-sm disabled:opacity-50"
+                style={{ background: '#25D366' }}
               >
-                {pagesCardBusy ? '⏳ جارٍ التحضير…' : '📤 مشاركة / تحميل'}
+                {pagesCardBusy ? '⏳ جارٍ التحضير…' : '📲 مشاركة واتساب'}
               </button>
               <button
                 type="button"
@@ -764,6 +809,7 @@ export function StatsScreen() {
             onClick={(e) => e.stopPropagation()}
           >
             <div class="font-extrabold text-ink-dark">بطاقة نجوم الحضور</div>
+            {shareNote && <div class="text-xs font-semibold text-[#B3261E]">{shareNote}</div>}
             <div
               class="rounded-xl overflow-hidden border border-hairline"
               dangerouslySetInnerHTML={{ __html: cardSvg }}
@@ -772,10 +818,11 @@ export function StatsScreen() {
               <button
                 type="button"
                 onClick={handleShareCard}
-                disabled={cardBusy}
-                class="flex-1 py-2.5 rounded-xl bg-forest text-parchment font-bold text-sm disabled:opacity-50"
+                disabled={cardBusy || !cardPng}
+                class="flex-1 py-2.5 rounded-xl text-white font-bold text-sm disabled:opacity-50"
+                style={{ background: '#25D366' }}
               >
-                {cardBusy ? '⏳ جارٍ التحضير…' : '📤 مشاركة / تحميل'}
+                {cardBusy ? '⏳ جارٍ التحضير…' : '📲 مشاركة واتساب'}
               </button>
               <button
                 type="button"

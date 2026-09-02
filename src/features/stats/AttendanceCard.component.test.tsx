@@ -24,7 +24,7 @@ describe('StatsScreen — نجوم الحضور card', () => {
     await userEvent.click(openBtn);
 
     expect(screen.getByText('بطاقة نجوم الحضور')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /مشاركة \/ تحميل/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /مشاركة واتساب/ })).toBeInTheDocument();
     // the preview really contains the rasterization-ready SVG
     expect(document.querySelector('svg')).toBeTruthy();
     expect(document.body.innerHTML).toContain('نجوم الحضور');

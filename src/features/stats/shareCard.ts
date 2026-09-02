@@ -37,36 +37,32 @@ export async function svgToPngBlob(svg: string, width: number, height: number): 
   }
 }
 
-function download(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
+export type ShareResult = 'shared' | 'cancelled' | 'unsupported' | 'failed';
 
-/** Share the PNG via the native share sheet when available (mobile), otherwise
- * fall back to a file download. Returns which path was taken. */
-export async function shareOrDownloadPng(
-  blob: Blob,
-  filename: string,
-): Promise<'shared' | 'downloaded'> {
+/**
+ * Hand the PNG to the OS share sheet, from which the user picks WhatsApp.
+ *
+ * Deliberately has no download fallback. It used to fall back, and that made
+ * every failure look like a silent "it saved the file instead" — including a
+ * plain user cancel. The four outcomes are reported separately so the screen
+ * can stay quiet on a cancel and say something useful otherwise.
+ *
+ * Must be called straight from the click handler with the blob already built:
+ * `navigator.share` only runs while the browser still considers the tap
+ * recent, and awaiting the canvas rasterization first burns that window.
+ */
+export async function sharePng(blob: Blob, filename: string, title: string): Promise<ShareResult> {
   const file = new File([blob], filename, { type: 'image/png' });
   const nav = navigator as Navigator & {
     canShare?: (data: unknown) => boolean;
     share?: (data: unknown) => Promise<void>;
   };
+  if (!nav.share || !nav.canShare || !nav.canShare({ files: [file] })) return 'unsupported';
   try {
-    if (nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
-      await nav.share({ files: [file], title: 'نجوم الحضور' });
-      return 'shared';
-    }
-  } catch {
-    // user cancelled or share failed — fall through to download
+    await nav.share({ files: [file], title });
+    return 'shared';
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') return 'cancelled';
+    return 'failed';
   }
-  download(blob, filename);
-  return 'downloaded';
 }
