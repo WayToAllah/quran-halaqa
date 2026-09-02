@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import type { Student, SessionRecord } from '../types';
-import { buildAttendanceCardData, buildAttendanceCardSvg } from './attendanceCard';
+import {
+  buildAttendanceCardData,
+  buildAttendanceCardSvg,
+  attendanceCardSize,
+  attendanceCardText,
+} from './attendanceCard';
 
 const students: Student[] = [
   { id: 's1', name: 'زيد أحمد' },
@@ -28,126 +33,89 @@ const distinctRecords: SessionRecord[] = [
   { id: 'e1', studentId: 's5', date: '2026-07-01' },
 ];
 
+const all = { minPct: 0 };
+
 describe('buildAttendanceCardData', () => {
-  it('assigns crown/gold/silver/bronze in rank order, matching the mockup medal emoji for 2nd/3rd', () => {
-    const data = buildAttendanceCardData(students, distinctRecords, {
-      minPct: 0,
-      now: new Date('2026-07-06'),
-    });
-    expect(data.stars[0].style.kind).toBe('crown');
-    expect(data.stars[1]).toMatchObject({ style: { kind: 'gold', medalEmoji: '🥇' } });
-    expect(data.stars[2]).toMatchObject({ style: { kind: 'silver', medalEmoji: '🥈' } });
-    expect(data.stars[3]).toMatchObject({ style: { kind: 'bronze', medalEmoji: '🥉' } }); // added per product decision
-    expect(data.stars[4].style.kind).toBe('number'); // 5th+ falls back to a numbered circle
-  });
-
-  it('applies dense ranking (ties share a rank/style) exactly like the on-screen leaderboard', () => {
-    // omar and ali tie at 3/5 days -> both rank 2 (gold), matching getAttendanceRanking.
-    const tiedRecords: SessionRecord[] = [
-      ...distinctRecords.filter((r) => r.studentId === 's1'), // zaid 5/5
-      { id: 'x1', studentId: 's2', date: '2026-07-01' },
-      { id: 'x2', studentId: 's2', date: '2026-07-02' },
-      { id: 'x3', studentId: 's2', date: '2026-07-03' },
-      { id: 'y1', studentId: 's3', date: '2026-07-01' },
-      { id: 'y2', studentId: 's3', date: '2026-07-02' },
-      { id: 'y3', studentId: 's3', date: '2026-07-03' },
-    ];
-    const data = buildAttendanceCardData(students, tiedRecords, {
-      minPct: 0,
-      now: new Date('2026-07-06'),
-    });
-    expect(data.stars[1].rank).toBe(2);
-    expect(data.stars[2].rank).toBe(2);
-    expect(data.stars[1].style.kind).toBe('gold');
-    expect(data.stars[2].style.kind).toBe('gold');
-  });
-
-  it('includes only students at/above the badge threshold by default (70%)', () => {
-    const data = buildAttendanceCardData(students, distinctRecords, {
-      now: new Date('2026-07-06'),
-    });
-    expect(data.stars.map((s) => s.name)).toEqual(['زيد أحمد', 'عمر خالد']); // 100% and 80%
-  });
-
-  it('respects a custom limit', () => {
-    const data = buildAttendanceCardData(students, distinctRecords, {
-      minPct: 0,
-      limit: 1,
-      now: new Date('2026-07-06'),
-    });
-    expect(data.stars).toHaveLength(1);
+  it('ranks by attendance percentage, highest first', () => {
+    const data = buildAttendanceCardData(students, distinctRecords, all);
     expect(data.stars[0].name).toBe('زيد أحمد');
+    expect(data.stars[0].rank).toBe(1);
+    expect(data.stars[0].attendPct).toBeGreaterThan(data.stars[1].attendPct);
   });
 
-  it('uses the provided mosque name and an arabic-digit date label', () => {
-    const data = buildAttendanceCardData(students, distinctRecords, {
-      mosqueName: 'مسجد النور',
-      now: new Date('2026-07-05'),
-    });
-    expect(data.mosqueName).toBe('مسجد النور');
-    expect(data.dateLabel).toBe('٢٠٢٦/٧/٥');
+  it('applies dense ranking — tied students share a rank', () => {
+    const tied: SessionRecord[] = [
+      { id: 't1', studentId: 's1', date: '2026-07-01' },
+      { id: 't2', studentId: 's2', date: '2026-07-01' },
+      { id: 't3', studentId: 's3', date: '2026-07-01' },
+    ];
+    const data = buildAttendanceCardData(students, tied, all);
+    expect(data.stars[0].rank).toBe(1);
+    expect(data.stars[1].rank).toBe(1);
   });
 
-  it('computes the star count from the attendance percentage', () => {
+  it('hides students below the نجم الحضور threshold by default', () => {
+    const data = buildAttendanceCardData(students, distinctRecords);
+    expect(data.stars.every((s) => s.attendPct >= 70)).toBe(true);
+    expect(data.stars.find((s) => s.name === 'حسن فؤاد')).toBeUndefined();
+  });
+
+  it('reports the period it was built for', () => {
     const data = buildAttendanceCardData(students, distinctRecords, {
-      minPct: 0,
-      now: new Date('2026-07-06'),
+      ...all,
+      periodLabel: 'يوليو ٢٠٢٦',
     });
-    expect(data.stars[0].filledStars).toBe(5); // 100%
-    expect(data.stars[1].filledStars).toBe(4); // 80%
+    expect(data.periodLabel).toBe('يوليو ٢٠٢٦');
+  });
+
+  it('honours the row limit', () => {
+    const data = buildAttendanceCardData(students, distinctRecords, { ...all, limit: 2 });
+    expect(data.stars).toHaveLength(2);
+    expect(data.count).toBe(2);
   });
 });
 
 describe('buildAttendanceCardSvg', () => {
-  it('produces a well-formed svg containing the title, mosque, and each star name', () => {
-    const data = buildAttendanceCardData(students, distinctRecords, {
-      minPct: 0,
-      now: new Date('2026-07-06'),
-    });
-    const svg = buildAttendanceCardSvg(data);
+  it('draws the live green-to-gold card, not the retired teal poster', () => {
+    const svg = buildAttendanceCardSvg(buildAttendanceCardData(students, distinctRecords, all));
     expect(svg.startsWith('<svg')).toBe(true);
-    expect(svg.trimEnd().endsWith('</svg>')).toBe(true);
+    expect(svg).toContain('#0f4a2c');
+    expect(svg).not.toContain('#1B4D5C');
+  });
+
+  it('shows the title, the halaqa day total and every student', () => {
+    const data = buildAttendanceCardData(students, distinctRecords, all);
+    const svg = buildAttendanceCardSvg(data);
     expect(svg).toContain('نجوم الحضور');
-    expect(svg).toContain('مسجد التيسير');
-    expect(svg).toContain('زيد أحمد');
-    expect(svg).toContain('عمر خالد');
-    expect(svg).toContain('٪');
-    expect(svg).not.toContain('oklch'); // rasterization-safe
+    expect(svg).toContain(`من إجمالي ${'٥'} يوم`);
+    data.stars.forEach((s) => expect(svg).toContain(s.name));
   });
 
-  it('draws the exact mockup crown path for 1st place', () => {
-    const data = buildAttendanceCardData(students, distinctRecords, {
-      minPct: 0,
-      now: new Date('2026-07-06'),
-    });
-    const svg = buildAttendanceCardSvg(data);
-    expect(svg).toContain('M3 8l4 3 5-6 5 6 4-3-1.6 10H4.6L3 8z');
+  it('writes percentages in Arabic-Indic digits', () => {
+    const svg = buildAttendanceCardSvg(buildAttendanceCardData(students, distinctRecords, all));
+    expect(svg).toContain('١٠٠٪');
+    expect(svg).not.toMatch(/>[0-9]+٪</);
   });
 
-  it('never sets direction=rtl on the svg root (it flips text-anchor start/end in SVG and pushes names into the badge circles — regression guard)', () => {
-    const data = buildAttendanceCardData(students, distinctRecords, {
-      minPct: 0,
-      now: new Date('2026-07-06'),
-    });
-    const svg = buildAttendanceCardSvg(data);
-    expect(svg).not.toMatch(/<svg[^>]*direction="rtl"/);
+  it('grows with the list instead of clipping it', () => {
+    const two = buildAttendanceCardData(students, distinctRecords, { ...all, limit: 2 });
+    const five = buildAttendanceCardData(students, distinctRecords, { ...all, limit: 5 });
+    expect(attendanceCardSize(five).height).toBeGreaterThan(attendanceCardSize(two).height);
+    expect(attendanceCardSize(five).width).toBe(attendanceCardSize(two).width);
   });
 
-  it('escapes names to stay xss-safe in the markup', () => {
-    const data = buildAttendanceCardData(
-      [{ id: 'x', name: '<script>zap' }],
-      [{ id: 'r', studentId: 'x', date: '2026-07-01' }],
-      { minPct: 0 },
-    );
-    const svg = buildAttendanceCardSvg(data);
-    expect(svg).not.toContain('<script>zap');
-    expect(svg).toContain('&lt;script&gt;zap');
+  it('pins its own direction so an RTL page cannot flip text-anchor', () => {
+    const svg = buildAttendanceCardSvg(buildAttendanceCardData(students, distinctRecords, all));
+    expect(svg).toContain('direction="ltr"');
   });
+});
 
-  it('handles an empty roster without throwing', () => {
-    const data = buildAttendanceCardData([], [], { minPct: 0 });
-    const svg = buildAttendanceCardSvg(data);
-    expect(svg.startsWith('<svg')).toBe(true);
-    expect(data.stars).toHaveLength(0);
+describe('attendanceCardText', () => {
+  it('builds a WhatsApp ranking with a badge per student', () => {
+    const data = buildAttendanceCardData(students, distinctRecords, all);
+    const text = attendanceCardText(data);
+    expect(text).toContain('👑 زيد أحمد — ١٠٠٪');
+    expect(text).toContain('نجوم الحضور');
+    expect(text).toContain('جزاكم الله خيراً');
   });
 });

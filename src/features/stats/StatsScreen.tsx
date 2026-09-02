@@ -20,7 +20,12 @@ import {
   type StatsSortKey,
 } from '../../domain/statsScreen';
 import { MOSQUE_ID, HALAQA_ID } from '../../config';
-import { buildAttendanceCardData, buildAttendanceCardSvg } from '../../domain/attendanceCard';
+import {
+  buildAttendanceCardData,
+  buildAttendanceCardSvg,
+  attendanceCardSize,
+} from '../../domain/attendanceCard';
+import { buildPagesCardData, buildPagesCardSvg, pagesCardSize } from '../../domain/pagesCard';
 import { svgToPngBlob, shareOrDownloadPng } from './shareCard';
 import { pagesLabel } from '../../domain/pages';
 import { SearchInput } from '../../ui/SearchInput';
@@ -141,6 +146,8 @@ export function StatsScreen() {
   const [search, setSearch] = useState('');
   const [cardOpen, setCardOpen] = useState(false);
   const [cardBusy, setCardBusy] = useState(false);
+  const [pagesCardOpen, setPagesCardOpen] = useState(false);
+  const [pagesCardBusy, setPagesCardBusy] = useState(false);
   const [pagesExpanded, setPagesExpanded] = useState(false);
   const [attendExpanded, setAttendExpanded] = useState(false);
   const [attendBasis, setAttendBasis] = useState<AttendBasis>('halaqa');
@@ -259,16 +266,45 @@ export function StatsScreen() {
     (best, w, i) => (w.count > (weeklyBuckets[best]?.count ?? -1) ? i : best),
     0,
   );
+  /** How the selected period reads on a card: a month name, or كل الفترة. */
+  const periodLabel = useMemo(() => {
+    if (monthFilter === 'all') return 'كل الفترة';
+    const d = new Date(`${monthFilter}-01T00:00:00`);
+    return Number.isNaN(d.getTime())
+      ? monthFilter
+      : d.toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' });
+  }, [monthFilter]);
+
   const cardData = useMemo(
-    () => buildAttendanceCardData(students, filteredRecords),
-    [students, filteredRecords],
+    () => buildAttendanceCardData(students, filteredRecords, { periodLabel }),
+    [students, filteredRecords, periodLabel],
   );
   const cardSvg = useMemo(() => buildAttendanceCardSvg(cardData), [cardData]);
+
+  const pagesCardData = useMemo(
+    () => buildPagesCardData(students, filteredRecords, { monthFilter, periodLabel }),
+    [students, filteredRecords, monthFilter, periodLabel],
+  );
+  const pagesCardSvg = useMemo(() => buildPagesCardSvg(pagesCardData), [pagesCardData]);
+
+  async function handleSharePagesCard() {
+    setPagesCardBusy(true);
+    try {
+      const { width, height } = pagesCardSize(pagesCardData);
+      const png = await svgToPngBlob(pagesCardSvg, width, height);
+      await shareOrDownloadPng(png, 'نجوم-الحفظ.png');
+    } catch (err) {
+      console.error('share pages card failed:', err);
+    } finally {
+      setPagesCardBusy(false);
+    }
+  }
 
   async function handleShareCard() {
     setCardBusy(true);
     try {
-      const png = await svgToPngBlob(cardSvg, 1080, 1350);
+      const { width, height } = attendanceCardSize(cardData);
+      const png = await svgToPngBlob(cardSvg, width, height);
       await shareOrDownloadPng(png, 'نجوم-الحضور.png');
     } catch (err) {
       console.error('share card failed:', err);
@@ -432,8 +468,8 @@ export function StatsScreen() {
           <div class="text-center text-sm text-taupe py-6">لا توجد صفحات مكتملة بعد</div>
         ) : (
           <div class="space-y-2">
-            {visiblePages.map((x, i) => {
-              const rc = rankStyle(i + 1);
+            {visiblePages.map((x) => {
+              const rc = rankStyle(x.rank);
               return (
                 <div
                   key={x.id}
@@ -442,13 +478,15 @@ export function StatsScreen() {
                   <div
                     class="w-[26px] h-[26px] rounded-full flex items-center justify-center text-xs font-extrabold shrink-0"
                     style={{ background: rc.bg, color: rc.color }}
+                    title={`المركز ${toArabicOrdinal(x.rank)}`}
                   >
-                    {toArabicDigits(i + 1)}
+                    {toArabicDigits(x.rank)}
                   </div>
                   <div class="flex-1 min-w-0">
                     <div class="text-sm font-bold text-ink-dark truncate">{x.name}</div>
                     <div class="text-xs text-taupe">
-                      {pagesLabel(x.pages)}، {sessionsLabel(x.sessionsCount)}
+                      المركز {toArabicOrdinal(x.rank)} · {pagesLabel(x.pages)}،{' '}
+                      {sessionsLabel(x.sessionsCount)}
                       {x.startLabel && x.endLabel && (
                         <>
                           {' · '}
@@ -472,6 +510,16 @@ export function StatsScreen() {
           onToggle={() => setPagesExpanded((v) => !v)}
         />
       </div>
+
+      <button
+        type="button"
+        onClick={() => setPagesCardOpen(true)}
+        disabled={pagesCardData.count === 0}
+        class="w-full rounded-2xl p-4 font-extrabold text-parchment shadow-[0_8px_20px_rgba(15,61,46,0.28)] disabled:opacity-40 disabled:cursor-not-allowed"
+        style={{ background: 'linear-gradient(165deg, #0F3D2E, #0A2E22)' }}
+      >
+        📖 بطاقة نجوم الحفظ — للمشاركة
+      </button>
 
       <div class={cardCls}>
         <div class={cardTitleCls}>✅ الأكثر حضوراً</div>
@@ -670,6 +718,41 @@ export function StatsScreen() {
           </div>
         )}
       </div>
+
+      {pagesCardOpen && (
+        <div
+          class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4"
+          onClick={() => setPagesCardOpen(false)}
+        >
+          <div
+            class="w-full max-w-sm bg-white rounded-2xl p-4 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div class="font-extrabold text-ink-dark">بطاقة نجوم الحفظ</div>
+            <div
+              class="rounded-xl overflow-hidden border border-hairline"
+              dangerouslySetInnerHTML={{ __html: pagesCardSvg }}
+            />
+            <div class="flex gap-2">
+              <button
+                type="button"
+                onClick={handleSharePagesCard}
+                disabled={pagesCardBusy}
+                class="flex-1 py-2.5 rounded-xl bg-forest text-parchment font-bold text-sm disabled:opacity-50"
+              >
+                {pagesCardBusy ? '⏳ جارٍ التحضير…' : '📤 مشاركة / تحميل'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPagesCardOpen(false)}
+                class="py-2.5 px-4 rounded-xl bg-[#F1ECDD] text-[#5B5646] font-bold text-sm"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {cardOpen && (
         <div

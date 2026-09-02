@@ -300,6 +300,11 @@ export interface TopPagesEntry {
   pages: number;
   /** Sessions inside the viewed period (context for the number, not its basis). */
   sessionsCount: number;
+  /** Dense rank by pages — students on the same page count share a rank and
+   * the next distinct count takes the following integer, exactly like the
+   * attendance leaderboard. The row's array index is NOT a rank: two students
+   * tied at 12 pages both hold المركز الأول. */
+  rank: number;
 }
 
 /**
@@ -348,9 +353,19 @@ export function computeTopPages(
         sessionsCount: recs.length,
       };
     })
-    .filter((x): x is TopPagesEntry => x !== null);
+    .filter((x): x is Omit<TopPagesEntry, 'rank'> => x !== null);
 
-  return per.sort((a, b) => b.pages - a.pages).slice(0, limit);
+  per.sort((a, b) => b.pages - a.pages);
+
+  // Dense ranking over the FULL field, assigned before the limit slice so a
+  // top-3 preview shows the same المركز the عرض الكل list does.
+  const uniquePages = [...new Set(per.map((x) => x.pages))].sort((a, b) => b - a);
+  const rankByPages: Record<number, number> = {};
+  uniquePages.forEach((pages, i) => {
+    rankByPages[pages] = i + 1;
+  });
+
+  return per.map((x) => ({ ...x, rank: rankByPages[x.pages] })).slice(0, limit);
 }
 
 /**

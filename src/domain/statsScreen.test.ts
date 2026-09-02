@@ -996,10 +996,10 @@ describe('sumMemorizedPages', () => {
 
   it('adds every row, not just the visible top three', () => {
     const rows = [
-      { id: 's_1', name: 'أ', startLabel: '', endLabel: '', pages: 6, sessionsCount: 2 },
-      { id: 's_2', name: 'ب', startLabel: '', endLabel: '', pages: 3, sessionsCount: 1 },
-      { id: 's_3', name: 'ج', startLabel: '', endLabel: '', pages: 1, sessionsCount: 1 },
-      { id: 's_4', name: 'د', startLabel: '', endLabel: '', pages: 2, sessionsCount: 1 },
+      { id: 's_1', name: 'أ', startLabel: '', endLabel: '', pages: 6, sessionsCount: 2, rank: 1 },
+      { id: 's_2', name: 'ب', startLabel: '', endLabel: '', pages: 3, sessionsCount: 1, rank: 2 },
+      { id: 's_3', name: 'ج', startLabel: '', endLabel: '', pages: 1, sessionsCount: 1, rank: 4 },
+      { id: 's_4', name: 'د', startLabel: '', endLabel: '', pages: 2, sessionsCount: 1, rank: 3 },
     ];
     expect(sumMemorizedPages(rows)).toBe(12);
   });
@@ -1026,5 +1026,62 @@ describe('sumMemorizedPages', () => {
     const rows = computeTopPages(roster, recs, Infinity);
     expect(rows.map((r) => r.pages)).toEqual([6, 6]);
     expect(sumMemorizedPages(rows)).toBe(12);
+  });
+});
+
+describe('computeTopPages — dense ranking', () => {
+  it('gives tied students the same rank, matching the attendance leaderboard', () => {
+    const records: SessionRecord[] = [
+      // s_1 and s_2 each complete exactly one page -> a genuine tie.
+      { id: 'r1', studentId: 's_1', date: '2026-07-01', newLoh: [{ sura: 'الناس' }] },
+      { id: 'r2', studentId: 's_1', date: '2026-07-08', newLoh: [{ sura: 'الفلق' }] },
+      { id: 'r3', studentId: 's_1', date: '2026-07-15', newLoh: [{ sura: 'الإخلاص' }] },
+      { id: 'r4', studentId: 's_1', date: '2026-07-22', newLoh: [{ sura: 'المسد' }] },
+      { id: 'r5', studentId: 's_1', date: '2026-07-29', newLoh: [{ sura: 'النصر' }] },
+      { id: 'r6', studentId: 's_2', date: '2026-07-01', newLoh: [{ sura: 'الفاتحة' }] },
+      { id: 'g1', studentId: 's_1', date: '2026-08-05', loh: { score: 90 } },
+      { id: 'g2', studentId: 's_2', date: '2026-08-05', loh: { score: 90 } },
+    ];
+    const top = computeTopPages(students, records);
+    expect(top[0].pages).toBe(top[1].pages);
+    expect(top[0].rank).toBe(1);
+    expect(top[1].rank).toBe(1);
+  });
+
+  it('is dense — the rank after a tie is the next integer, not a skipped one', () => {
+    const three: Student[] = [
+      { id: 's_1', name: 'زيد احمد' },
+      { id: 's_2', name: 'محمد علي' },
+      { id: 's_3', name: 'عمر سالم' },
+    ];
+    const records: SessionRecord[] = [
+      // s_1 and s_2 tie on one page each; s_3 also completes one page but of
+      // a shorter span... so instead give s_3 a strictly larger span.
+      { id: 'a1', studentId: 's_3', date: '2026-07-01', newLoh: [{ sura: 'الضحى' }] },
+      { id: 'a2', studentId: 's_3', date: '2026-07-08', newLoh: [{ sura: 'الليل' }] },
+      { id: 'a3', studentId: 's_3', date: '2026-07-15', newLoh: [{ sura: 'الشمس' }] },
+      { id: 'a4', studentId: 's_3', date: '2026-07-22', newLoh: [{ sura: 'البلد' }] },
+      { id: 'a5', studentId: 's_3', date: '2026-07-29', newLoh: [{ sura: 'الفجر' }] },
+      { id: 'a6', studentId: 's_3', date: '2026-08-01', newLoh: [{ sura: 'الغاشية' }] },
+      { id: 'r1', studentId: 's_1', date: '2026-07-01', newLoh: [{ sura: 'الناس' }] },
+      { id: 'r2', studentId: 's_1', date: '2026-07-08', newLoh: [{ sura: 'الفلق' }] },
+      { id: 'r3', studentId: 's_1', date: '2026-07-15', newLoh: [{ sura: 'الإخلاص' }] },
+      { id: 'r4', studentId: 's_1', date: '2026-07-22', newLoh: [{ sura: 'المسد' }] },
+      { id: 'r5', studentId: 's_1', date: '2026-07-29', newLoh: [{ sura: 'النصر' }] },
+      { id: 'r6', studentId: 's_2', date: '2026-07-01', newLoh: [{ sura: 'الفاتحة' }] },
+      { id: 'g1', studentId: 's_1', date: '2026-08-05', loh: { score: 90 } },
+      { id: 'g2', studentId: 's_2', date: '2026-08-05', loh: { score: 90 } },
+      { id: 'g3', studentId: 's_3', date: '2026-08-05', loh: { score: 90 } },
+    ];
+    const top = computeTopPages(three, records, Infinity);
+    const ranks = top.map((x) => x.rank);
+    const pages = top.map((x) => x.pages);
+    // Whatever the page counts turn out to be, ranks must be dense: sorted,
+    // starting at 1, and never skipping a value.
+    expect(ranks[0]).toBe(1);
+    for (let i = 1; i < ranks.length; i++) {
+      const expected = pages[i] === pages[i - 1] ? ranks[i - 1] : ranks[i - 1] + 1;
+      expect(ranks[i]).toBe(expected);
+    }
   });
 });
