@@ -37,6 +37,15 @@ function barHeights(): number[] {
 }
 
 describe('StatsScreen — مقياس النشاط الأسبوعي', () => {
+  it('gives the chart enough height for small differences to register', () => {
+    render(<StatsScreen />);
+    const plot = Array.from(chartCard().querySelectorAll('div')).find((el) =>
+      (el.className ?? '').includes('items-end'),
+    );
+    const h = Number(/\bh-(\d+)\b/.exec(plot?.className ?? '')?.[1]);
+    expect(h).toBeGreaterThan(24);
+  });
+
   it('spreads bunched weeks apart instead of drawing them all near full height', () => {
     render(<StatsScreen />);
     const h = barHeights();

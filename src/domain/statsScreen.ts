@@ -671,30 +671,47 @@ export interface WeeklyScale {
   truncated: boolean;
 }
 
-/** Below this share of the tallest week, the shortest one already stands out
- * from a zero baseline and cropping would only exaggerate. */
+/** Below this share of the tallest week, the bulk of the weeks already stand
+ * out from a zero baseline and cropping would only exaggerate. */
 const CROP_THRESHOLD = 0.35;
-/** Margin left below the shortest week, as a share of the spread, so the
- * shortest bar keeps a visible height instead of collapsing to nothing. */
+/** Margin left below the lowest bunched week, as a share of the spread, so
+ * that bar keeps a visible height instead of collapsing to nothing. */
 const CROP_MARGIN = 0.35;
+
+/**
+ * The lower edge of where the weeks actually cluster: the lower-quartile
+ * value, by nearest rank.
+ *
+ * Using the outright minimum here made one quiet week — a holiday, a first
+ * partial week — veto cropping for the whole chart, which is how 61 and 70
+ * ended up the same height. The quartile ignores a lone low week while still
+ * refusing to crop when the low weeks are a real part of the spread.
+ */
+function clusterFloor(sorted: number[]): number {
+  const i = Math.max(0, Math.ceil(sorted.length * 0.25) - 1);
+  return sorted[i];
+}
 
 /**
  * Vertical scale for the weekly activity chart.
  *
  * Attendance counts cluster — a halaqa of fifty runs 40, 42, 45, 44 — and from
- * a zero baseline those bars are all 89–100% tall and read as identical. This
+ * a zero baseline those bars are all 89-100% tall and read as identical. This
  * crops the axis so the differences are legible, but only when cropping is
- * honest about it: an identical set, a single week, or a set that already
- * spans most of its range all keep the zero baseline, and the crop never eats
- * the shortest bar entirely.
+ * honest about it: an identical set, a single week, or a set whose weeks
+ * genuinely span most of their range all keep the zero baseline. A week below
+ * the crop is drawn at the minimum bar height rather than dropped, and its
+ * real count is printed above it either way.
  */
 export function computeWeeklyScale(counts: number[]): WeeklyScale {
   if (counts.length === 0) return { baseline: 0, top: 1, truncated: false };
-  const max = Math.max(...counts);
-  const min = Math.min(...counts);
+  const sorted = [...counts].sort((a, b) => a - b);
+  const max = sorted[sorted.length - 1];
+  const min = sorted[0];
   if (max === min) return { baseline: 0, top: Math.max(1, max), truncated: false };
-  if (min <= max * CROP_THRESHOLD) return { baseline: 0, top: max, truncated: false };
-  const pad = Math.max(1, Math.ceil((max - min) * CROP_MARGIN));
-  const baseline = Math.max(0, min - pad);
+  const floor = clusterFloor(sorted);
+  if (floor <= max * CROP_THRESHOLD) return { baseline: 0, top: max, truncated: false };
+  const pad = Math.max(1, Math.ceil((max - floor) * CROP_MARGIN));
+  const baseline = Math.max(0, floor - pad);
   return { baseline, top: max, truncated: baseline > 0 };
 }

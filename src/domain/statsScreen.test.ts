@@ -1137,3 +1137,39 @@ describe('computeWeeklyScale', () => {
     expect(computeWeeklyScale([5, 45]).top).toBe(45);
   });
 });
+
+describe('computeWeeklyScale — a single quiet week must not flatten the rest', () => {
+  const heights = (counts: number[]) => {
+    const s = computeWeeklyScale(counts);
+    const span = Math.max(1, s.top - s.baseline);
+    return counts.map((n) => Math.max(6, Math.round(((n - s.baseline) / span) * 100)));
+  };
+
+  it('still separates the busy weeks when one week is far below them', () => {
+    // 61..70 bunched, plus a lone week of 5. Judged on the minimum alone this
+    // set refuses to crop and the busy weeks land within 13 points of each
+    // other, which is the complaint this covers.
+    const h = heights([5, 61, 65, 70, 63]);
+    const busy = h.slice(1);
+    expect(Math.max(...busy) - Math.min(...busy)).toBeGreaterThan(50);
+  });
+
+  it('keeps the outlier week on the chart rather than dropping it', () => {
+    const h = heights([5, 61, 65, 70, 63]);
+    expect(h[0]).toBeGreaterThan(0);
+  });
+
+  it('does not crop when the low weeks are a real part of the spread', () => {
+    // Half the weeks sit low: this is a genuinely wide range, not one outlier.
+    expect(computeWeeklyScale([8, 12, 30, 45]).baseline).toBe(0);
+    expect(computeWeeklyScale([5, 45, 30]).baseline).toBe(0);
+  });
+
+  it('leaves the already-good bunched case alone', () => {
+    const s = computeWeeklyScale([40, 42, 45, 44, 41, 43]);
+    expect(s.truncated).toBe(true);
+    expect(s.top).toBe(45);
+    expect(s.baseline).toBeGreaterThan(35);
+    expect(s.baseline).toBeLessThan(40);
+  });
+});

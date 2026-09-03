@@ -447,7 +447,7 @@ export function StatsScreen() {
         {weeklyBuckets.length === 0 ? (
           <div class="text-center text-sm text-taupe py-6">لا يوجد بيانات</div>
         ) : (
-          <div class="flex items-end gap-2 h-24">
+          <div class="flex items-end gap-2 h-36">
             {weeklyBuckets.map((w, i) => {
               const span = Math.max(1, weeklyScale.top - weeklyScale.baseline);
               const h = Math.max(6, Math.round(((w.count - weeklyScale.baseline) / span) * 100));
