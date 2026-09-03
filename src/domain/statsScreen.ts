@@ -661,3 +661,40 @@ export function computeLohSpan(
     direction,
   };
 }
+
+export interface WeeklyScale {
+  /** Count the bottom of the chart represents. */
+  baseline: number;
+  /** Count a full-height bar represents. */
+  top: number;
+  /** True when the baseline is above zero and the reader should be told. */
+  truncated: boolean;
+}
+
+/** Below this share of the tallest week, the shortest one already stands out
+ * from a zero baseline and cropping would only exaggerate. */
+const CROP_THRESHOLD = 0.35;
+/** Margin left below the shortest week, as a share of the spread, so the
+ * shortest bar keeps a visible height instead of collapsing to nothing. */
+const CROP_MARGIN = 0.35;
+
+/**
+ * Vertical scale for the weekly activity chart.
+ *
+ * Attendance counts cluster — a halaqa of fifty runs 40, 42, 45, 44 — and from
+ * a zero baseline those bars are all 89–100% tall and read as identical. This
+ * crops the axis so the differences are legible, but only when cropping is
+ * honest about it: an identical set, a single week, or a set that already
+ * spans most of its range all keep the zero baseline, and the crop never eats
+ * the shortest bar entirely.
+ */
+export function computeWeeklyScale(counts: number[]): WeeklyScale {
+  if (counts.length === 0) return { baseline: 0, top: 1, truncated: false };
+  const max = Math.max(...counts);
+  const min = Math.min(...counts);
+  if (max === min) return { baseline: 0, top: Math.max(1, max), truncated: false };
+  if (min <= max * CROP_THRESHOLD) return { baseline: 0, top: max, truncated: false };
+  const pad = Math.max(1, Math.ceil((max - min) * CROP_MARGIN));
+  const baseline = Math.max(0, min - pad);
+  return { baseline, top: max, truncated: baseline > 0 };
+}

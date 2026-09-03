@@ -13,6 +13,7 @@ import {
   getWeekStart,
   countRecentlyActiveStudents,
   sumMemorizedPages,
+  computeWeeklyScale,
 } from './statsScreen';
 import type { SessionRecord, Student } from '../types';
 
@@ -1083,5 +1084,56 @@ describe('computeTopPages — dense ranking', () => {
       const expected = pages[i] === pages[i - 1] ? ranks[i - 1] : ranks[i - 1] + 1;
       expect(ranks[i]).toBe(expected);
     }
+  });
+});
+
+describe('computeWeeklyScale', () => {
+  it('starts at zero when there is nothing to plot', () => {
+    expect(computeWeeklyScale([])).toMatchObject({ baseline: 0, truncated: false });
+  });
+
+  it('starts at zero when every week is identical — there is no difference to show', () => {
+    const s = computeWeeklyScale([12, 12, 12]);
+    expect(s.baseline).toBe(0);
+    expect(s.truncated).toBe(false);
+  });
+
+  it('starts at zero when the smallest week is already far below the largest', () => {
+    // 5 vs 45: the gap is obvious from zero, so cropping would only mislead.
+    const s = computeWeeklyScale([5, 45, 30]);
+    expect(s.baseline).toBe(0);
+    expect(s.truncated).toBe(false);
+  });
+
+  it('crops the axis when the weeks bunch together, keeping a margin below the smallest', () => {
+    const s = computeWeeklyScale([40, 42, 45, 44]);
+    expect(s.truncated).toBe(true);
+    expect(s.baseline).toBeGreaterThan(0);
+    expect(s.baseline).toBeLessThan(40); // the shortest bar stays visible
+    expect(s.top).toBe(45);
+  });
+
+  it('separates bunched weeks far more than a zero baseline would', () => {
+    const counts = [40, 42, 45, 44];
+    const s = computeWeeklyScale(counts);
+    const pct = (n: number) => ((n - s.baseline) / (s.top - s.baseline)) * 100;
+    const fromZero = (n: number) => (n / 45) * 100;
+    expect(pct(45) - pct(40)).toBeGreaterThan((fromZero(45) - fromZero(40)) * 3);
+  });
+
+  it('never drops the baseline below zero', () => {
+    expect(computeWeeklyScale([1, 2]).baseline).toBeGreaterThanOrEqual(0);
+    expect(computeWeeklyScale([2, 3, 3]).baseline).toBeGreaterThanOrEqual(0);
+  });
+
+  it('does not crop a single week — there is nothing to compare it against', () => {
+    const s = computeWeeklyScale([37]);
+    expect(s.baseline).toBe(0);
+    expect(s.truncated).toBe(false);
+  });
+
+  it('keeps the top at the busiest week so it fills the chart', () => {
+    expect(computeWeeklyScale([40, 42, 45, 44]).top).toBe(45);
+    expect(computeWeeklyScale([5, 45]).top).toBe(45);
   });
 });

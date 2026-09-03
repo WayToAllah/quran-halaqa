@@ -8,6 +8,7 @@ import {
   getPersonalAttendanceRanking,
 } from '../../domain/attendance';
 import {
+  computeWeeklyScale,
   computeSummaryStats,
   computeWeeklyBuckets,
   computeScoreDistribution,
@@ -265,7 +266,10 @@ export function StatsScreen() {
       ? Math.min(100, Math.round((summary.avgDailyAttendance / recentlyActive) * 100))
       : null;
 
-  const maxWeekly = Math.max(1, ...weeklyBuckets.map((w) => w.count));
+  const weeklyScale = useMemo(
+    () => computeWeeklyScale(weeklyBuckets.map((w) => w.count)),
+    [weeklyBuckets],
+  );
   const busiestWeekIdx = weeklyBuckets.reduce(
     (best, w, i) => (w.count > (weeklyBuckets[best]?.count ?? -1) ? i : best),
     0,
@@ -435,12 +439,18 @@ export function StatsScreen() {
 
       <div class={cardCls}>
         <div class={cardTitleCls}>📈 النشاط الأسبوعي</div>
+        {weeklyScale.truncated && (
+          <div class="text-[10px] text-taupe/70 font-semibold -mt-1 mb-1.5">
+            المقياس يبدأ من {toArabicDigits(weeklyScale.baseline)}
+          </div>
+        )}
         {weeklyBuckets.length === 0 ? (
           <div class="text-center text-sm text-taupe py-6">لا يوجد بيانات</div>
         ) : (
           <div class="flex items-end gap-2 h-24">
             {weeklyBuckets.map((w, i) => {
-              const h = Math.max(6, Math.round((w.count / maxWeekly) * 100));
+              const span = Math.max(1, weeklyScale.top - weeklyScale.baseline);
+              const h = Math.max(6, Math.round(((w.count - weeklyScale.baseline) / span) * 100));
               const label = new Date(w.weekStart + 'T00:00:00').toLocaleDateString('ar-EG', {
                 day: 'numeric',
                 month: 'numeric',
