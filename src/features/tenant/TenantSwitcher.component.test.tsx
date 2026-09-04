@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/preact';
 import userEvent from '@testing-library/user-event';
+import { ToastProvider } from '../../ui/ToastProvider';
 import { TenantSwitcher } from './TenantSwitcher';
 import { TenantProvider, useTenant } from './TenantContext';
 import { DraftGuardProvider, useReportDraft } from './DraftGuard';
@@ -33,15 +34,17 @@ function Draft({ dirty }: { dirty: boolean }) {
   return null;
 }
 
-function setup({ dirty = false }: { dirty?: boolean } = {}) {
+function setup({ dirty = false, uid = 'uid_1' }: { dirty?: boolean; uid?: string | null } = {}) {
   return render(
-    <TenantProvider initial={{ mosqueId: 'altayseer', halaqaId: 'main' }}>
-      <DraftGuardProvider>
-        <Draft dirty={dirty} />
-        <TenantSwitcher uid="uid_1" />
-        <Probe />
-      </DraftGuardProvider>
-    </TenantProvider>,
+    <ToastProvider>
+      <TenantProvider initial={{ mosqueId: 'altayseer', halaqaId: 'main' }}>
+        <DraftGuardProvider>
+          <Draft dirty={dirty} />
+          <TenantSwitcher uid={uid} />
+          <Probe />
+        </DraftGuardProvider>
+      </TenantProvider>
+    </ToastProvider>,
   );
 }
 
@@ -53,11 +56,20 @@ beforeEach(() => {
 });
 
 describe('TenantSwitcher', () => {
-  // A teacher with one halaqa must not pay for a feature they can't use: no
-  // control, no dead chrome in a header that is already tight on a phone.
-  it('renders nothing at all when there is only one place to go', () => {
+  /**
+   * This used to render nothing below two options, to keep the header exactly
+   * as it was. Adding a mosque needs a reachable home and the chip is the only
+   * natural one, so a single-halaqa teacher now sees their mosque name and one
+   * extra action — and nothing more.
+   */
+  it('still shows for a teacher with a single halaqa, so a mosque can be added', () => {
     options = [TAYSEER];
     setup();
+    expect(screen.getByRole('button', { name: /مسجد التيسير/ })).toBeInTheDocument();
+  });
+
+  it('renders nothing when nobody is signed in', () => {
+    setup({ uid: null });
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
@@ -127,6 +139,27 @@ describe('TenantSwitcher', () => {
     await user.click(items[items.length - 1]);
 
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('now')).toHaveTextContent('altayseer/main');
+  });
+});
+
+describe('TenantSwitcher — adding a mosque', () => {
+  it('offers creating one from the list', async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByRole('button', { name: /مسجد التيسير/ }));
+    expect(await screen.findByRole('button', { name: /مسجد جديد/ })).toBeInTheDocument();
+  });
+
+  // Landing in the new mosque would discard a half-typed session exactly the
+  // way a manual switch would. The mosque is created either way.
+  it('does not jump into the new mosque while a session is half-typed', async () => {
+    const user = userEvent.setup();
+    setup({ dirty: true });
+    await user.click(screen.getByRole('button', { name: /مسجد التيسير/ }));
+    await user.click(await screen.findByRole('button', { name: /مسجد جديد/ }));
+
+    expect(screen.getByRole('button', { name: 'إنشاء المسجد' })).toBeInTheDocument();
     expect(screen.getByTestId('now')).toHaveTextContent('altayseer/main');
   });
 });

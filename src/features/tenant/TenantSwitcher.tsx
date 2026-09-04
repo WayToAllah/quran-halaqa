@@ -1,4 +1,6 @@
 import { useState } from 'preact/hooks';
+import { CreateMosqueModal } from './CreateMosqueModal';
+import { useToast } from '../../ui/ToastProvider';
 import { useTenantControls } from './TenantContext';
 import { useDraftGuard } from './DraftGuard';
 import { useMemberships } from '../../hooks/useMemberships';
@@ -20,8 +22,14 @@ export function TenantSwitcher({ uid }: { uid: string | null }) {
   const { options, loading } = useMemberships(uid, tenant);
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState<TenantOption | null>(null);
+  const [creating, setCreating] = useState(false);
+  const { showToast } = useToast();
 
-  if (loading || options.length < 2) return null;
+  // Adding a mosque has to live somewhere reachable, and this is its only
+  // natural home — so the chip now appears for any signed-in teacher, not just
+  // one who already has two halaqat. A teacher with a single halaqa sees their
+  // mosque name and one extra action, nothing more.
+  if (loading || !uid || options.length === 0) return null;
 
   const current =
     options.find((o) => o.mosqueId === tenant.mosqueId && o.halaqaId === tenant.halaqaId) ?? null;
@@ -40,6 +48,19 @@ export function TenantSwitcher({ uid }: { uid: string | null }) {
       return;
     }
     setTenant(next);
+  }
+
+  function afterCreate(next: { mosqueId: string; halaqaId: string }) {
+    setCreating(false);
+    // Jumping into the new mosque would throw away a half-typed session exactly
+    // the way a manual switch would. The mosque is made either way; it just
+    // waits in the list until the session is dealt with.
+    if (hasDraft) {
+      showToast('اتعمل المسجد. بدّل ليه بعد ما تحفظ الجلسة');
+      return;
+    }
+    setTenant(next);
+    showToast('✓ اتعمل المسجد');
   }
 
   function confirmSwitch() {
@@ -82,8 +103,26 @@ export function TenantSwitcher({ uid }: { uid: string | null }) {
                 </button>
               );
             })}
+            <button
+              type="button"
+              class="w-full text-right px-4 py-3 text-[12.5px] font-bold text-forest border-t border-hairline"
+              onClick={() => {
+                setOpen(false);
+                setCreating(true);
+              }}
+            >
+              ＋ مسجد جديد
+            </button>
           </div>
         </div>
+      )}
+
+      {creating && uid && (
+        <CreateMosqueModal
+          ownerUid={uid}
+          onClose={() => setCreating(false)}
+          onCreated={afterCreate}
+        />
       )}
 
       {pending && (
