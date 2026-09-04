@@ -1,3 +1,6 @@
+import { useTenantControls } from '../tenant/TenantContext';
+import { DEFAULT_TENANT } from '../../config';
+import { sameTenant } from '../../domain/tenant';
 import { useState } from 'preact/hooks';
 import type { AuthState } from './useAuth';
 import { loginErrorMessage } from '../../domain/authErrors';
@@ -7,6 +10,7 @@ interface Props {
 }
 
 export function LoginScreen({ auth }: Props) {
+  const { tenant, resetTenant } = useTenantControls();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -83,9 +87,20 @@ export function LoginScreen({ auth }: Props) {
         )}
 
         {auth.status === 'denied' && (
-          <button class="text-xs text-taupe underline" onClick={() => auth.signOutUser()}>
-            تسجيل خروج وتجربة حساب آخر
-          </button>
+          <div class="flex flex-col items-center gap-2">
+            {/* The device remembers the last mosque it was on. If the account
+                has no membership there, signing in again just walks back into
+                the same denial — so offer the way back explicitly rather than
+                leaving "clear your browser data" as the only escape. */}
+            {!sameTenant(tenant, DEFAULT_TENANT) && (
+              <button class="text-xs text-forest underline font-semibold" onClick={resetTenant}>
+                الرجوع إلى المسجد الافتراضي
+              </button>
+            )}
+            <button class="text-xs text-taupe underline" onClick={() => auth.signOutUser()}>
+              تسجيل خروج وتجربة حساب آخر
+            </button>
+          </div>
         )}
 
         {showForm && (

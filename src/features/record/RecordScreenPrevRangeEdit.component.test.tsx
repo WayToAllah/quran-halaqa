@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/preact';
 import userEvent from '@testing-library/user-event';
 import { ToastProvider } from '../../ui/ToastProvider';
 import { RecordScreen } from './RecordScreen';
+import { DraftGuardProvider } from '../tenant/DraftGuard';
 import type { SessionRecord, Student } from '../../types';
 
 // The teacher's report: listening to a child mid-session and finding he'd
@@ -41,7 +42,9 @@ vi.mock('../../data/publishStats', () => ({
 function renderScreen(editRecord: SessionRecord | null = null) {
   return render(
     <ToastProvider>
-      <RecordScreen editRecord={editRecord} onEditConsumed={() => {}} />
+      <DraftGuardProvider>
+        <RecordScreen editRecord={editRecord} onEditConsumed={() => {}} />
+      </DraftGuardProvider>
     </ToastProvider>,
   );
 }
@@ -209,7 +212,9 @@ describe('RecordScreen — correcting a previous session range from the eval car
     previousSessionForS1 = prevSession;
     rerender(
       <ToastProvider>
-        <RecordScreen editRecord={null} onEditConsumed={() => {}} />
+        <DraftGuardProvider>
+          <RecordScreen editRecord={null} onEditConsumed={() => {}} />
+        </DraftGuardProvider>
       </ToastProvider>,
     );
     await screen.findByText('📋 ما سمعناه النهارده');

@@ -44,6 +44,7 @@ import { StarPicker } from '../../ui/StarPicker';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useToast } from '../../ui/ToastProvider';
 import { useTenant } from '../tenant/TenantContext';
+import { useReportDraft } from '../tenant/DraftGuard';
 import type { SuraAssignment, SessionRecord, Student } from '../../types';
 
 /**
@@ -394,6 +395,12 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     if (rowsSignature(madiRows) !== pristineRowsRef.current.madi) return true;
     return false;
   }
+
+  // Publish the same signal the student-switch warning already uses, so the
+  // mosque switcher can refuse to move while a session is half-typed. Every
+  // screen stays mounted, so without this the draft would survive the switch
+  // and be saved under a halaqa its student doesn't belong to.
+  useReportDraft(hasUnsavedEntry());
 
   function applyStudentSwitch(s: Student) {
     setSelectedStudent(s);

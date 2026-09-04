@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/preact';
 import userEvent from '@testing-library/user-event';
 import { ToastProvider } from '../../ui/ToastProvider';
 import { RecordScreen } from './RecordScreen';
+import { DraftGuardProvider } from '../tenant/DraftGuard';
 import type { SessionRecord, Student } from '../../types';
 
 const students: Student[] = [{ id: 's_1', name: 'زيد احمد' }];
@@ -35,7 +36,9 @@ async function selectStudent(name: string) {
 function renderScreen() {
   return render(
     <ToastProvider>
-      <RecordScreen editRecord={null} />
+      <DraftGuardProvider>
+        <RecordScreen editRecord={null} />
+      </DraftGuardProvider>
     </ToastProvider>,
   );
 }

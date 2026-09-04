@@ -3,12 +3,17 @@ import { useCallback, useContext, useMemo, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { DEFAULT_TENANT } from '../../config';
 import { isTenant, sameTenant, type Tenant } from '../../domain/tenant';
-import { recallTenant, rememberTenant } from '../../data/tenantStore';
+import { forgetTenant, recallTenant, rememberTenant } from '../../data/tenantStore';
 
 export interface TenantControls {
   tenant: Tenant;
   /** Ignores anything that isn't a valid tenant; see the comment on setTenant. */
   setTenant: (next: Tenant) => void;
+  /** Back to the configured default, forgetting this device's choice. The way
+   * out of a remembered mosque the account turns out to have no access to —
+   * otherwise that account is stuck on the denied screen with nothing but
+   * clearing browser data to recover. */
+  resetTenant: () => void;
 }
 
 /**
@@ -53,7 +58,15 @@ export function TenantProvider({
     });
   }, []);
 
-  const value = useMemo<TenantControls>(() => ({ tenant, setTenant }), [tenant, setTenant]);
+  const resetTenant = useCallback(() => {
+    forgetTenant();
+    setTenantState(DEFAULT_TENANT);
+  }, []);
+
+  const value = useMemo<TenantControls>(
+    () => ({ tenant, setTenant, resetTenant }),
+    [tenant, setTenant, resetTenant],
+  );
 
   return <TenantCtx.Provider value={value}>{children}</TenantCtx.Provider>;
 }

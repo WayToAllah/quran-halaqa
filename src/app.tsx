@@ -12,6 +12,8 @@ import { NiyyatModal } from './features/niyyat/NiyyatModal';
 import { useNiyyat } from './hooks/useNiyyat';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { TenantProvider, useTenant } from './features/tenant/TenantContext';
+import { DraftGuardProvider } from './features/tenant/DraftGuard';
+import { TenantSwitcher } from './features/tenant/TenantSwitcher';
 import type { SessionRecord } from './types';
 import type { JSX } from 'preact';
 
@@ -73,6 +75,10 @@ function AppShell() {
             <circle cx="12" cy="14.5" r="2.1" stroke="#C9A227" stroke-width="1.4" />
           </svg>
         </div>
+
+        {/* Renders nothing while this account has only one halaqa to open,
+            which is everybody today — the header stays exactly as it was. */}
+        <TenantSwitcher uid={auth.user?.uid ?? null} />
 
         <NiyyahBar niyyat={niyyat} onEdit={() => setNiyyatOpen(true)} />
 
@@ -147,7 +153,9 @@ export function App() {
   return (
     <ToastProvider>
       <TenantProvider>
-        <AppShell />
+        <DraftGuardProvider>
+          <AppShell />
+        </DraftGuardProvider>
       </TenantProvider>
     </ToastProvider>
   );

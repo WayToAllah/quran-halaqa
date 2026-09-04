@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/preact';
 import userEvent from '@testing-library/user-event';
 import { ToastProvider } from '../../ui/ToastProvider';
 import { RecordScreen } from './RecordScreen';
+import { DraftGuardProvider } from '../tenant/DraftGuard';
 import type { SessionRecord, Student } from '../../types';
 
 // Three ways the record screen could lose the teacher's work without telling
@@ -45,7 +46,9 @@ vi.mock('../../data/publishStats', () => ({
 function renderScreen(editRecord: SessionRecord | null = null) {
   return render(
     <ToastProvider>
-      <RecordScreen editRecord={editRecord} onEditConsumed={() => {}} />
+      <DraftGuardProvider>
+        <RecordScreen editRecord={editRecord} onEditConsumed={() => {}} />
+      </DraftGuardProvider>
     </ToastProvider>,
   );
 }
@@ -196,10 +199,12 @@ describe('RecordScreen — the recording-run date survives an edit', () => {
 
     rerender(
       <ToastProvider>
-        <RecordScreen
-          editRecord={{ ...prevSession, id: 'r_old', date: '2026-07-10' }}
-          onEditConsumed={() => {}}
-        />
+        <DraftGuardProvider>
+          <RecordScreen
+            editRecord={{ ...prevSession, id: 'r_old', date: '2026-07-10' }}
+            onEditConsumed={() => {}}
+          />
+        </DraftGuardProvider>
       </ToastProvider>,
     );
     expect(dateBox()).toHaveValue('2026-07-10');
@@ -214,10 +219,12 @@ describe('RecordScreen — the recording-run date survives an edit', () => {
 
     rerender(
       <ToastProvider>
-        <RecordScreen
-          editRecord={{ ...prevSession, id: 'r_old', date: '2026-07-10' }}
-          onEditConsumed={() => {}}
-        />
+        <DraftGuardProvider>
+          <RecordScreen
+            editRecord={{ ...prevSession, id: 'r_old', date: '2026-07-10' }}
+            onEditConsumed={() => {}}
+          />
+        </DraftGuardProvider>
       </ToastProvider>,
     );
     fireEvent.input(dateBox(), { target: { value: '2026-07-12' } });

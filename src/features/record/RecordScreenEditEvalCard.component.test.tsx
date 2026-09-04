@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/preact';
 import { ToastProvider } from '../../ui/ToastProvider';
 import { RecordScreen } from './RecordScreen';
+import { DraftGuardProvider } from '../tenant/DraftGuard';
 import type { SessionRecord, Student } from '../../types';
 
 // The teacher's report: opening a session in EDIT mode showed the same مادي
@@ -35,7 +36,9 @@ vi.mock('../../data/publishStats', () => ({
 function renderScreen(editRecord: SessionRecord | null) {
   return render(
     <ToastProvider>
-      <RecordScreen editRecord={editRecord} onEditConsumed={() => {}} />
+      <DraftGuardProvider>
+        <RecordScreen editRecord={editRecord} onEditConsumed={() => {}} />
+      </DraftGuardProvider>
     </ToastProvider>,
   );
 }

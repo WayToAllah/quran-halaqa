@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent, within } from '@testing-library/pre
 import userEvent from '@testing-library/user-event';
 import { ToastProvider } from '../../ui/ToastProvider';
 import { RecordScreen } from './RecordScreen';
+import { DraftGuardProvider } from '../tenant/DraftGuard';
 import { localDateStr } from '../../domain';
 import type { SessionRecord, Student } from '../../types';
 
@@ -46,7 +47,9 @@ function renderScreen(
 ) {
   return render(
     <ToastProvider>
-      <RecordScreen editRecord={props.editRecord ?? null} onEditConsumed={props.onEditConsumed} />
+      <DraftGuardProvider>
+        <RecordScreen editRecord={props.editRecord ?? null} onEditConsumed={props.onEditConsumed} />
+      </DraftGuardProvider>
     </ToastProvider>,
   );
 }
@@ -567,7 +570,9 @@ describe('RecordScreen — edit mode', () => {
     studentsForHook = students;
     rerender(
       <ToastProvider>
-        <RecordScreen editRecord={null} onEditConsumed={() => {}} />
+        <DraftGuardProvider>
+          <RecordScreen editRecord={null} onEditConsumed={() => {}} />
+        </DraftGuardProvider>
       </ToastProvider>,
     );
 
