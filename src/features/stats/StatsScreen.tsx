@@ -139,8 +139,7 @@ function ShowAllToggle({
 }
 
 export function StatsScreen() {
-  const tenant = useTenant();
-  const { mosqueId, halaqaId } = tenant;
+  const { mosqueId, halaqaId } = useTenant();
   const { students, loaded: studentsLoaded } = useStudents(mosqueId, halaqaId);
   const { records, loaded: recordsLoaded } = useAllRecords(mosqueId, halaqaId);
 

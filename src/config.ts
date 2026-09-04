@@ -12,12 +12,9 @@ import type { Tenant } from './domain/tenant';
  * مسجد التيسير stays the default because it is the halaqa that exists today and
  * the one this device is used for; a returning teacher must never have to pick.
  */
-export const DEFAULT_MOSQUE_ID = 'altayseer';
-export const DEFAULT_HALAQA_ID = 'main';
-
 export const DEFAULT_TENANT: Tenant = {
-  mosqueId: DEFAULT_MOSQUE_ID,
-  halaqaId: DEFAULT_HALAQA_ID,
+  mosqueId: 'altayseer',
+  halaqaId: 'main',
 };
 
 /**

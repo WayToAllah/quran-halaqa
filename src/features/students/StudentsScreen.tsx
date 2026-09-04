@@ -40,8 +40,7 @@ function PersonAvatarIcon() {
 }
 
 export function StudentsScreen() {
-  const tenant = useTenant();
-  const { mosqueId, halaqaId } = tenant;
+  const { mosqueId, halaqaId } = useTenant();
   const { students, loaded: studentsLoaded } = useStudents(mosqueId, halaqaId);
   const { records } = useAllRecords(mosqueId, halaqaId);
   const { showToast } = useToast();

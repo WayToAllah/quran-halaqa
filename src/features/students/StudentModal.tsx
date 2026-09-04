@@ -37,8 +37,7 @@ interface Props {
 }
 
 export function StudentModal({ student, allStudents, onClose }: Props) {
-  const tenant = useTenant();
-  const { mosqueId, halaqaId } = tenant;
+  const { mosqueId, halaqaId } = useTenant();
   const { showToast } = useToast();
   const [name, setName] = useState(student?.name ?? '');
   const [age, setAge] = useState(student?.age ?? '');
