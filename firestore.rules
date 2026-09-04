@@ -32,21 +32,76 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Anonymous auth is enabled for the parent page, and email/password
+    // self-signup is reachable through the public Auth REST API. So "signed in"
+    // is not a meaningful bar for creating anything — an anonymous visitor must
+    // never be able to stand up a mosque.
+    function isRealUser() {
+      return isSignedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // Deliberately UNCHANGED: still exactly one exists() lookup. This runs on
+    // every student and record access, and rules lookups are billed reads, so
+    // adding an ownerUid fallback here would quietly double the cost of the
+    // busiest path in the app. The owner gets a real members/{uid} document
+    // instead, written immediately after the mosque (see isMosqueOwner).
     function isMosqueMember(mosqueId) {
       return isSignedIn() &&
         exists(/databases/$(database)/documents/mosques/$(mosqueId)/members/$(request.auth.uid));
     }
 
+    // Only used on the rare administrative writes below, never on a read path.
+    function isMosqueOwner(mosqueId) {
+      return isRealUser() &&
+        exists(/databases/$(database)/documents/mosques/$(mosqueId)) &&
+        get(/databases/$(database)/documents/mosques/$(mosqueId)).data.ownerUid == request.auth.uid;
+    }
+
+    function isValidMosqueName(name) {
+      return name is string && name.size() > 0 && name.size() <= 80;
+    }
+
     match /mosques/{mosqueId} {
       allow read: if isMosqueMember(mosqueId);
-      // Mosque documents themselves are created/managed out-of-band (Firebase
-      // Console or an Admin SDK script), never by a client — prevents anyone
-      // from, say, renaming the mosque or granting themselves membership.
-      allow write: if false;
+
+      // A teacher creates their own mosque from inside the app. This is the one
+      // self-authorising write in the whole model: the document names its own
+      // owner, and every administrative write below is then authorised by
+      // reading it back. That is what removes the need for a Cloud Function —
+      // rules evaluate each write in a batch independently, so two documents
+      // that had to appear together atomically would have required a server.
+      //
+      // The shape is pinned so the document cannot be used for anything else,
+      // and `id` must match the path so the stored id can never disagree with
+      // where the document actually lives.
+      allow create: if isRealUser()
+        && request.resource.data.keys().hasOnly(['id', 'name', 'createdAt', 'ownerUid'])
+        && request.resource.data.keys().hasAll(['id', 'name', 'ownerUid'])
+        && request.resource.data.id == mosqueId
+        && request.resource.data.ownerUid == request.auth.uid
+        && isValidMosqueName(request.resource.data.name);
+
+      // Renaming is fine; handing the mosque to someone else, or changing which
+      // document this is, is not.
+      allow update: if isMosqueOwner(mosqueId)
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.id == resource.data.id
+        && isValidMosqueName(request.resource.data.name);
+
+      // Deleting a mosque would orphan every student, record and parent link
+      // under it with no way to reach them again.
+      allow delete: if false;
 
       match /members/{uid} {
         allow read: if isMosqueMember(mosqueId);
-        allow write: if false; // membership managed by Admin SDK/Console only
+        // Only the owner grants access, and only ever a role — never arbitrary
+        // data. The owner writes their own entry here right after creating the
+        // mosque; if that second write is lost, they can simply retry, because
+        // this rule is authorised by ownerUid on the mosque, not by membership.
+        allow create, update: if isMosqueOwner(mosqueId)
+          && request.resource.data.keys().hasOnly(['role'])
+          && request.resource.data.role in ['owner', 'admin'];
+        allow delete: if isMosqueOwner(mosqueId);
       }
 
       match /halaqat/{halaqaId} {

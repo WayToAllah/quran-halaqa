@@ -211,3 +211,106 @@ describe('users/{uid} — private lookup index, owner-only, shape-pinned', () =>
     await assertFails(setDoc(doc(db, 'users', ADMIN_UID), { mosqueIds: tooMany }));
   });
 });
+
+describe('mosque creation from inside the app', () => {
+  const NEW_ID = 'new_mosque';
+  const good = (uid: string) => ({ id: NEW_ID, name: 'مسجد النور', createdAt: 1, ownerUid: uid });
+
+  it('lets a real signed-in user create a mosque they own', async () => {
+    const db = testEnv.authenticatedContext(OUTSIDER_UID).firestore();
+    await assertSucceeds(setDoc(doc(db, 'mosques', NEW_ID), good(OUTSIDER_UID)));
+  });
+
+  // Anonymous auth is on for the parent page. Without this guard, every visitor
+  // holding a child link could stand up mosques.
+  it('denies an anonymous visitor', async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertFails(setDoc(doc(db, 'mosques', NEW_ID), good('anyone')));
+  });
+
+  it('denies naming someone else as owner', async () => {
+    const db = testEnv.authenticatedContext(OUTSIDER_UID).firestore();
+    await assertFails(setDoc(doc(db, 'mosques', NEW_ID), good(ADMIN_UID)));
+  });
+
+  it('denies an id that disagrees with the path', async () => {
+    const db = testEnv.authenticatedContext(OUTSIDER_UID).firestore();
+    await assertFails(
+      setDoc(doc(db, 'mosques', NEW_ID), { ...good(OUTSIDER_UID), id: 'somewhere_else' }),
+    );
+  });
+
+  it('denies extra fields and unusable names', async () => {
+    const db = testEnv.authenticatedContext(OUTSIDER_UID).firestore();
+    await assertFails(setDoc(doc(db, 'mosques', NEW_ID), { ...good(OUTSIDER_UID), secret: 'x' }));
+    await assertFails(setDoc(doc(db, 'mosques', NEW_ID), { ...good(OUTSIDER_UID), name: '' }));
+    await assertFails(
+      setDoc(doc(db, 'mosques', NEW_ID), { ...good(OUTSIDER_UID), name: 'ح'.repeat(81) }),
+    );
+  });
+
+  it('does not let creating a mosque touch an existing one', async () => {
+    const db = testEnv.authenticatedContext(OUTSIDER_UID).firestore();
+    await assertFails(setDoc(doc(db, 'mosques', MOSQUE_ID), good(OUTSIDER_UID)));
+  });
+
+  it('never allows deleting a mosque, even by its owner', async () => {
+    const db = testEnv.authenticatedContext(OUTSIDER_UID).firestore();
+    await assertSucceeds(setDoc(doc(db, 'mosques', NEW_ID), good(OUTSIDER_UID)));
+    await assertFails(deleteDoc(doc(db, 'mosques', NEW_ID)));
+  });
+});
+
+describe('membership is granted by the mosque owner', () => {
+  const NEW_ID = 'owned_mosque';
+
+  async function createOwned(uid: string) {
+    const db = testEnv.authenticatedContext(uid).firestore();
+    await assertSucceeds(
+      setDoc(doc(db, 'mosques', NEW_ID), { id: NEW_ID, name: 'مسجد', createdAt: 1, ownerUid: uid }),
+    );
+    return db;
+  }
+
+  // The bootstrap that replaces the Admin SDK script: the mosque authorises
+  // the membership write that follows it.
+  it('lets the owner write their own membership right after creating', async () => {
+    const db = await createOwned(OUTSIDER_UID);
+    await assertSucceeds(
+      setDoc(doc(db, 'mosques', NEW_ID, 'members', OUTSIDER_UID), { role: 'owner' }),
+    );
+    await assertSucceeds(getDoc(doc(db, 'mosques', NEW_ID)));
+  });
+
+  it('lets the owner invite another teacher', async () => {
+    const db = await createOwned(OUTSIDER_UID);
+    await assertSucceeds(
+      setDoc(doc(db, 'mosques', NEW_ID, 'members', ADMIN_UID), { role: 'admin' }),
+    );
+  });
+
+  it('denies a non-owner granting themselves membership', async () => {
+    await createOwned(OUTSIDER_UID);
+    const other = testEnv.authenticatedContext(ADMIN_UID).firestore();
+    await assertFails(
+      setDoc(doc(other, 'mosques', NEW_ID, 'members', ADMIN_UID), { role: 'owner' }),
+    );
+  });
+
+  it('denies membership documents carrying anything but a known role', async () => {
+    const db = await createOwned(OUTSIDER_UID);
+    await assertFails(
+      setDoc(doc(db, 'mosques', NEW_ID, 'members', OUTSIDER_UID), { role: 'owner', extra: 1 }),
+    );
+    await assertFails(
+      setDoc(doc(db, 'mosques', NEW_ID, 'members', OUTSIDER_UID), { role: 'superadmin' }),
+    );
+  });
+
+  it('still denies granting membership in a mosque nobody owns from the client', async () => {
+    const db = testEnv.authenticatedContext(OUTSIDER_UID).firestore();
+    await assertFails(
+      setDoc(doc(db, 'mosques', MOSQUE_ID, 'members', OUTSIDER_UID), { role: 'owner' }),
+    );
+  });
+});
