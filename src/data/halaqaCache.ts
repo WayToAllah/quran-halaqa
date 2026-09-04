@@ -22,7 +22,7 @@
  * Scope note: this is a per-tab, in-memory cache tied to the app session. It is
  * NOT persistence across reloads (that's a separate concern — persistentLocalCache
  * in firebase.ts). It intentionally keys on a single (mosqueId, halaqaId) pair —
- * the whole app runs against one halaqa at a time (see MOSQUE_ID/HALAQA_ID in
+ * the whole app runs against one halaqa at a time (see useTenant() in
  * config.ts). If that pair ever changes at runtime the cache resets cleanly.
  */
 import type { Unsubscribe } from 'firebase/firestore';

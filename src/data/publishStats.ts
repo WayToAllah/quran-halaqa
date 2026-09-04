@@ -9,7 +9,7 @@ import { setPublicStats } from './publicStats.repo';
 import { getAllRecords } from './records.repo';
 import { getAllStudents } from './students.repo';
 import { getCachedHalaqaSnapshot } from './halaqaCache';
-import { MOSQUE_ID, HALAQA_ID } from '../config';
+import type { Tenant } from '../domain/tenant';
 
 /**
  * Recompute the shared, halaqa-wide inputs (total halaqa days, dense rank by
@@ -86,13 +86,14 @@ export async function publishStudentPublicStats(
  * Fire-and-forget: never awaited by the UI in a way that blocks the user, and
  * failures only warn (the projection self-heals on the next successful save).
  */
-export async function republishPublicStatsFor(studentIds: string[]): Promise<void> {
+export async function republishPublicStatsFor(tenant: Tenant, studentIds: string[]): Promise<void> {
   if (!studentIds.length) return;
   try {
-    const cached = getCachedHalaqaSnapshot(MOSQUE_ID, HALAQA_ID);
+    const { mosqueId, halaqaId } = tenant;
+    const cached = getCachedHalaqaSnapshot(mosqueId, halaqaId);
     const { students: allStudents, records: allRecords } = cached ?? {
-      students: await getAllStudents(MOSQUE_ID, HALAQA_ID),
-      records: await getAllRecords(MOSQUE_ID, HALAQA_ID),
+      students: await getAllStudents(mosqueId, halaqaId),
+      records: await getAllRecords(mosqueId, halaqaId),
     };
     const inputs = computeSharedStatsInputs(allStudents, allRecords);
     await Promise.all(

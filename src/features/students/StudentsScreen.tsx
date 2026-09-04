@@ -16,7 +16,7 @@ import {
 } from '../../domain/attendance';
 import { genParentToken } from '../../domain/ids';
 import { useToast } from '../../ui/ToastProvider';
-import { MOSQUE_ID, HALAQA_ID } from '../../config';
+import { useTenant } from '../tenant/TenantContext';
 import { StudentModal } from './StudentModal';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { SearchInput } from '../../ui/SearchInput';
@@ -40,8 +40,10 @@ function PersonAvatarIcon() {
 }
 
 export function StudentsScreen() {
-  const { students, loaded: studentsLoaded } = useStudents(MOSQUE_ID, HALAQA_ID);
-  const { records } = useAllRecords(MOSQUE_ID, HALAQA_ID);
+  const tenant = useTenant();
+  const { mosqueId, halaqaId } = tenant;
+  const { students, loaded: studentsLoaded } = useStudents(mosqueId, halaqaId);
+  const { records } = useAllRecords(mosqueId, halaqaId);
   const { showToast } = useToast();
 
   const [query, setQuery] = useState('');
@@ -82,7 +84,7 @@ export function StudentsScreen() {
     if (!token) {
       token = genParentToken();
       try {
-        await updateStudent(MOSQUE_ID, HALAQA_ID, s.id, { parentToken: token });
+        await updateStudent(mosqueId, halaqaId, s.id, { parentToken: token });
       } catch (err) {
         console.error('failed to mint parentToken:', err);
         showToast('⚠️ تعذّر إنشاء رابط المتابعة', true);
@@ -112,9 +114,9 @@ export function StudentsScreen() {
     requestDelete(
       s.id,
       `🗑 تم حذف ${getStudentName(s)}`,
-      (id) => deleteStudentDoc(MOSQUE_ID, HALAQA_ID, id),
+      (id) => deleteStudentDoc(mosqueId, halaqaId, id),
       // Same id back, so the student's records and parent link re-attach.
-      () => saveStudent(MOSQUE_ID, HALAQA_ID, s),
+      () => saveStudent(mosqueId, halaqaId, s),
     );
   }
 

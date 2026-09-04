@@ -4,7 +4,7 @@ import { normAr, stripWhitespace, toWesternDigits } from '../../domain/text';
 import { saveStudent } from '../../data/students.repo';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useToast } from '../../ui/ToastProvider';
-import { MOSQUE_ID, HALAQA_ID } from '../../config';
+import { useTenant } from '../tenant/TenantContext';
 import type { Student } from '../../types';
 
 const GRADE_OPTIONS = [
@@ -37,6 +37,8 @@ interface Props {
 }
 
 export function StudentModal({ student, allStudents, onClose }: Props) {
+  const tenant = useTenant();
+  const { mosqueId, halaqaId } = tenant;
   const { showToast } = useToast();
   const [name, setName] = useState(student?.name ?? '');
   const [age, setAge] = useState(student?.age ?? '');
@@ -154,7 +156,7 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
     };
 
     try {
-      await saveStudent(MOSQUE_ID, HALAQA_ID, obj);
+      await saveStudent(mosqueId, halaqaId, obj);
       showToast(student ? '✓ تم التحديث' : '✓ تم الحفظ بنجاح');
       onClose();
     } catch (err) {

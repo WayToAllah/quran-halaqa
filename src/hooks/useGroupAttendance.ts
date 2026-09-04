@@ -3,7 +3,7 @@ import { getRecordsByDate, saveRecord } from '../data/records.repo';
 import { republishPublicStatsFor } from '../data/publishStats';
 import { getStudentName, studentHasRecordOnDate } from '../domain/students';
 import { genId } from '../domain/ids';
-import { MOSQUE_ID, HALAQA_ID } from '../config';
+import { useTenant } from '../features/tenant/TenantContext';
 import type { SessionRecord, Student } from '../types';
 
 /**
@@ -14,6 +14,8 @@ import type { SessionRecord, Student } from '../types';
  * of the screen, not a per-mode one).
  */
 export function useGroupAttendance(date: string, students: Student[]) {
+  const tenant = useTenant();
+  const { mosqueId, halaqaId } = tenant;
   const [dayRecords, setDayRecords] = useState<SessionRecord[] | null>(null);
   const [checked, setChecked] = useState<Set<string>>(new Set());
 
@@ -21,7 +23,7 @@ export function useGroupAttendance(date: string, students: Student[]) {
     let cancelled = false;
     setDayRecords(null);
     setChecked(new Set());
-    getRecordsByDate(MOSQUE_ID, HALAQA_ID, date)
+    getRecordsByDate(mosqueId, halaqaId, date)
       .then((recs) => {
         if (!cancelled) setDayRecords(recs);
       })
@@ -29,7 +31,7 @@ export function useGroupAttendance(date: string, students: Student[]) {
     return () => {
       cancelled = true;
     };
-  }, [date]);
+  }, [date, mosqueId, halaqaId]);
 
   /** Re-reads the day's coverage. The individual tab needs this too: it warns
    * "مسجّل بالفعل" off this same snapshot, which is otherwise only taken when
@@ -37,7 +39,7 @@ export function useGroupAttendance(date: string, students: Student[]) {
    * sitting drew no warning at all. */
   async function refresh() {
     try {
-      setDayRecords(await getRecordsByDate(MOSQUE_ID, HALAQA_ID, date));
+      setDayRecords(await getRecordsByDate(mosqueId, halaqaId, date));
     } catch (err) {
       console.error('getRecordsByDate failed:', err);
     }
@@ -83,7 +85,7 @@ export function useGroupAttendance(date: string, students: Student[]) {
     try {
       await Promise.all(
         toSave.map((s) =>
-          saveRecord(MOSQUE_ID, HALAQA_ID, {
+          saveRecord(mosqueId, halaqaId, {
             id: genId('att'),
             studentId: s.id,
             student: getStudentName(s),
@@ -94,7 +96,10 @@ export function useGroupAttendance(date: string, students: Student[]) {
         ),
       );
       showToast(`✓ تم تسجيل حضور ${toSave.length} طالب`);
-      void republishPublicStatsFor(toSave.map((s) => s.id));
+      void republishPublicStatsFor(
+        tenant,
+        toSave.map((s) => s.id),
+      );
       // Refresh day coverage so the just-saved students immediately show as
       // "مسجّل بالفعل" instead of staying checkable until the next date change.
       await refresh();

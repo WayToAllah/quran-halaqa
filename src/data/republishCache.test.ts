@@ -28,6 +28,9 @@ vi.mock('./halaqaCache', () => ({
 }));
 
 import { republishPublicStatsFor } from './publishStats';
+import type { Tenant } from '../domain/tenant';
+
+const TENANT: Tenant = { mosqueId: 'altayseer', halaqaId: 'main' };
 
 const students: Student[] = [
   { id: 's_1', name: 'زيد', parentToken: 'T1' },
@@ -48,7 +51,7 @@ describe('republishPublicStatsFor read source', () => {
   it('uses the warm cache and does NOT fetch the full halaqa', async () => {
     getCachedSnapshotMock.mockReturnValue({ students, records });
 
-    await republishPublicStatsFor(['s_1']);
+    await republishPublicStatsFor(TENANT, ['s_1']);
 
     expect(getAllStudentsMock).not.toHaveBeenCalled();
     expect(getAllRecordsMock).not.toHaveBeenCalled();
@@ -61,15 +64,28 @@ describe('republishPublicStatsFor read source', () => {
     getAllStudentsMock.mockResolvedValue(students);
     getAllRecordsMock.mockResolvedValue(records);
 
-    await republishPublicStatsFor(['s_1']);
+    await republishPublicStatsFor(TENANT, ['s_1']);
 
     expect(getAllStudentsMock).toHaveBeenCalledTimes(1);
     expect(getAllRecordsMock).toHaveBeenCalledTimes(1);
     expect(setPublicStatsMock).toHaveBeenCalledTimes(1);
   });
 
+  it('scopes every read to the tenant it was handed, not a global constant', async () => {
+    const other: Tenant = { mosqueId: 'alnour', halaqaId: 'nashieen' };
+    getCachedSnapshotMock.mockReturnValue(null);
+    getAllStudentsMock.mockResolvedValue(students);
+    getAllRecordsMock.mockResolvedValue(records);
+
+    await republishPublicStatsFor(other, ['s_1']);
+
+    expect(getCachedSnapshotMock).toHaveBeenCalledWith('alnour', 'nashieen');
+    expect(getAllStudentsMock).toHaveBeenCalledWith('alnour', 'nashieen');
+    expect(getAllRecordsMock).toHaveBeenCalledWith('alnour', 'nashieen');
+  });
+
   it('does nothing for an empty id list (no reads at all)', async () => {
-    await republishPublicStatsFor([]);
+    await republishPublicStatsFor(TENANT, []);
     expect(getCachedSnapshotMock).not.toHaveBeenCalled();
     expect(getAllStudentsMock).not.toHaveBeenCalled();
     expect(setPublicStatsMock).not.toHaveBeenCalled();
@@ -82,7 +98,7 @@ describe('republishPublicStatsFor read source', () => {
     ];
     getCachedSnapshotMock.mockReturnValue({ students: mixed, records });
 
-    await republishPublicStatsFor(['s_1', 's_3']);
+    await republishPublicStatsFor(TENANT, ['s_1', 's_3']);
 
     expect(getAllStudentsMock).not.toHaveBeenCalled();
     expect(setPublicStatsMock).toHaveBeenCalledTimes(1); // only s_1

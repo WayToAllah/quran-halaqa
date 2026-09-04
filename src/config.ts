@@ -1,11 +1,24 @@
+import type { Tenant } from './domain/tenant';
+
 /**
- * Hardcoded for now: مسجد التيسير is the only tenant in the system today
- * (see PROJECT_CONTEXT.md §10 and scripts/migrate-rtdb-to-firestore.ts's
- * defaults, which write to exactly this mosque/halaqa). A mosque-switcher UI
- * only makes sense once there's a second mosque to switch to.
+ * The mosque/halaqa the app opens on when this device has never picked one.
+ *
+ * These used to be `MOSQUE_ID` / `HALAQA_ID`, imported directly by every screen
+ * — which made "work with a second mosque" a rebuild rather than a state
+ * change. They are now only a *default*: the live value comes from
+ * `useTenant()` (see `src/features/tenant/TenantContext.tsx`), which reads the
+ * device's stored selection and falls back to this.
+ *
+ * مسجد التيسير stays the default because it is the halaqa that exists today and
+ * the one this device is used for; a returning teacher must never have to pick.
  */
-export const MOSQUE_ID = 'altayseer';
-export const HALAQA_ID = 'main';
+export const DEFAULT_MOSQUE_ID = 'altayseer';
+export const DEFAULT_HALAQA_ID = 'main';
+
+export const DEFAULT_TENANT: Tenant = {
+  mosqueId: DEFAULT_MOSQUE_ID,
+  halaqaId: DEFAULT_HALAQA_ID,
+};
 
 /**
  * Base URL of the public parent progress page. Points at the v2 portal

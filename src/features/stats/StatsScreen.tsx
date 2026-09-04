@@ -20,7 +20,7 @@ import {
   countRecentlyActiveStudents,
   type StatsSortKey,
 } from '../../domain/statsScreen';
-import { MOSQUE_ID, HALAQA_ID } from '../../config';
+import { useTenant } from '../tenant/TenantContext';
 import {
   buildAttendanceCardData,
   buildAttendanceCardSvg,
@@ -139,8 +139,10 @@ function ShowAllToggle({
 }
 
 export function StatsScreen() {
-  const { students, loaded: studentsLoaded } = useStudents(MOSQUE_ID, HALAQA_ID);
-  const { records, loaded: recordsLoaded } = useAllRecords(MOSQUE_ID, HALAQA_ID);
+  const tenant = useTenant();
+  const { mosqueId, halaqaId } = tenant;
+  const { students, loaded: studentsLoaded } = useStudents(mosqueId, halaqaId);
+  const { records, loaded: recordsLoaded } = useAllRecords(mosqueId, halaqaId);
 
   const [monthFilter, setMonthFilter] = useState('all');
   const [sortKey, setSortKey] = useState<StatsSortKey>('attend');

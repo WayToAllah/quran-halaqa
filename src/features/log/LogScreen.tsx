@@ -17,7 +17,7 @@ import type { LogFilter } from '../../domain/logGrouping';
 import { toArabicDigits } from '../../domain/text';
 import { PlainStars } from '../../ui/StarRating';
 import { useToast } from '../../ui/ToastProvider';
-import { MOSQUE_ID, HALAQA_ID } from '../../config';
+import { useTenant } from '../tenant/TenantContext';
 import type { SessionRecord, SuraAssignment } from '../../types';
 
 function formatDate(dateStr: string): string {
@@ -246,11 +246,10 @@ interface LogScreenProps {
 }
 
 export function LogScreen({ onEditRecord }: LogScreenProps = {}) {
-  const { records, loaded, loadMore, loadingMore, hasMore } = useRecentRecords(
-    MOSQUE_ID,
-    HALAQA_ID,
-  );
-  const { students } = useStudents(MOSQUE_ID, HALAQA_ID);
+  const tenant = useTenant();
+  const { mosqueId, halaqaId } = tenant;
+  const { records, loaded, loadMore, loadingMore, hasMore } = useRecentRecords(mosqueId, halaqaId);
+  const { students } = useStudents(mosqueId, halaqaId);
   const { pendingIds, requestDelete } = useUndoableDelete();
   const { showToast } = useToast();
   const [query, setQuery] = useState('');
@@ -258,7 +257,7 @@ export function LogScreen({ onEditRecord }: LogScreenProps = {}) {
   const isSearching = query.trim().length > 0;
   // When searching, results come from Firestore (every matching student's full
   // history), not just the paginated slice already in memory.
-  const search = useRecordSearch(MOSQUE_ID, HALAQA_ID, query, students);
+  const search = useRecordSearch(mosqueId, halaqaId, query, students);
 
   const [filter, setFilter] = useState<LogFilter>('all');
 
@@ -296,16 +295,16 @@ export function LogScreen({ onEditRecord }: LogScreenProps = {}) {
       r.id,
       `🗑 تم حذف ${label}`,
       async (id) => {
-        await deleteRecordDoc(MOSQUE_ID, HALAQA_ID, id);
+        await deleteRecordDoc(mosqueId, halaqaId, id);
         // Refresh the parent projection now that this session is gone.
-        if (r.studentId) void republishPublicStatsFor([r.studentId]);
+        if (r.studentId) void republishPublicStatsFor(tenant, [r.studentId]);
       },
       async () => {
         // `r` is the full record as it was listed, so the restore is
         // byte-identical under the same id — the session slots back into the
         // chain exactly where it was.
-        await saveRecord(MOSQUE_ID, HALAQA_ID, r);
-        if (r.studentId) void republishPublicStatsFor([r.studentId]);
+        await saveRecord(mosqueId, halaqaId, r);
+        if (r.studentId) void republishPublicStatsFor(tenant, [r.studentId]);
       },
     );
   }

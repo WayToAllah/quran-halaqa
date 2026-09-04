@@ -10,7 +10,7 @@ import { auth } from '../../data/firebase';
 import { getMembership } from '../../data/mosques.repo';
 import { rememberMembership, recallMembership, forgetMembership } from '../../data/membershipCache';
 import { classifyMembershipError } from '../../domain/authErrors';
-import { MOSQUE_ID } from '../../config';
+import { useTenant } from '../tenant/TenantContext';
 import type { MosqueMember } from '../../types';
 
 export type AuthStatus =
@@ -45,6 +45,7 @@ export interface AuthState {
  * this account, the app opens against the local record instead.
  */
 export function useAuth(): AuthState {
+  const { mosqueId } = useTenant();
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [user, setUser] = useState<User | null>(null);
   const [member, setMember] = useState<MosqueMember | null>(null);
@@ -54,46 +55,49 @@ export function useAuth(): AuthState {
   // auth state change (which will not come — the session is already valid).
   const userRef = useRef<User | null>(null);
 
-  const check = useCallback(async (u: User) => {
-    setStatus('checking-membership');
-    try {
-      const m = await getMembership(MOSQUE_ID, u.uid);
-      if (m) {
-        rememberMembership(MOSQUE_ID, u.uid, m);
-        setMember(m);
-        setOfflineSession(false);
-        setStatus('ready');
-      } else {
-        // An authoritative "no" — drop any local record so it can't outlive
-        // the access it was recording.
-        forgetMembership(MOSQUE_ID, u.uid);
-        setMember(null);
-        setStatus('denied');
+  const check = useCallback(
+    async (u: User) => {
+      setStatus('checking-membership');
+      try {
+        const m = await getMembership(mosqueId, u.uid);
+        if (m) {
+          rememberMembership(mosqueId, u.uid, m);
+          setMember(m);
+          setOfflineSession(false);
+          setStatus('ready');
+        } else {
+          // An authoritative "no" — drop any local record so it can't outlive
+          // the access it was recording.
+          forgetMembership(mosqueId, u.uid);
+          setMember(null);
+          setStatus('denied');
+        }
+      } catch (err) {
+        const failure = classifyMembershipError(err, navigator.onLine);
+        if (failure === 'denied') {
+          console.error('membership denied:', err);
+          forgetMembership(mosqueId, u.uid);
+          setMember(null);
+          setStatus('denied');
+          return;
+        }
+        // Never reached the server. Fall back to a previous confirmation from
+        // this device if there is one; otherwise say so plainly rather than
+        // accusing the account of having no access.
+        const cached = recallMembership(mosqueId, u.uid);
+        console.warn('membership check unreachable:', err);
+        if (cached) {
+          setMember(cached);
+          setOfflineSession(true);
+          setStatus('ready');
+        } else {
+          setMember(null);
+          setStatus('unreachable');
+        }
       }
-    } catch (err) {
-      const failure = classifyMembershipError(err, navigator.onLine);
-      if (failure === 'denied') {
-        console.error('membership denied:', err);
-        forgetMembership(MOSQUE_ID, u.uid);
-        setMember(null);
-        setStatus('denied');
-        return;
-      }
-      // Never reached the server. Fall back to a previous confirmation from
-      // this device if there is one; otherwise say so plainly rather than
-      // accusing the account of having no access.
-      const cached = recallMembership(MOSQUE_ID, u.uid);
-      console.warn('membership check unreachable:', err);
-      if (cached) {
-        setMember(cached);
-        setOfflineSession(true);
-        setStatus('ready');
-      } else {
-        setMember(null);
-        setStatus('unreachable');
-      }
-    }
-  }, []);
+    },
+    [mosqueId],
+  );
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {

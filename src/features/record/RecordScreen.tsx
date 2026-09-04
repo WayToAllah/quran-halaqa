@@ -43,7 +43,7 @@ import {
 import { StarPicker } from '../../ui/StarPicker';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useToast } from '../../ui/ToastProvider';
-import { MOSQUE_ID, HALAQA_ID } from '../../config';
+import { useTenant } from '../tenant/TenantContext';
 import type { SuraAssignment, SessionRecord, Student } from '../../types';
 
 /**
@@ -109,7 +109,9 @@ interface Props {
 }
 
 export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) {
-  const { students } = useStudents(MOSQUE_ID, HALAQA_ID);
+  const tenant = useTenant();
+  const { mosqueId, halaqaId } = tenant;
+  const { students } = useStudents(mosqueId, halaqaId);
   const { showToast } = useToast();
 
   const [date, setDate] = useState(localDateStr());
@@ -132,8 +134,8 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   const [editingRecordData, setEditingRecordData] = useState<SessionRecord | null>(null);
 
   const { prev: prevSession, loading: prevLoading } = usePreviousSession(
-    MOSQUE_ID,
-    HALAQA_ID,
+    mosqueId,
+    halaqaId,
     selectedStudent,
     editingId ?? undefined,
   );
@@ -774,10 +776,10 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
       // costs no extra round trip worth waiting on separately.
       const write: Promise<void> = prevUpdate
         ? Promise.all([
-            saveRecord(MOSQUE_ID, HALAQA_ID, rec),
-            saveRecord(MOSQUE_ID, HALAQA_ID, prevUpdate),
+            saveRecord(mosqueId, halaqaId, rec),
+            saveRecord(mosqueId, halaqaId, prevUpdate),
           ]).then(() => undefined)
-        : saveRecord(MOSQUE_ID, HALAQA_ID, rec);
+        : saveRecord(mosqueId, halaqaId, rec);
       const outcome = await raceTimeout(write, SAVE_ACK_TIMEOUT_MS);
       if (outcome.status === 'pending') {
         // The deadline won, so this promise's eventual result is ours to
@@ -802,7 +804,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
         studentId,
         ...(prevUpdate?.studentId ? [prevUpdate.studentId] : []),
       ]);
-      void republishPublicStatsFor([...affectedIds]);
+      void republishPublicStatsFor(tenant, [...affectedIds]);
       // The "مسجّل بالفعل" warning reads the day's coverage snapshot, which is
       // otherwise only taken when the date changes — without this refresh the
       // student just saved could be picked again straight away with no warning.

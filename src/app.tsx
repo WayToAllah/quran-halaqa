@@ -11,7 +11,7 @@ import { NiyyahBar } from './features/niyyat/NiyyahBar';
 import { NiyyatModal } from './features/niyyat/NiyyatModal';
 import { useNiyyat } from './hooks/useNiyyat';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
-import { MOSQUE_ID, HALAQA_ID } from './config';
+import { TenantProvider, useTenant } from './features/tenant/TenantContext';
 import type { SessionRecord } from './types';
 import type { JSX } from 'preact';
 
@@ -25,11 +25,12 @@ const TABS: { id: Tab; label: string; Icon: (p: { class?: string }) => JSX.Eleme
 ];
 
 function AppShell() {
+  const { mosqueId, halaqaId } = useTenant();
   const auth = useAuth();
   const [tab, setTab] = useState<Tab>('record');
   // A session handed off from the log screen's ✏️ button to the record screen.
   const [editingRecord, setEditingRecord] = useState<SessionRecord | null>(null);
-  const { niyyat, save: saveNiyyat } = useNiyyat(MOSQUE_ID, HALAQA_ID, auth.status === 'ready');
+  const { niyyat, save: saveNiyyat } = useNiyyat(mosqueId, halaqaId, auth.status === 'ready');
   const [niyyatOpen, setNiyyatOpen] = useState(false);
   const online = useOnlineStatus();
 
@@ -145,7 +146,9 @@ function AppShell() {
 export function App() {
   return (
     <ToastProvider>
-      <AppShell />
+      <TenantProvider>
+        <AppShell />
+      </TenantProvider>
     </ToastProvider>
   );
 }
