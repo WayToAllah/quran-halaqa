@@ -31,8 +31,8 @@ export default defineConfig({
         // never confuse it with the production PWA at the root (whose id is
         // /quran-halaqa/) — the two install as two separate apps.
         id: '/quran-halaqa/v2/',
-        scope: '/quran-halaqa/v2/',
-        start_url: '/quran-halaqa/v2/',
+        scope: '/quran-halaqa/v3/',
+        start_url: '/quran-halaqa/v3/',
         display: 'standalone',
         orientation: 'portrait',
         background_color: '#FAF7F0',
@@ -59,7 +59,8 @@ export default defineConfig({
         // runtime (they're cross-origin, not in the build output).
         globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
         // SPA-style navigation fallback to the admin index, but ONLY within the
-        // v2 scope — never intercept the production root.
+        // v3 scope — never intercept the production root, and never the v2
+        // build that is still deployed alongside it.
         navigateFallback: '/quran-halaqa/v2/index.html',
         navigateFallbackDenylist: [/\/child\.html(\?.*)?$/],
         runtimeCaching: [
@@ -79,7 +80,7 @@ export default defineConfig({
   // GitHub Pages serves this from /quran-halaqa/v2/ — a subfolder alongside
   // the existing production root, added additively without touching any
   // existing file (see the /v2/ deployment step in Phase 4).
-  base: '/quran-halaqa/v2/',
+  base: '/quran-halaqa/v3/',
   build: {
     // Two independent entry points: the admin app (index.html → main.tsx) and
     // the public, read-only parent page (child.html → child-main.tsx). Keeping

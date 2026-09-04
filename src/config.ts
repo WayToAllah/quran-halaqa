@@ -18,6 +18,13 @@ export const DEFAULT_TENANT: Tenant = {
 };
 
 /**
+ * Deliberately still /v2/ on this branch. Parent links are permanent — every
+ * child.html?t=… already sent on WhatsApp has to keep working forever — so a
+ * second public URL would mean a second surface to keep alive indefinitely,
+ * not a migration. The parent page doesn't know or need the mosque anyway; it
+ * resolves everything from the token. The URL is the contract; the bundle
+ * served behind it can be rebuilt from whichever branch is current.
+ *
  * Base URL of the public parent progress page. Points at the v2 portal
  * (/v2/child.html, reads publicStats from Firestore over REST). Single source
  * of truth so the WhatsApp message and the copy-link button can never drift
