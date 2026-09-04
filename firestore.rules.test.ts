@@ -167,3 +167,47 @@ describe('publicStats/{token} — public get, no list, member-only write (transi
     );
   });
 });
+
+describe('users/{uid} — private lookup index, owner-only, shape-pinned', () => {
+  it('denies an anonymous visitor', async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(db, 'users', ADMIN_UID)));
+  });
+
+  it("denies reading someone else's index", async () => {
+    const db = testEnv.authenticatedContext(OUTSIDER_UID).firestore();
+    await assertFails(getDoc(doc(db, 'users', ADMIN_UID)));
+  });
+
+  it("denies writing someone else's index", async () => {
+    const db = testEnv.authenticatedContext(OUTSIDER_UID).firestore();
+    await assertFails(setDoc(doc(db, 'users', ADMIN_UID), { mosqueIds: [MOSQUE_ID] }));
+  });
+
+  it('allows an account to read and write its own', async () => {
+    const db = testEnv.authenticatedContext(ADMIN_UID).firestore();
+    await assertSucceeds(setDoc(doc(db, 'users', ADMIN_UID), { mosqueIds: [MOSQUE_ID] }));
+    await assertSucceeds(getDoc(doc(db, 'users', ADMIN_UID)));
+  });
+
+  // Listing a mosque here is not membership: the mosque read still fails.
+  it('does not turn a forged entry into access', async () => {
+    const db = testEnv.authenticatedContext(OUTSIDER_UID).firestore();
+    await assertSucceeds(setDoc(doc(db, 'users', OUTSIDER_UID), { mosqueIds: [MOSQUE_ID] }));
+    await assertFails(getDoc(doc(db, 'mosques', MOSQUE_ID)));
+  });
+
+  it('refuses to be used as free storage', async () => {
+    const db = testEnv.authenticatedContext(ADMIN_UID).firestore();
+    await assertFails(
+      setDoc(doc(db, 'users', ADMIN_UID), { mosqueIds: [MOSQUE_ID], payload: 'x'.repeat(1000) }),
+    );
+    await assertFails(setDoc(doc(db, 'users', ADMIN_UID), { mosqueIds: 'altayseer' }));
+  });
+
+  it('refuses a list long enough to fan out into hundreds of reads', async () => {
+    const db = testEnv.authenticatedContext(ADMIN_UID).firestore();
+    const tooMany = Array.from({ length: 51 }, (_, i) => `m${i}`);
+    await assertFails(setDoc(doc(db, 'users', ADMIN_UID), { mosqueIds: tooMany }));
+  });
+});

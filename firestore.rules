@@ -62,6 +62,29 @@ service cloud.firestore {
       }
     }
 
+    // `users/{uid}` is a LOOKUP INDEX, never a grant. Firestore cannot answer
+    // "which mosques is this uid a member of" — members/{uid} lives under each
+    // mosque and there is no cross-collection query for it — so each account
+    // keeps its own list of mosque ids here.
+    //
+    // The owner writes it themselves (a teacher creating their own mosque adds
+    // their own entry), which means the contents are untrusted: an account can
+    // list a mosque it has no membership in. That buys nothing — reading
+    // mosques/{id} still requires a real members/{uid} document, so a forged
+    // entry just drops out of the picker. Nothing may ever treat presence in
+    // this list as proof of access.
+    //
+    // The shape is pinned so the document cannot be used as free storage, and
+    // capped so it cannot fan out into hundreds of reads on the client (see
+    // MAX_INDEXED_MOSQUES in src/domain/memberships.ts).
+    match /users/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      allow write: if isSignedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['mosqueIds'])
+        && request.resource.data.mosqueIds is list
+        && request.resource.data.mosqueIds.size() <= 50;
+    }
+
     match /publicStats/{token} {
       allow get: if true;
       allow list: if false;
