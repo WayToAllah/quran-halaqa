@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { publicStatsConverter } from './converters';
 import type { PublicStats } from '../types';
@@ -25,4 +25,11 @@ export async function getPublicStats(token: string): Promise<PublicStats | null>
  * for how the payload itself is computed. */
 export function setPublicStats(token: string, stats: PublicStats): Promise<void> {
   return setDoc(publicStatsDocRef(token), stats);
+}
+
+/** Removes a family's projection. Called when the student is deleted: their
+ * token has already been sent out on WhatsApp, so leaving the document behind
+ * keeps an ex-student's name and scores world-readable at a known URL. */
+export function deletePublicStats(token: string): Promise<void> {
+  return deleteDoc(doc(db, 'publicStats', token));
 }

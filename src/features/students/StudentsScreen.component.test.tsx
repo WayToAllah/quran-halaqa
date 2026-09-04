@@ -40,6 +40,15 @@ vi.mock('../../data/students.repo', () => ({
   updateStudent: (...args: unknown[]) => updateStudentMock(...args),
   deleteStudent: (...args: unknown[]) => deleteStudentMock(...args),
 }));
+// The screen now keeps the parent-page projection in sync on save/copy/delete.
+// Stubbed so this suite stays hermetic: the real modules reach for Firestore,
+// and a queued offline write never resolves.
+vi.mock('../../data/publishStats', () => ({
+  republishPublicStatsFor: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('../../data/publicStats.repo', () => ({
+  deletePublicStats: vi.fn().mockResolvedValue(undefined),
+}));
 
 function renderScreen() {
   return render(

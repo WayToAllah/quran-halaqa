@@ -5,6 +5,7 @@ import { saveStudent } from '../../data/students.repo';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useToast } from '../../ui/ToastProvider';
 import { useTenant } from '../tenant/TenantContext';
+import { republishPublicStatsFor } from '../../data/publishStats';
 import type { Student } from '../../types';
 
 const GRADE_OPTIONS = [
@@ -37,7 +38,8 @@ interface Props {
 }
 
 export function StudentModal({ student, allStudents, onClose }: Props) {
-  const { mosqueId, halaqaId } = useTenant();
+  const tenant = useTenant();
+  const { mosqueId, halaqaId } = tenant;
   const { showToast } = useToast();
   const [name, setName] = useState(student?.name ?? '');
   const [age, setAge] = useState(student?.age ?? '');
@@ -156,6 +158,11 @@ export function StudentModal({ student, allStudents, onClose }: Props) {
 
     try {
       await saveStudent(mosqueId, halaqaId, obj);
+      // publicStats carries its own copy of the name, so an edit that never
+      // republishes leaves the parent page showing the old one until the
+      // student's next session happens to be recorded. A brand-new student
+      // gets their projection created here, before any link is copied.
+      void republishPublicStatsFor(tenant, [obj.id]);
       showToast(student ? '✓ تم التحديث' : '✓ تم الحفظ بنجاح');
       onClose();
     } catch (err) {

@@ -17,6 +17,8 @@ import {
 import { genParentToken } from '../../domain/ids';
 import { useToast } from '../../ui/ToastProvider';
 import { useTenant } from '../tenant/TenantContext';
+import { republishPublicStatsFor } from '../../data/publishStats';
+import { deletePublicStats } from '../../data/publicStats.repo';
 import { StudentModal } from './StudentModal';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { SearchInput } from '../../ui/SearchInput';
@@ -40,7 +42,8 @@ function PersonAvatarIcon() {
 }
 
 export function StudentsScreen() {
-  const { mosqueId, halaqaId } = useTenant();
+  const tenant = useTenant();
+  const { mosqueId, halaqaId } = tenant;
   const { students, loaded: studentsLoaded } = useStudents(mosqueId, halaqaId);
   const { records } = useAllRecords(mosqueId, halaqaId);
   const { showToast } = useToast();
@@ -90,6 +93,11 @@ export function StudentsScreen() {
         return;
       }
     }
+    // The projection is what the family actually opens. A student created but
+    // never yet recorded has none, so the link used to lead to an error page —
+    // publish before handing the URL over. Fire-and-forget like every other
+    // republish: an offline setDoc would otherwise block the copy indefinitely.
+    void republishPublicStatsFor(tenant, [s.id]);
     const url = `${CHILD_STATS_BASE_URL}?t=${token}`;
     try {
       await navigator.clipboard.writeText(url);
@@ -113,9 +121,18 @@ export function StudentsScreen() {
     requestDelete(
       s.id,
       `🗑 تم حذف ${getStudentName(s)}`,
-      (id) => deleteStudentDoc(mosqueId, halaqaId, id),
-      // Same id back, so the student's records and parent link re-attach.
-      () => saveStudent(mosqueId, halaqaId, s),
+      async (id) => {
+        await deleteStudentDoc(mosqueId, halaqaId, id);
+        // The student doc is gone, so nothing can regenerate this projection
+        // later — it has to be removed here or it stays public forever.
+        if (s.parentToken) await deletePublicStats(s.parentToken);
+      },
+      // Same id back, so the student's records and parent link re-attach —
+      // including the projection the delete just removed.
+      async () => {
+        await saveStudent(mosqueId, halaqaId, s);
+        void republishPublicStatsFor(tenant, [s.id]);
+      },
     );
   }
 
