@@ -241,3 +241,41 @@ export function getAttendanceRanking(
   const list = minPct != null ? ranked.filter((x) => x.attendPct >= minPct) : ranked;
   return { totalHalaqaDays, list };
 }
+
+/**
+ * Same population and same numbers as getAttendanceRanking, ranked by the raw
+ * count of days attended instead of by percentage.
+ *
+ * The two percentage bases both let a student who came twice and never missed
+ * outrank one who came twenty times, which is the honest answer to "who is
+ * most consistent" but the wrong answer to "who shows up the most". This is
+ * the second question. `attendPct` is carried along unchanged (halaqa-wide
+ * basis) so the row can still show it as a secondary figure — it just has no
+ * say in the position.
+ *
+ * Dense ranking on the day count: two students on 12 days share a rank and the
+ * next one down is the following number, no gap.
+ */
+export function getDaysAttendedRanking(
+  students: Student[],
+  recordsFilter: SessionRecord[],
+): { totalHalaqaDays: number; list: AttendanceRankEntry[] } {
+  const { totalHalaqaDays, list } = getAttendanceRanking(students, recordsFilter);
+
+  // النسبة معيار تانوي للعرض بس — لما اتنين يتساووا في عدد الأيام، اللي نسبته
+  // أعلى يظهر فوق، من غير ما يفرق في رقم المركز.
+  const per = [...list].sort(
+    (a, b) =>
+      b.uniqueDays - a.uniqueDays ||
+      b.attendPct - a.attendPct ||
+      a.name.localeCompare(b.name, 'ar'),
+  );
+
+  const uniqueDayCounts = [...new Set(per.map((x) => x.uniqueDays))].sort((a, b) => b - a);
+  const rankByDays: Record<number, number> = {};
+  uniqueDayCounts.forEach((days, i) => {
+    rankByDays[days] = i + 1;
+  });
+
+  return { totalHalaqaDays, list: per.map((x) => ({ ...x, rank: rankByDays[x.uniqueDays] })) };
+}

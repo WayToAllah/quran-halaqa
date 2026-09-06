@@ -5,6 +5,7 @@ import { arabicPlural, esc, toArabicDigits, toArabicOrdinal } from '../../domain
 import {
   ATTENDANCE_BADGE_THRESHOLD,
   getAttendanceRanking,
+  getDaysAttendedRanking,
   getPersonalAttendanceRanking,
 } from '../../domain/attendance';
 import {
@@ -53,9 +54,9 @@ function rankStyle(rank: number) {
   return RANK_COLORS[rank - 1] ?? RANK_FALLBACK;
 }
 
-type AttendBasis = 'halaqa' | 'personal';
+type AttendBasis = 'halaqa' | 'personal' | 'days';
 
-/** Row shape shared by both attendance bases; `days`/`ofDays` are the numerator
+/** Row shape shared by all attendance bases; `days`/`ofDays` are the numerator
  * and denominator behind the percentage, whichever basis produced them. */
 interface AttendRow {
   id: string;
@@ -69,6 +70,7 @@ interface AttendRow {
 const ATTEND_BASIS_TABS: { key: AttendBasis; label: string }[] = [
   { key: 'halaqa', label: 'على مستوى الحلقة' },
   { key: 'personal', label: 'منذ انضمامه' },
+  { key: 'days', label: 'أيام الحضور' },
 ];
 
 function attendBarColor(pct: number): string {
@@ -104,6 +106,14 @@ const HALAQA_FORMS = {
   two: 'حلقتين',
   few: 'حلقات',
   many: 'حلقة',
+} as const;
+
+/** يوم واحد / يومين / ٣ أيام / ١٢ يوم */
+const DAY_FORMS = {
+  one: 'يوم واحد',
+  two: 'يومين',
+  few: 'أيام',
+  many: 'يوم',
 } as const;
 
 /**
@@ -211,28 +221,32 @@ export function StatsScreen() {
     () => getPersonalAttendanceRanking(students, filteredRecords, records).list,
     [students, filteredRecords, records],
   );
-  /** Both rankings flattened to one row shape so the card renders once. */
-  const attendRows = useMemo<AttendRow[]>(
-    () =>
-      attendBasis === 'halaqa'
-        ? topAttend.map((x) => ({
-            id: x.id,
-            name: x.name,
-            rank: x.rank,
-            attendPct: x.attendPct,
-            days: x.uniqueDays,
-            ofDays: summary.totalHalaqaDays,
-          }))
-        : topAttendPersonal.map((x) => ({
-            id: x.id,
-            name: x.name,
-            rank: x.rank,
-            attendPct: x.attendPct,
-            days: x.attendedDays,
-            ofDays: x.enrolledDays,
-          })),
-    [attendBasis, topAttend, topAttendPersonal, summary.totalHalaqaDays],
+  const topAttendDays = useMemo(
+    () => getDaysAttendedRanking(students, filteredRecords).list,
+    [students, filteredRecords],
   );
+  /** All three rankings flattened to one row shape so the card renders once. */
+  const attendRows = useMemo<AttendRow[]>(() => {
+    if (attendBasis === 'personal') {
+      return topAttendPersonal.map((x) => ({
+        id: x.id,
+        name: x.name,
+        rank: x.rank,
+        attendPct: x.attendPct,
+        days: x.attendedDays,
+        ofDays: x.enrolledDays,
+      }));
+    }
+    const source = attendBasis === 'days' ? topAttendDays : topAttend;
+    return source.map((x) => ({
+      id: x.id,
+      name: x.name,
+      rank: x.rank,
+      attendPct: x.attendPct,
+      days: x.uniqueDays,
+      ofDays: summary.totalHalaqaDays,
+    }));
+  }, [attendBasis, topAttend, topAttendPersonal, topAttendDays, summary.totalHalaqaDays]);
   const studentRows = useMemo(
     () => computeStudentStatsRows(students, filteredRecords, summary.totalHalaqaDays),
     [students, filteredRecords, summary.totalHalaqaDays],
@@ -252,10 +266,13 @@ export function StatsScreen() {
   const visiblePages = pagesExpanded ? topPages : topPages.slice(0, PREVIEW_COUNT);
   const visibleAttend = attendExpanded ? attendRows : attendRows.slice(0, PREVIEW_COUNT);
   /** Index of the first student under the نجم الحضور line, or -1. Only ever
-   * reached in the expanded list, since the preview is the top of the table. */
-  const firstBelowThreshold = visibleAttend.findIndex(
-    (x) => x.attendPct < ATTENDANCE_BADGE_THRESHOLD,
-  );
+   * reached in the expanded list, since the preview is the top of the table.
+   * Suppressed under the days basis: the order there is by day count, so the
+   * percentages don't descend and the line would appear mid-list at random. */
+  const firstBelowThreshold =
+    attendBasis === 'days'
+      ? -1
+      : visibleAttend.findIndex((x) => x.attendPct < ATTENDANCE_BADGE_THRESHOLD);
 
   // Share of the currently active roster that turns up on a typical halaqa
   // day. Denominator is the recently-active count, not every registered
@@ -592,7 +609,9 @@ export function StatsScreen() {
         <div class="text-[11px] text-taupe mb-2.5">
           {attendBasis === 'halaqa'
             ? 'النسبة من كل أيام الحلقة — مقياس واحد للجميع'
-            : 'النسبة من أيام الحلقة بعد انضمام الطالب — زي صفحة ولي الأمر'}
+            : attendBasis === 'personal'
+              ? 'النسبة من أيام الحلقة بعد انضمام الطالب — زي صفحة ولي الأمر'
+              : 'الترتيب بعدد أيام الحضور نفسه — الأكثر التزاماً بالعدد'}
         </div>
         {attendRows.length === 0 ? (
           <div class="text-center text-sm text-taupe py-6">لا يوجد بيانات</div>
@@ -624,22 +643,42 @@ export function StatsScreen() {
                       <div
                         class={
                           'text-sm font-bold truncate ' +
-                          (below ? 'text-[#5B5646]' : 'text-ink-dark')
+                          (below && attendBasis !== 'days' ? 'text-[#5B5646]' : 'text-ink-dark')
                         }
                       >
                         {x.name}
                       </div>
                       <div class="text-xs text-taupe">
-                        المركز {toArabicOrdinal(x.rank)} · {toArabicDigits(x.days)} يوم حضور من{' '}
-                        {toArabicDigits(x.ofDays)}
+                        {attendBasis === 'days' ? (
+                          <>
+                            المركز {toArabicOrdinal(x.rank)} · من {toArabicDigits(x.ofDays)} يوم
+                            حلقة
+                          </>
+                        ) : (
+                          <>
+                            المركز {toArabicOrdinal(x.rank)} · {toArabicDigits(x.days)} يوم حضور من{' '}
+                            {toArabicDigits(x.ofDays)}
+                          </>
+                        )}
                       </div>
                     </div>
-                    <div
-                      class="font-extrabold shrink-0"
-                      style={{ color: attendBarColor(x.attendPct) }}
-                    >
-                      {toArabicDigits(x.attendPct)}٪
-                    </div>
+                    {attendBasis === 'days' ? (
+                      <div class="shrink-0 text-center leading-tight">
+                        <div class="font-extrabold" style={{ color: attendBarColor(x.attendPct) }}>
+                          {arabicPlural(x.days, DAY_FORMS)}
+                        </div>
+                        <div class="text-[10px] font-bold text-taupe">
+                          {toArabicDigits(x.attendPct)}٪
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        class="font-extrabold shrink-0"
+                        style={{ color: attendBarColor(x.attendPct) }}
+                      >
+                        {toArabicDigits(x.attendPct)}٪
+                      </div>
+                    )}
                   </div>
                 </div>
               );
