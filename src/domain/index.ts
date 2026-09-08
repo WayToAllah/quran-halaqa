@@ -8,6 +8,7 @@ export * from './text';
 export * from './attendance';
 export * from './stats';
 export * from './statsScreen';
+export * from './overallRanking';
 export * from './record';
 export * from './whatsapp';
 export * from './mistakes';
