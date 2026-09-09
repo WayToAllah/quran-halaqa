@@ -1,5 +1,5 @@
 import type { ComponentChildren } from 'preact';
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useStudents } from '../../hooks/useStudents';
 import { useAllRecords } from '../../hooks/useAllRecords';
 import { arabicPlural, esc, toArabicDigits, toArabicOrdinal } from '../../domain/text';
@@ -94,18 +94,43 @@ const sessionsLabel = (n: number) =>
   arabicPlural(n, { one: 'جلسة واحدة', two: 'جلستين', few: 'جلسات', many: 'جلسة' });
 
 const cardCls = 'bg-white border border-hairline rounded-2xl p-[18px]';
+/** Height of the app bar the card headers pin below. Kept in step with the
+ * `top-[69px]` class by hand — Tailwind needs the value as a literal. */
+const STICKY_TOP = 69;
+
 function CollapsibleCard({ title, children }: { title: string; children: ComponentChildren }) {
   // Open by default. The control lives in the HEADER rather than under the
   // list: a fifty-row leaderboard used to bury its own "عرض أقل" button at the
   // bottom, so folding it away meant scrolling the whole thing first.
   const [open, setOpen] = useState(true);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const restoreScroll = useRef(false);
+
+  // Closing a card from the middle of its list removes everything below the
+  // header, so the page shrinks under the reader and the same scroll offset
+  // now shows a completely different card. Pull the card back up under the app
+  // bar, so the header lands exactly where the button they just tapped was.
+  useLayoutEffect(() => {
+    if (!restoreScroll.current) return;
+    restoreScroll.current = false;
+    const el = cardRef.current;
+    if (!el || typeof window.scrollTo !== 'function') return;
+    const { top } = el.getBoundingClientRect();
+    if (top < STICKY_TOP) window.scrollTo({ top: window.scrollY + top - STICKY_TOP });
+  }, [open]);
+
   return (
-    <div class={cardCls} data-card>
+    <div class={cardCls} data-card ref={cardRef}>
       <button
         type="button"
         aria-label={title}
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          // Only on the way closed: opening a card leaves the header where it
+          // already is, and moving the page then would be the jarring part.
+          restoreScroll.current = open;
+          setOpen((v) => !v);
+        }}
         class={
           // Pinned just under the 69px app bar, and stretched over the card's
           // own padding so rows scroll behind it edge to edge. Without this the

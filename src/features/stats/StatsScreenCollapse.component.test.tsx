@@ -42,6 +42,43 @@ function card(title: string): HTMLElement {
 }
 
 describe('StatsScreen — collapsible cards', () => {
+  it('leaves you at the header you just tapped, not further down the page', async () => {
+    // Closing a card from its middle shortens the page under you, so the same
+    // scroll position now shows whatever came after it. The card is pulled
+    // back under the app bar, where the button you tapped still is.
+    const scrollTo = vi.fn();
+    const origScroll = window.scrollTo;
+    const origRect = Element.prototype.getBoundingClientRect;
+    window.scrollTo = scrollTo as unknown as typeof window.scrollTo;
+    window.scrollY = 500;
+    // Scrolled 200px into the card: its top is above the viewport.
+    Element.prototype.getBoundingClientRect = () => ({ top: -200 }) as DOMRect;
+    try {
+      render(<StatsScreen />);
+      await userEvent.click(header('🥇 الترتيب العام'));
+      expect(scrollTo).toHaveBeenCalledWith({ top: 500 - 200 - 69 });
+    } finally {
+      window.scrollTo = origScroll;
+      Element.prototype.getBoundingClientRect = origRect;
+    }
+  });
+
+  it('does not yank the page when the card was already fully in view', async () => {
+    const scrollTo = vi.fn();
+    const origScroll = window.scrollTo;
+    const origRect = Element.prototype.getBoundingClientRect;
+    window.scrollTo = scrollTo as unknown as typeof window.scrollTo;
+    Element.prototype.getBoundingClientRect = () => ({ top: 300 }) as DOMRect;
+    try {
+      render(<StatsScreen />);
+      await userEvent.click(header('🥇 الترتيب العام'));
+      expect(scrollTo).not.toHaveBeenCalled();
+    } finally {
+      window.scrollTo = origScroll;
+      Element.prototype.getBoundingClientRect = origRect;
+    }
+  });
+
   it('opens every card by default', () => {
     render(<StatsScreen />);
     expect(card('🥇 الترتيب العام').textContent).toContain('زيد احمد');
