@@ -98,7 +98,15 @@ const cardCls = 'bg-white border border-hairline rounded-2xl p-[18px]';
  * `top-[69px]` class by hand — Tailwind needs the value as a literal. */
 const STICKY_TOP = 69;
 
-function CollapsibleCard({ title, children }: { title: string; children: ComponentChildren }) {
+function CollapsibleCard({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: ComponentChildren;
+  children: ComponentChildren;
+}) {
   // Open by default. The control lives in the HEADER rather than under the
   // list: a fifty-row leaderboard used to bury its own "عرض أقل" button at the
   // bottom, so folding it away meant scrolling the whole thing first.
@@ -121,34 +129,44 @@ function CollapsibleCard({ title, children }: { title: string; children: Compone
 
   return (
     <div class={cardCls} data-card ref={cardRef}>
-      <button
-        type="button"
-        aria-label={title}
-        aria-expanded={open}
-        onClick={() => {
-          // Only on the way closed: opening a card leaves the header where it
-          // already is, and moving the page then would be the jarring part.
-          restoreScroll.current = open;
-          setOpen((v) => !v);
-        }}
+      <div
+        data-card-header
         class={
           // Pinned just under the 69px app bar, and stretched over the card's
           // own padding so rows scroll behind it edge to edge. Without this the
           // header scrolls away and a long leaderboard becomes impossible to
           // close from the middle without first scrolling back to the top.
-          'sticky top-[69px] z-[5] bg-white w-full flex items-center justify-between gap-2 ' +
-          'text-start -mx-[18px] px-[18px] -mt-[18px] pt-[18px] ' +
+          //
+          // The list toggle rides along here rather than sitting under the
+          // list: two controls that each open and close something, one at the
+          // top and one at the very bottom, read as one control misbehaving.
+          'sticky top-[69px] z-[5] bg-white flex items-center gap-2 ' +
+          '-mx-[18px] px-[18px] -mt-[18px] pt-[18px] ' +
           (open ? 'pb-3.5' : 'pb-[18px] -mb-[18px]')
         }
       >
-        <span class="text-[13.5px] font-extrabold text-ink-dark">{title}</span>
-        <span
-          class={`text-taupe text-[11px] leading-none transition-transform ${open ? '' : 'rotate-90'}`}
-          aria-hidden="true"
+        <button
+          type="button"
+          aria-label={title}
+          aria-expanded={open}
+          onClick={() => {
+            // Only on the way closed: opening a card leaves the header where it
+            // already is, and moving the page then would be the jarring part.
+            restoreScroll.current = open;
+            setOpen((v) => !v);
+          }}
+          class="flex-1 min-w-0 flex items-center gap-1.5 text-start"
         >
-          ▼
-        </span>
-      </button>
+          <span class="text-[13.5px] font-extrabold text-ink-dark truncate">{title}</span>
+          <span
+            class={`text-taupe text-[10px] leading-none transition-transform ${open ? '' : 'rotate-90'}`}
+            aria-hidden="true"
+          >
+            ▼
+          </span>
+        </button>
+        {open && action}
+      </div>
       {open && children}
     </div>
   );
@@ -201,7 +219,7 @@ function ShowAllToggle({
       onClick={onToggle}
       aria-label={`${text} — ${cardLabel}`}
       aria-expanded={expanded}
-      class="w-full mt-2.5 py-2 rounded-full text-xs font-bold text-forest border border-hairline"
+      class="shrink-0 px-2.5 py-1 rounded-full text-[11px] font-bold text-forest border border-hairline"
     >
       {text}
     </button>
@@ -454,7 +472,17 @@ export function StatsScreen() {
 
       {/* Sits ABOVE the month picker on purpose: it is the one card the picker
           has no say over, and putting it underneath would imply otherwise. */}
-      <CollapsibleCard title="🥇 الترتيب العام">
+      <CollapsibleCard
+        title="🥇 الترتيب العام"
+        action={
+          <ShowAllToggle
+            expanded={overallExpanded}
+            total={overall.length}
+            cardLabel="الترتيب العام"
+            onToggle={() => setOverallExpanded((v) => !v)}
+          />
+        }
+      >
         <div class="text-[10.5px] text-taupe font-semibold mt-0.5 mb-3.5">
           حضور ٤٠٪ · تسميع ٣٠٪ · سطور ٣٠٪ — من بداية التسجيل
           <br />
@@ -494,12 +522,6 @@ export function StatsScreen() {
             })}
           </div>
         )}
-        <ShowAllToggle
-          expanded={overallExpanded}
-          total={overall.length}
-          cardLabel="الترتيب العام"
-          onToggle={() => setOverallExpanded((v) => !v)}
-        />
       </CollapsibleCard>
 
       <div class="relative">
@@ -639,7 +661,17 @@ export function StatsScreen() {
         )}
       </CollapsibleCard>
 
-      <CollapsibleCard title="🏆 الأكثر حفظاً للصفحات">
+      <CollapsibleCard
+        title="🏆 الأكثر حفظاً للصفحات"
+        action={
+          <ShowAllToggle
+            expanded={pagesExpanded}
+            total={topPages.length}
+            cardLabel="الأكثر حفظاً للصفحات"
+            onToggle={() => setPagesExpanded((v) => !v)}
+          />
+        }
+      >
         {topPages.length === 0 ? (
           <div class="text-center text-sm text-taupe py-6">لا توجد صفحات مكتملة بعد</div>
         ) : (
@@ -679,12 +711,6 @@ export function StatsScreen() {
             })}
           </div>
         )}
-        <ShowAllToggle
-          expanded={pagesExpanded}
-          total={topPages.length}
-          cardLabel="الأكثر حفظاً للصفحات"
-          onToggle={() => setPagesExpanded((v) => !v)}
-        />
       </CollapsibleCard>
 
       <button
@@ -701,7 +727,17 @@ export function StatsScreen() {
         📖 بطاقة نجوم الحفظ — للمشاركة
       </button>
 
-      <CollapsibleCard title="✅ الأكثر حضوراً">
+      <CollapsibleCard
+        title="✅ الأكثر حضوراً"
+        action={
+          <ShowAllToggle
+            expanded={attendExpanded}
+            total={attendRows.length}
+            cardLabel="الأكثر حضوراً"
+            onToggle={() => setAttendExpanded((v) => !v)}
+          />
+        }
+      >
         <div class="flex gap-1.5 mb-3">
           {ATTEND_BASIS_TABS.map((tab) => (
             <button
@@ -799,15 +835,19 @@ export function StatsScreen() {
             })}
           </div>
         )}
-        <ShowAllToggle
-          expanded={attendExpanded}
-          total={attendRows.length}
-          cardLabel="الأكثر حضوراً"
-          onToggle={() => setAttendExpanded((v) => !v)}
-        />
       </CollapsibleCard>
 
-      <CollapsibleCard title="⚠️ يحتاجون متابعة">
+      <CollapsibleCard
+        title="⚠️ يحتاجون متابعة"
+        action={
+          <ShowAllToggle
+            expanded={followUpExpanded}
+            total={followUp.length}
+            cardLabel="يحتاجون متابعة"
+            onToggle={() => setFollowUpExpanded((v) => !v)}
+          />
+        }
+      >
         {followUp.length === 0 ? (
           <div class="text-xs text-taupe text-center py-3">
             كل الطلاب حضروا آخر {arabicPlural(ABSENCE_ALERT_STREAK, HALAQA_FORMS)} — ما شاء الله
@@ -838,12 +878,6 @@ export function StatsScreen() {
             ))}
           </div>
         )}
-        <ShowAllToggle
-          expanded={followUpExpanded}
-          total={followUp.length}
-          cardLabel="يحتاجون متابعة"
-          onToggle={() => setFollowUpExpanded((v) => !v)}
-        />
       </CollapsibleCard>
 
       <button

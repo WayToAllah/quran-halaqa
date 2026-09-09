@@ -5,8 +5,11 @@ import { StatsScreen } from './StatsScreen';
 import type { SessionRecord, Student } from '../../types';
 
 const students: Student[] = [
-  { id: 's_1', name: 'زيد احمد' },
+  { id: 's_1', name: 'أنس طارق' },
   { id: 's_2', name: 'خالد سعيد' },
+  { id: 's_3', name: 'عمر حسن' },
+  { id: 's_4', name: 'أنس طارق' },
+  { id: 's_5', name: 'بلال يوسف' },
 ];
 
 const DAYS = ['2026-07-01', '2026-07-08', '2026-07-15'];
@@ -81,14 +84,14 @@ describe('StatsScreen — collapsible cards', () => {
 
   it('opens every card by default', () => {
     render(<StatsScreen />);
-    expect(card('🥇 الترتيب العام').textContent).toContain('زيد احمد');
+    expect(card('🥇 الترتيب العام').textContent).toContain('أنس طارق');
     expect(header('🥇 الترتيب العام').getAttribute('aria-expanded')).toBe('true');
   });
 
   it('folds a card away when its header is tapped', async () => {
     render(<StatsScreen />);
     await userEvent.click(header('🥇 الترتيب العام'));
-    expect(card('🥇 الترتيب العام').textContent).not.toContain('زيد احمد');
+    expect(card('🥇 الترتيب العام').textContent).not.toContain('أنس طارق');
     expect(header('🥇 الترتيب العام').getAttribute('aria-expanded')).toBe('false');
   });
 
@@ -96,7 +99,7 @@ describe('StatsScreen — collapsible cards', () => {
     render(<StatsScreen />);
     await userEvent.click(header('🥇 الترتيب العام'));
     await userEvent.click(header('🥇 الترتيب العام'));
-    expect(card('🥇 الترتيب العام').textContent).toContain('زيد احمد');
+    expect(card('🥇 الترتيب العام').textContent).toContain('أنس طارق');
   });
 
   it('keeps the header reachable while the card is open, so nothing needs scrolling past', () => {
@@ -104,7 +107,8 @@ describe('StatsScreen — collapsible cards', () => {
     // The control that closes a long list sits at its TOP, not buried under
     // fifty rows at the bottom — that was the whole complaint.
     const c = card('🥇 الترتيب العام');
-    expect(c.firstElementChild).toBe(header('🥇 الترتيب العام'));
+    expect(c.firstElementChild).toBe(c.querySelector('[data-card-header]'));
+    expect(c.firstElementChild!.contains(header('🥇 الترتيب العام'))).toBe(true);
   });
 
   it('pins the header so it is still reachable from the middle of a long list', () => {
@@ -112,16 +116,33 @@ describe('StatsScreen — collapsible cards', () => {
     // Scrolled halfway down a fifty-row leaderboard, a header sitting at the
     // top of the card is off-screen and the card cannot be closed without
     // scrolling back up. It sticks just below the app bar instead.
-    const cls = header('🥇 الترتيب العام').className;
+    const cls = (card('🥇 الترتيب العام').querySelector('[data-card-header]') as HTMLElement)
+      .className;
     expect(cls).toContain('sticky');
     expect(cls).toContain('top-[69px]');
+  });
+
+  it('keeps the list toggle in the pinned header, not buried under the list', () => {
+    render(<StatsScreen />);
+    // Two controls that both open and close something, one pinned at the top
+    // and one at the very bottom, read as the same control misbehaving. They
+    // sit side by side now: the chevron folds the card, the pill lengthens
+    // the list, and both stay reachable.
+    const row = card('🥇 الترتيب العام').querySelector('[data-card-header]') as HTMLElement;
+    expect(row.textContent).toContain('عرض الكل');
+  });
+
+  it('hides the list toggle while the card is shut', async () => {
+    render(<StatsScreen />);
+    await userEvent.click(header('🥇 الترتيب العام'));
+    expect(card('🥇 الترتيب العام').textContent).not.toContain('عرض الكل');
   });
 
   it('folds each card independently', async () => {
     render(<StatsScreen />);
     await userEvent.click(header('🥇 الترتيب العام'));
     expect(header('✅ الأكثر حضوراً').getAttribute('aria-expanded')).toBe('true');
-    expect(card('✅ الأكثر حضوراً').textContent).toContain('زيد احمد');
+    expect(card('✅ الأكثر حضوراً').textContent).toContain('أنس طارق');
   });
 
   it('gives the other leaderboards the same header control', () => {
