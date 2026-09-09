@@ -56,7 +56,7 @@ describe('StatsScreen — الترتيب العام', () => {
     expect(card.textContent).toContain('زيد احمد');
     expect(card.textContent).toContain('حضور');
     expect(card.textContent).toContain('تسميع');
-    expect(card.textContent).toContain('صفحات');
+    expect(card.textContent).toContain('سطور');
   });
 
   it('puts the student who never misses at the top', () => {

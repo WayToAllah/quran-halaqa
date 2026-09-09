@@ -1,7 +1,10 @@
 import type { ScoreEval, SessionRecord, Student } from '../types';
 import { getPersonalAttendanceRanking } from './attendance';
+import { completedLines } from './lines';
+import { LINES_PER_FULL_PAGE } from './lineTable';
+import type { DatedAssignment } from './pages';
 import { hasScore } from './scoring';
-import { computeTopPages } from './statsScreen';
+import { gradedAssignmentIds, lohAssignmentsOf } from './statsScreen';
 import { recordsForStudent } from './students';
 
 /**
@@ -18,7 +21,7 @@ import { recordsForStudent } from './students';
 export const OVERALL_WEIGHTS = {
   attendance: 0.4,
   recitation: 0.3,
-  pages: 0.3,
+  lines: 0.3,
 } as const;
 
 /**
@@ -37,8 +40,8 @@ export const PRIOR_EVAL_COUNT = 3;
 export const PRIOR_EVAL_SCORE = 70;
 
 /**
- * The pace a student is expected to hold: one third of a mushaf page per
- * attended session. Hitting it scores the full 100; beating it is capped there.
+ * The pace a student is expected to hold: five lines a session, a third of a
+ * mushaf page. Hitting it scores the full 100; beating it is capped there.
  *
  * This is a FIXED benchmark, not a comparison against the fastest student in
  * the halaqa. Grading against the fastest meant one boy who attended four
@@ -47,7 +50,7 @@ export const PRIOR_EVAL_SCORE = 70;
  * denominator grew and the lower he scored. A fixed target measures every
  * student against the same expectation instead of against each other.
  */
-export const STANDARD_PAGES_PER_SESSION = 1 / 3;
+export const STANDARD_LINES_PER_SESSION = LINES_PER_FULL_PAGE / 3;
 
 export interface OverallRankEntry {
   /** Stable student id — the correct render key and lookup handle. */
@@ -63,12 +66,12 @@ export interface OverallRankEntry {
   evalCount: number;
   /** 0–100 blended average of those evaluations (see PRIOR_EVAL_COUNT). */
   recitationScore: number;
-  /** Whole mushaf pages of new memorization completed, cumulative. */
-  pages: number;
-  /** Pages per attended day. */
-  pagesRate: number;
-  /** 0–100: the rate as a share of STANDARD_PAGES_PER_SESSION, capped at 100. */
-  pagesScore: number;
+  /** Lines of the mushaf memorized, cumulative. */
+  lines: number;
+  /** Lines per attended day. */
+  linesRate: number;
+  /** 0–100: the rate as a share of STANDARD_LINES_PER_SESSION, capped at 100. */
+  linesScore: number;
   /** The weighted total, 0–100, rounded to one decimal. */
   points: number;
   /** Dense rank on `points` — ties share a rank and the next distinct total
@@ -89,7 +92,7 @@ function evalScore(o: ScoreEval | null | undefined): number | null {
 }
 
 /**
- * One combined leaderboard: attendance + recitation + pages, cumulative over
+ * One combined leaderboard: attendance + recitation + lines, cumulative over
  * the student's whole history.
  *
  * The three inputs are on incompatible scales — a percentage, a grade, and a
@@ -102,20 +105,18 @@ function evalScore(o: ScoreEval | null | undefined): number | null {
  *     the score.
  *  2. **Recitation** averages loh and madi together, blended toward a neutral
  *     prior so a two-session sample can't top the list.
- *  3. **Pages** is a RATE — pages per attended day — scored against a fixed
- *     expectation of a third of a page per session, capped at 100. A
+ *  3. **Lines** is a RATE — lines of the mushaf per attended day — scored
+ *     against a fixed expectation of five a session, capped at 100. A
  *     cumulative count would rank by seniority: a student of two years is
  *     unreachable no matter how hard a newcomer works. A share of the fastest
- *     student was worse still — see STANDARD_PAGES_PER_SESSION.
- *     Attendance is already its own component, so dividing pages by days is
- *     deliberate, not an oversight — it stops turning up being paid for twice.
+ *     student was worse still — see STANDARD_LINES_PER_SESSION.
+ *     Attendance is already its own component, so dividing by days is
+ *     deliberate, not an oversight — it stops turning up being paid twice.
+ *     Lines rather than pages because a page credits nothing until it is
+ *     finished, which left the youngest students on zero for months at a
+ *     time; see completedLines().
  *
- * Known bias, accepted: a student in جزء عم finishes pages faster than one in
- * البقرة because the suras are short and often partly known already. The
- * component's weight dampens this; it does not remove it.
- *
- * `allRecords` must be the UNFILTERED history — pages are cumulative and are
- * computed over the whole record (see computeTopPages).
+ * `allRecords` must be the UNFILTERED history — the ranking is cumulative.
  */
 export function computeOverallRanking(
   students: Student[],
@@ -127,9 +128,6 @@ export function computeOverallRanking(
   const attendance = getPersonalAttendanceRanking(students, allRecords, allRecords).list;
   if (!attendance.length) return [];
 
-  const pagesById = new Map(
-    computeTopPages(students, allRecords, Infinity, 'all').map((e) => [e.id, e.pages]),
-  );
   const studentsById = new Map(students.map((s) => [s.id, s]));
 
   const partial = attendance.map((a) => {
@@ -148,7 +146,16 @@ export function computeOverallRanking(
     const recitationScore =
       (evalTotal + PRIOR_EVAL_COUNT * PRIOR_EVAL_SCORE) / (evalCount + PRIOR_EVAL_COUNT);
 
-    const pages = pagesById.get(a.id) ?? 0;
+    // Only assignments actually recited afterwards count as ground covered —
+    // the same rule the pages leaderboard applies, so the two never disagree.
+    const graded = gradedAssignmentIds(recs);
+    const assignments: DatedAssignment[] = [];
+    for (const r of recs) {
+      if (!graded.has(r.id) || !r.date) continue;
+      for (const item of lohAssignmentsOf(r)) assignments.push({ item, date: r.date });
+    }
+    const lines = completedLines(assignments);
+
     // Attended days, not record count: two records on one day is one session's
     // worth of opportunity, and attendance is counted in days everywhere else.
     const days = a.attendedDays;
@@ -157,17 +164,17 @@ export function computeOverallRanking(
       recs,
       evalCount,
       recitationScore,
-      pages,
-      pagesRate: days ? pages / days : 0,
+      lines,
+      linesRate: days ? lines / days : 0,
     };
   });
 
   const scored = partial.map((p) => {
-    const pagesScore = Math.min(100, Math.round((p.pagesRate / STANDARD_PAGES_PER_SESSION) * 100));
+    const linesScore = Math.min(100, Math.round((p.linesRate / STANDARD_LINES_PER_SESSION) * 100));
     const raw =
       OVERALL_WEIGHTS.attendance * p.entry.attendPct +
       OVERALL_WEIGHTS.recitation * p.recitationScore +
-      OVERALL_WEIGHTS.pages * pagesScore;
+      OVERALL_WEIGHTS.lines * linesScore;
     return {
       id: p.entry.id,
       name: p.entry.name,
@@ -176,9 +183,9 @@ export function computeOverallRanking(
       attendPct: p.entry.attendPct,
       evalCount: p.evalCount,
       recitationScore: p.recitationScore,
-      pages: p.pages,
-      pagesRate: p.pagesRate,
-      pagesScore,
+      lines: p.lines,
+      linesRate: p.linesRate,
+      linesScore,
       points: Math.round(raw * 10) / 10,
     };
   });

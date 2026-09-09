@@ -4,7 +4,7 @@ import {
   OVERALL_WEIGHTS,
   PRIOR_EVAL_COUNT,
   PRIOR_EVAL_SCORE,
-  STANDARD_PAGES_PER_SESSION,
+  STANDARD_LINES_PER_SESSION,
 } from './overallRanking';
 import type { SessionRecord, Student } from '../types';
 
@@ -33,13 +33,13 @@ function byId<T extends { id: string }>(list: T[], id: string): T {
 
 describe('OVERALL_WEIGHTS', () => {
   it('sums to 1 so points stay on a 0–100 scale', () => {
-    const { attendance, recitation, pages } = OVERALL_WEIGHTS;
-    expect(attendance + recitation + pages).toBeCloseTo(1, 10);
+    const { attendance, recitation, lines } = OVERALL_WEIGHTS;
+    expect(attendance + recitation + lines).toBeCloseTo(1, 10);
   });
 
   it('weights attendance the heaviest and the other two equally', () => {
     expect(OVERALL_WEIGHTS.attendance).toBeGreaterThan(OVERALL_WEIGHTS.recitation);
-    expect(OVERALL_WEIGHTS.recitation).toBe(OVERALL_WEIGHTS.pages);
+    expect(OVERALL_WEIGHTS.recitation).toBe(OVERALL_WEIGHTS.lines);
   });
 });
 
@@ -133,66 +133,82 @@ describe('computeOverallRanking — recitation component', () => {
   });
 });
 
-describe('computeOverallRanking — pages component', () => {
-  /** New-memorization assignments handed out on one day. They only count once
-   * a LATER session grades them, which the `attended(..., score)` days below
-   * supply — the grader has to be the immediately following session. */
-  function pageRun(id: string, day: string, suras: string[]): SessionRecord[] {
-    return suras.map((sura, i) => ({
-      id: `p_${id}_${i}`,
-      studentId: id,
-      date: day,
-      newLoh: [{ sura }],
-    }));
+describe('computeOverallRanking — lines component', () => {
+  /** One session's assignment, the way the app actually stores it: a single
+   * record carrying every sura handed out that day. It counts only once a
+   * LATER session grades it — homework never recited is not memorized ground. */
+  function run(id: string, day: string, suras: string[]): SessionRecord[] {
+    return [{ id: `p_${id}`, studentId: id, date: day, newLoh: suras.map((sura) => ({ sura })) }];
   }
 
-  /** Both students finish exactly one page. s_1 took five attended days to do
-   * it, s_2 took two. */
-  const sameNumberOfPages = [
-    ...pageRun('s_1', DAYS[0], ['الناس', 'الفلق', 'الإخلاص', 'المسد', 'النصر']),
-    ...attended('s_1', DAYS.slice(1), 90),
-    ...pageRun('s_2', DAYS[0], ['الفاتحة']),
-    ...attended('s_2', [DAYS[1]], 90),
-  ];
-
-  it('expects a third of a page per session', () => {
-    expect(STANDARD_PAGES_PER_SESSION).toBeCloseTo(1 / 3, 10);
+  it('expects five lines a session — a third of a mushaf page', () => {
+    expect(STANDARD_LINES_PER_SESSION).toBe(5);
   });
 
-  it('scores pages as a rate per attended day, so seniority alone cannot win', () => {
-    const list = computeOverallRanking(students, sameNumberOfPages);
-    expect(byId(list, 's_1').pages).toBe(1);
-    expect(byId(list, 's_2').pages).toBe(1);
-    expect(byId(list, 's_2').pagesScore).toBeGreaterThan(byId(list, 's_1').pagesScore);
+  it('credits a young student who only ever takes two ayat at a time', () => {
+    // The point of the whole change: البقرة ١–٢ is one line. Counted in whole
+    // pages this boy scored zero for months while attending every week.
+    const records: SessionRecord[] = [
+      {
+        id: 'a',
+        studentId: 's_1',
+        date: DAYS[0],
+        newLoh: [{ sura: 'البقرة', from: '1', to: '2' }],
+      },
+      ...attended('s_1', [DAYS[1]], 90),
+    ];
+    const only = computeOverallRanking(students, records)[0];
+    expect(only.lines).toBe(1);
+    expect(only.linesScore).toBeGreaterThan(0);
   });
 
-  it('scores against the fixed standard, not against the fastest student', () => {
-    // s_1: one page over five attended days = 0.2/session, which is 60% of the
-    // third-of-a-page standard. It must read 60 whether or not a faster
-    // student happens to be in the halaqa — that was the old bug.
-    const withFastPeer = computeOverallRanking(students, sameNumberOfPages);
-    expect(byId(withFastPeer, 's_1').pagesScore).toBe(60);
+  it('scores lines per attended day against the fixed standard', () => {
+    // الفاتحة is 7 lines of the mushaf, over 2 attended days = 3.5 a session,
+    // which is 70% of the five-line standard.
+    const records = [...run('s_1', DAYS[0], ['الفاتحة']), ...attended('s_1', [DAYS[1]], 90)];
+    const only = computeOverallRanking(students, records)[0];
+    expect(only.lines).toBe(7);
+    expect(only.linesScore).toBe(70);
+  });
 
-    const alone = computeOverallRanking(
-      students,
-      sameNumberOfPages.filter((r) => r.studentId === 's_1'),
-    );
-    expect(byId(alone, 's_1').pagesScore).toBe(60);
+  it('scores against the standard, not against the fastest student', () => {
+    const alone = computeOverallRanking(students, [
+      ...run('s_1', DAYS[0], ['الفاتحة']),
+      ...attended('s_1', [DAYS[1]], 90),
+    ]);
+    const withFastPeer = computeOverallRanking(students, [
+      ...run('s_1', DAYS[0], ['الفاتحة']),
+      ...attended('s_1', [DAYS[1]], 90),
+      ...run('s_2', DAYS[0], ['الناس', 'الفلق', 'الإخلاص', 'المسد', 'النصر']),
+      ...attended('s_2', [DAYS[1]], 90),
+    ]);
+    expect(byId(withFastPeer, 's_1').linesScore).toBe(byId(alone, 's_1').linesScore);
   });
 
   it('caps the component at 100 for a student who beats the standard', () => {
-    const list = computeOverallRanking(students, sameNumberOfPages);
-    // s_2: one page in two attended days = 0.5/session, well past the standard.
-    expect(byId(list, 's_2').pagesScore).toBe(100);
-    expect(list.every((e) => e.pagesScore >= 0 && e.pagesScore <= 100)).toBe(true);
+    // The last six suras are 18 lines; over two attended days that is nine a
+    // session, well past the standard.
+    const records = [
+      ...run('s_1', DAYS[0], ['الناس', 'الفلق', 'الإخلاص', 'المسد', 'النصر', 'الكافرون']),
+      ...attended('s_1', [DAYS[1]], 90),
+    ];
+    const only = computeOverallRanking(students, records)[0];
+    expect(only.lines).toBe(18);
+    expect(only.linesScore).toBe(100);
   });
 
-  it('gives everyone a zero pages component when nobody finished a page', () => {
+  it('does not credit an assignment that was never recited', () => {
+    const only = computeOverallRanking(students, run('s_1', DAYS[0], ['الفاتحة']))[0];
+    expect(only.lines).toBe(0);
+    expect(only.linesScore).toBe(0);
+  });
+
+  it('gives a zero component to a student who has memorized nothing', () => {
     const list = computeOverallRanking(students, [
       ...attended('s_1', DAYS, 90),
       ...attended('s_2', DAYS, 90),
     ]);
-    expect(list.every((e) => e.pages === 0 && e.pagesScore === 0)).toBe(true);
+    expect(list.every((e) => e.lines === 0 && e.linesScore === 0)).toBe(true);
   });
 });
 
@@ -233,7 +249,7 @@ describe('computeOverallRanking — points and ranking', () => {
     expect(only.points).toBeCloseTo(
       OVERALL_WEIGHTS.attendance * only.attendPct +
         OVERALL_WEIGHTS.recitation * only.recitationScore +
-        OVERALL_WEIGHTS.pages * only.pagesScore,
+        OVERALL_WEIGHTS.lines * only.linesScore,
       1,
     );
   });

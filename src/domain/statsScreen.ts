@@ -561,7 +561,9 @@ function pathPositionLabel(pos: number, direction: MemorizationDirection): strin
 }
 
 /** Assignments carried by a record, with the legacy `loh`-as-assignment shape. */
-function lohAssignmentsOf(r: SessionRecord): SuraAssignment[] {
+/** New-memorization assignments on a record, tolerating the legacy shape that
+ * carried the sura on `loh` itself. Exported for the overall ranking. */
+export function lohAssignmentsOf(r: SessionRecord): SuraAssignment[] {
   if (r.attendance_only) return [];
   if (r.newLoh?.length) return r.newLoh.filter((i) => !!i?.sura);
   const legacy = r.loh as unknown as SuraAssignment | undefined;
@@ -595,7 +597,10 @@ function lohAssignmentsOf(r: SessionRecord): SuraAssignment[] {
  * Built from the student's full history, never a filtered slice — the session
  * that grades June's last assignment usually falls in July.
  */
-function gradedAssignmentIds(studentRecords: SessionRecord[]): Set<string> {
+/** Records whose assignment was recited in the IMMEDIATELY following session.
+ * Homework never heard is not memorized ground. Exported for the overall
+ * ranking so both leaderboards answer that question the same way. */
+export function gradedAssignmentIds(studentRecords: SessionRecord[]): Set<string> {
   const chain = studentRecords
     .filter((r) => !r.attendance_only && !!r.date)
     .sort((a, b) => (a.date! < b.date! ? -1 : a.date! > b.date! ? 1 : 0));

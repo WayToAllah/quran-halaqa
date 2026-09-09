@@ -398,9 +398,9 @@ export function StatsScreen() {
       <div class={cardCls}>
         <div class="text-[13.5px] font-extrabold text-ink-dark">🥇 الترتيب العام</div>
         <div class="text-[10.5px] text-taupe font-semibold mt-0.5 mb-3.5">
-          حضور ٤٠٪ · تسميع ٣٠٪ · صفحات ٣٠٪ — من بداية التسجيل
+          حضور ٤٠٪ · تسميع ٣٠٪ · سطور ٣٠٪ — من بداية التسجيل
           <br />
-          الصفحات: ثلث صفحة في الجلسة = ١٠٠
+          السطور: ٥ سطور في الجلسة (ثلث صفحة) = ١٠٠
         </div>
         {overall.length === 0 ? (
           <div class="text-center text-sm text-taupe py-6">لا توجد بيانات كافية بعد</div>
@@ -424,8 +424,8 @@ export function StatsScreen() {
                     <div class="text-sm font-bold text-ink-dark truncate">{x.name}</div>
                     <div class="text-xs text-taupe">
                       حضور {toArabicDigits(x.attendPct)}٪ · تسميع{' '}
-                      {toArabicDigits(Math.round(x.recitationScore))} · صفحات{' '}
-                      {toArabicDigits(x.pagesScore)}
+                      {toArabicDigits(Math.round(x.recitationScore))} · سطور{' '}
+                      {toArabicDigits(x.linesScore)}
                     </div>
                   </div>
                   <div class="font-extrabold text-forest shrink-0 text-[15px]">
