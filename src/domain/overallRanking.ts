@@ -10,12 +10,15 @@ import { recordsForStudent } from './students';
  * read as a percentage of a perfect student.
  *
  * Attendance carries the most weight by decision: showing up is the thing the
- * student fully controls, and it is the precondition for the other two.
+ * student fully controls, and it is the precondition for the other two. The
+ * other two are held equal — grading how well the old assignment was recited
+ * and counting how much new ground was covered are two halves of one effort,
+ * and neither deserves to outrank the other.
  */
 export const OVERALL_WEIGHTS = {
-  attendance: 0.5,
+  attendance: 0.4,
   recitation: 0.3,
-  pages: 0.2,
+  pages: 0.3,
 } as const;
 
 /**
@@ -107,8 +110,8 @@ function median(values: number[]): number {
  *     deliberate, not an oversight — it stops turning up being paid for twice.
  *
  * Known bias, accepted: a student in جزء عم finishes pages faster than one in
- * البقرة because the suras are short and often partly known already. The 20%
- * weight dampens this; it does not remove it.
+ * البقرة because the suras are short and often partly known already. The
+ * component's weight dampens this; it does not remove it.
  *
  * `allRecords` must be the UNFILTERED history — pages are cumulative and are
  * computed over the whole record (see computeTopPages).

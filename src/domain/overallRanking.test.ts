@@ -36,9 +36,9 @@ describe('OVERALL_WEIGHTS', () => {
     expect(attendance + recitation + pages).toBeCloseTo(1, 10);
   });
 
-  it('weights attendance the heaviest', () => {
+  it('weights attendance the heaviest and the other two equally', () => {
     expect(OVERALL_WEIGHTS.attendance).toBeGreaterThan(OVERALL_WEIGHTS.recitation);
-    expect(OVERALL_WEIGHTS.recitation).toBeGreaterThan(OVERALL_WEIGHTS.pages);
+    expect(OVERALL_WEIGHTS.recitation).toBe(OVERALL_WEIGHTS.pages);
   });
 });
 
