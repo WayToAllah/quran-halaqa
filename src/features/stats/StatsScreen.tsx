@@ -21,6 +21,7 @@ import {
   countRecentlyActiveStudents,
   type StatsSortKey,
 } from '../../domain/statsScreen';
+import { computeOverallRanking } from '../../domain/overallRanking';
 import { useTenant } from '../tenant/TenantContext';
 import {
   buildAttendanceCardData,
@@ -167,6 +168,7 @@ export function StatsScreen() {
   const [pagesExpanded, setPagesExpanded] = useState(false);
   const [attendExpanded, setAttendExpanded] = useState(false);
   const [attendBasis, setAttendBasis] = useState<AttendBasis>('halaqa');
+  const [overallExpanded, setOverallExpanded] = useState(false);
   const [followUpExpanded, setFollowUpExpanded] = useState(false);
 
   const availableMonths = useMemo(() => {
@@ -247,6 +249,13 @@ export function StatsScreen() {
       ofDays: summary.totalHalaqaDays,
     }));
   }, [attendBasis, topAttend, topAttendPersonal, topAttendDays, summary.totalHalaqaDays]);
+  // Deliberately reads `records`, never `filteredRecords`: the overall ranking
+  // is cumulative by design (see computeOverallRanking), so the month chips do
+  // not narrow it. The card says so on its face — a leaderboard that silently
+  // ignores the filter sitting above it would just read as a bug.
+  const overall = useMemo(() => computeOverallRanking(students, records), [students, records]);
+  const visibleOverall = overallExpanded ? overall : overall.slice(0, PREVIEW_COUNT);
+
   const studentRows = useMemo(
     () => computeStudentStatsRows(students, filteredRecords, summary.totalHalaqaDays),
     [students, filteredRecords, summary.totalHalaqaDays],
@@ -383,6 +392,55 @@ export function StatsScreen() {
   return (
     <div class="p-[18px] pb-[100px] space-y-3.5" dir="rtl">
       <div class="text-[19px] font-extrabold text-ink-dark mb-1">إحصائيات</div>
+
+      {/* Sits ABOVE the month picker on purpose: it is the one card the picker
+          has no say over, and putting it underneath would imply otherwise. */}
+      <div class={cardCls}>
+        <div class="text-[13.5px] font-extrabold text-ink-dark">🥇 الترتيب العام</div>
+        <div class="text-[10.5px] text-taupe font-semibold mt-0.5 mb-3.5">
+          حضور ٥٠٪ · تسميع ٣٠٪ · صفحات ٢٠٪ — من بداية التسجيل
+        </div>
+        {overall.length === 0 ? (
+          <div class="text-center text-sm text-taupe py-6">لا توجد بيانات كافية بعد</div>
+        ) : (
+          <div class="space-y-2">
+            {visibleOverall.map((x) => {
+              const rc = rankStyle(x.rank);
+              return (
+                <div
+                  key={x.id}
+                  class="flex items-center gap-3 py-1.5 border-b border-[#F5F1E5] last:border-0"
+                >
+                  <div
+                    class="w-[26px] h-[26px] rounded-full flex items-center justify-center text-xs font-extrabold shrink-0"
+                    style={{ background: rc.bg, color: rc.color }}
+                    title={`المركز ${toArabicOrdinal(x.rank)} في الترتيب العام`}
+                  >
+                    {toArabicDigits(x.rank)}
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-sm font-bold text-ink-dark truncate">{x.name}</div>
+                    <div class="text-xs text-taupe">
+                      حضور {toArabicDigits(x.attendPct)}٪ · تسميع{' '}
+                      {toArabicDigits(Math.round(x.recitationScore))} · صفحات{' '}
+                      {toArabicDigits(x.pagesScore)}
+                    </div>
+                  </div>
+                  <div class="font-extrabold text-forest shrink-0 text-[15px]">
+                    {toArabicDigits(x.points.toFixed(1))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <ShowAllToggle
+          expanded={overallExpanded}
+          total={overall.length}
+          cardLabel="الترتيب العام"
+          onToggle={() => setOverallExpanded((v) => !v)}
+        />
+      </div>
 
       <div class="relative">
         <select
