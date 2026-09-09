@@ -70,6 +70,16 @@ describe('StatsScreen — collapsible cards', () => {
     expect(c.firstElementChild).toBe(header('🥇 الترتيب العام'));
   });
 
+  it('pins the header so it is still reachable from the middle of a long list', () => {
+    render(<StatsScreen />);
+    // Scrolled halfway down a fifty-row leaderboard, a header sitting at the
+    // top of the card is off-screen and the card cannot be closed without
+    // scrolling back up. It sticks just below the app bar instead.
+    const cls = header('🥇 الترتيب العام').className;
+    expect(cls).toContain('sticky');
+    expect(cls).toContain('top-[69px]');
+  });
+
   it('folds each card independently', async () => {
     render(<StatsScreen />);
     await userEvent.click(header('🥇 الترتيب العام'));

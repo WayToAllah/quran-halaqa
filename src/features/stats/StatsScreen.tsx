@@ -106,7 +106,15 @@ function CollapsibleCard({ title, children }: { title: string; children: Compone
         aria-label={title}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        class={`w-full flex items-center justify-between gap-2 text-start ${open ? 'mb-3.5' : ''}`}
+        class={
+          // Pinned just under the 69px app bar, and stretched over the card's
+          // own padding so rows scroll behind it edge to edge. Without this the
+          // header scrolls away and a long leaderboard becomes impossible to
+          // close from the middle without first scrolling back to the top.
+          'sticky top-[69px] z-[5] bg-white w-full flex items-center justify-between gap-2 ' +
+          'text-start -mx-[18px] px-[18px] -mt-[18px] pt-[18px] ' +
+          (open ? 'pb-3.5' : 'pb-[18px] -mb-[18px]')
+        }
       >
         <span class="text-[13.5px] font-extrabold text-ink-dark">{title}</span>
         <span
