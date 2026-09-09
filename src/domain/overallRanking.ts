@@ -36,10 +36,18 @@ export const OVERALL_WEIGHTS = {
 export const PRIOR_EVAL_COUNT = 3;
 export const PRIOR_EVAL_SCORE = 70;
 
-/** The same idea applied to the pages rate: three sessions' worth of the
- * halaqa's typical pace, so one lucky short-sura week can't crown a student
- * who has attended twice. */
-export const PRIOR_SESSION_COUNT = 3;
+/**
+ * The pace a student is expected to hold: one third of a mushaf page per
+ * attended session. Hitting it scores the full 100; beating it is capped there.
+ *
+ * This is a FIXED benchmark, not a comparison against the fastest student in
+ * the halaqa. Grading against the fastest meant one boy who attended four
+ * times and happened to finish a page set a rate nobody attending regularly
+ * could touch — and the more faithfully a student came, the bigger his
+ * denominator grew and the lower he scored. A fixed target measures every
+ * student against the same expectation instead of against each other.
+ */
+export const STANDARD_PAGES_PER_SESSION = 1 / 3;
 
 export interface OverallRankEntry {
   /** Stable student id — the correct render key and lookup handle. */
@@ -57,9 +65,9 @@ export interface OverallRankEntry {
   recitationScore: number;
   /** Whole mushaf pages of new memorization completed, cumulative. */
   pages: number;
-  /** Pages per attended day, blended (see PRIOR_SESSION_COUNT). */
+  /** Pages per attended day. */
   pagesRate: number;
-  /** 0–100: the student's rate as a share of the halaqa's fastest rate. */
+  /** 0–100: the rate as a share of STANDARD_PAGES_PER_SESSION, capped at 100. */
   pagesScore: number;
   /** The weighted total, 0–100, rounded to one decimal. */
   points: number;
@@ -80,13 +88,6 @@ function evalScore(o: ScoreEval | null | undefined): number | null {
   return stars > 0 ? stars * 20 : null;
 }
 
-function median(values: number[]): number {
-  if (!values.length) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-}
-
 /**
  * One combined leaderboard: attendance + recitation + pages, cumulative over
  * the student's whole history.
@@ -101,11 +102,11 @@ function median(values: number[]): number {
  *     the score.
  *  2. **Recitation** averages loh and madi together, blended toward a neutral
  *     prior so a two-session sample can't top the list.
- *  3. **Pages** is a RATE — pages per attended day — measured as a share of
- *     the halaqa's fastest student, not an absolute count. A cumulative count
- *     ranks by seniority: a student of two years is unreachable no matter how
- *     hard a newcomer works, and the component stops rewarding anything. The
- *     rate lets the new and the old compete on effort.
+ *  3. **Pages** is a RATE — pages per attended day — scored against a fixed
+ *     expectation of a third of a page per session, capped at 100. A
+ *     cumulative count would rank by seniority: a student of two years is
+ *     unreachable no matter how hard a newcomer works. A share of the fastest
+ *     student was worse still — see STANDARD_PAGES_PER_SESSION.
  *     Attendance is already its own component, so dividing pages by days is
  *     deliberate, not an oversight — it stops turning up being paid for twice.
  *
@@ -151,27 +152,18 @@ export function computeOverallRanking(
     // Attended days, not record count: two records on one day is one session's
     // worth of opportunity, and attendance is counted in days everywhere else.
     const days = a.attendedDays;
-    return { entry: a, recs, evalCount, recitationScore, pages, rawRate: days ? pages / days : 0 };
+    return {
+      entry: a,
+      recs,
+      evalCount,
+      recitationScore,
+      pages,
+      pagesRate: days ? pages / days : 0,
+    };
   });
 
-  // The prior for the rate is the halaqa's own median pace rather than a fixed
-  // number, so the scale re-calibrates itself as the circle's level changes
-  // instead of encoding today's pace as a constant.
-  const priorRate = median(partial.map((p) => p.rawRate));
-  const rated = partial.map((p) => ({
-    ...p,
-    pagesRate:
-      (p.pages + PRIOR_SESSION_COUNT * priorRate) / (p.entry.attendedDays + PRIOR_SESSION_COUNT),
-  }));
-  const maxRate = Math.max(0, ...rated.map((p) => p.pagesRate));
-
-  const scored = rated.map((p) => {
-    // Nobody has finished a page yet: the component is 0 for everyone rather
-    // than handing an arbitrary 100 to whoever the prior happens to favour.
-    const pagesScore =
-      maxRate > 0 && rated.some((x) => x.pages > 0)
-        ? Math.min(100, Math.round((p.pagesRate / maxRate) * 100))
-        : 0;
+  const scored = partial.map((p) => {
+    const pagesScore = Math.min(100, Math.round((p.pagesRate / STANDARD_PAGES_PER_SESSION) * 100));
     const raw =
       OVERALL_WEIGHTS.attendance * p.entry.attendPct +
       OVERALL_WEIGHTS.recitation * p.recitationScore +

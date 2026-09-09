@@ -4,6 +4,7 @@ import {
   OVERALL_WEIGHTS,
   PRIOR_EVAL_COUNT,
   PRIOR_EVAL_SCORE,
+  STANDARD_PAGES_PER_SESSION,
 } from './overallRanking';
 import type { SessionRecord, Student } from '../types';
 
@@ -154,6 +155,10 @@ describe('computeOverallRanking — pages component', () => {
     ...attended('s_2', [DAYS[1]], 90),
   ];
 
+  it('expects a third of a page per session', () => {
+    expect(STANDARD_PAGES_PER_SESSION).toBeCloseTo(1 / 3, 10);
+  });
+
   it('scores pages as a rate per attended day, so seniority alone cannot win', () => {
     const list = computeOverallRanking(students, sameNumberOfPages);
     expect(byId(list, 's_1').pages).toBe(1);
@@ -161,9 +166,24 @@ describe('computeOverallRanking — pages component', () => {
     expect(byId(list, 's_2').pagesScore).toBeGreaterThan(byId(list, 's_1').pagesScore);
   });
 
-  it('caps the pages component at 100 for the fastest student and never goes below 0', () => {
+  it('scores against the fixed standard, not against the fastest student', () => {
+    // s_1: one page over five attended days = 0.2/session, which is 60% of the
+    // third-of-a-page standard. It must read 60 whether or not a faster
+    // student happens to be in the halaqa — that was the old bug.
+    const withFastPeer = computeOverallRanking(students, sameNumberOfPages);
+    expect(byId(withFastPeer, 's_1').pagesScore).toBe(60);
+
+    const alone = computeOverallRanking(
+      students,
+      sameNumberOfPages.filter((r) => r.studentId === 's_1'),
+    );
+    expect(byId(alone, 's_1').pagesScore).toBe(60);
+  });
+
+  it('caps the component at 100 for a student who beats the standard', () => {
     const list = computeOverallRanking(students, sameNumberOfPages);
-    expect(Math.max(...list.map((e) => e.pagesScore))).toBe(100);
+    // s_2: one page in two attended days = 0.5/session, well past the standard.
+    expect(byId(list, 's_2').pagesScore).toBe(100);
     expect(list.every((e) => e.pagesScore >= 0 && e.pagesScore <= 100)).toBe(true);
   });
 
