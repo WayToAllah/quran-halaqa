@@ -52,7 +52,7 @@ beforeEach(() => {
 
 /** The leaderboard row for a student, inside the الأكثر حفظاً card. */
 function pagesRow(name: string): HTMLElement {
-  const card = screen.getByText('🏆 الأكثر حفظاً للصفحات').parentElement as HTMLElement;
+  const card = screen.getByText('🏆 الأكثر حفظاً للصفحات').closest('[data-card]') as HTMLElement;
   const nameEl = Array.from(card.querySelectorAll('div')).find(
     (el) => el.textContent?.trim() === name && el.className.includes('truncate'),
   );

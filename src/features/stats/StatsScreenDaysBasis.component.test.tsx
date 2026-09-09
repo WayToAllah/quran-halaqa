@@ -47,7 +47,7 @@ beforeEach(() => {
 });
 
 function attendCard(): HTMLElement {
-  return screen.getByText('✅ الأكثر حضوراً').parentElement as HTMLElement;
+  return screen.getByText('✅ الأكثر حضوراً').closest('[data-card]') as HTMLElement;
 }
 
 /** Student names in the order the attendance card currently lists them. */

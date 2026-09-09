@@ -26,7 +26,7 @@ vi.mock('../../hooks/useAllRecords', () => ({ useAllRecords: () => ({ records, l
 beforeEach(() => vi.clearAllMocks());
 
 function chartCard(): HTMLElement {
-  return screen.getByText('📈 النشاط الأسبوعي').parentElement as HTMLElement;
+  return screen.getByText('📈 النشاط الأسبوعي').closest('[data-card]') as HTMLElement;
 }
 
 function barHeights(): number[] {

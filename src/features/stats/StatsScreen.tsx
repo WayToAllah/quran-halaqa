@@ -1,3 +1,4 @@
+import type { ComponentChildren } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { useStudents } from '../../hooks/useStudents';
 import { useAllRecords } from '../../hooks/useAllRecords';
@@ -93,7 +94,32 @@ const sessionsLabel = (n: number) =>
   arabicPlural(n, { one: 'جلسة واحدة', two: 'جلستين', few: 'جلسات', many: 'جلسة' });
 
 const cardCls = 'bg-white border border-hairline rounded-2xl p-[18px]';
-const cardTitleCls = 'text-[13.5px] font-extrabold text-ink-dark mb-3.5';
+function CollapsibleCard({ title, children }: { title: string; children: ComponentChildren }) {
+  // Open by default. The control lives in the HEADER rather than under the
+  // list: a fifty-row leaderboard used to bury its own "عرض أقل" button at the
+  // bottom, so folding it away meant scrolling the whole thing first.
+  const [open, setOpen] = useState(true);
+  return (
+    <div class={cardCls} data-card>
+      <button
+        type="button"
+        aria-label={title}
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        class={`w-full flex items-center justify-between gap-2 text-start ${open ? 'mb-3.5' : ''}`}
+      >
+        <span class="text-[13.5px] font-extrabold text-ink-dark">{title}</span>
+        <span
+          class={`text-taupe text-[11px] leading-none transition-transform ${open ? '' : 'rotate-90'}`}
+          aria-hidden="true"
+        >
+          ▼
+        </span>
+      </button>
+      {open && children}
+    </div>
+  );
+}
 
 /** How many rows a leaderboard shows before عرض الكل is tapped. */
 const PREVIEW_COUNT = 3;
@@ -395,8 +421,7 @@ export function StatsScreen() {
 
       {/* Sits ABOVE the month picker on purpose: it is the one card the picker
           has no say over, and putting it underneath would imply otherwise. */}
-      <div class={cardCls}>
-        <div class="text-[13.5px] font-extrabold text-ink-dark">🥇 الترتيب العام</div>
+      <CollapsibleCard title="🥇 الترتيب العام">
         <div class="text-[10.5px] text-taupe font-semibold mt-0.5 mb-3.5">
           حضور ٤٠٪ · تسميع ٣٠٪ · سطور ٣٠٪ — من بداية التسجيل
           <br />
@@ -442,7 +467,7 @@ export function StatsScreen() {
           cardLabel="الترتيب العام"
           onToggle={() => setOverallExpanded((v) => !v)}
         />
-      </div>
+      </CollapsibleCard>
 
       <div class="relative">
         <select
@@ -515,8 +540,7 @@ export function StatsScreen() {
         ))}
       </div>
 
-      <div class={cardCls}>
-        <div class={cardTitleCls}>📈 النشاط الأسبوعي</div>
+      <CollapsibleCard title="📈 النشاط الأسبوعي">
         {weeklyScale.truncated && (
           <div class="text-[10px] text-taupe/70 font-semibold -mt-1 mb-1.5">
             المقياس يبدأ من {toArabicDigits(weeklyScale.baseline)}
@@ -554,10 +578,9 @@ export function StatsScreen() {
             })}
           </div>
         )}
-      </div>
+      </CollapsibleCard>
 
-      <div class={cardCls}>
-        <div class={cardTitleCls}>🎯 توزيع مستويات التقييم</div>
+      <CollapsibleCard title="🎯 توزيع مستويات التقييم">
         {scoreDist.every((d) => d.count === 0) ? (
           <div class="text-center text-sm text-taupe py-6">لا يوجد تقييمات مسجلة بعد</div>
         ) : (
@@ -581,10 +604,9 @@ export function StatsScreen() {
             })}
           </div>
         )}
-      </div>
+      </CollapsibleCard>
 
-      <div class={cardCls}>
-        <div class={cardTitleCls}>🏆 الأكثر حفظاً للصفحات</div>
+      <CollapsibleCard title="🏆 الأكثر حفظاً للصفحات">
         {topPages.length === 0 ? (
           <div class="text-center text-sm text-taupe py-6">لا توجد صفحات مكتملة بعد</div>
         ) : (
@@ -630,7 +652,7 @@ export function StatsScreen() {
           cardLabel="الأكثر حفظاً للصفحات"
           onToggle={() => setPagesExpanded((v) => !v)}
         />
-      </div>
+      </CollapsibleCard>
 
       <button
         type="button"
@@ -646,8 +668,7 @@ export function StatsScreen() {
         📖 بطاقة نجوم الحفظ — للمشاركة
       </button>
 
-      <div class={cardCls}>
-        <div class={cardTitleCls}>✅ الأكثر حضوراً</div>
+      <CollapsibleCard title="✅ الأكثر حضوراً">
         <div class="flex gap-1.5 mb-3">
           {ATTEND_BASIS_TABS.map((tab) => (
             <button
@@ -751,10 +772,9 @@ export function StatsScreen() {
           cardLabel="الأكثر حضوراً"
           onToggle={() => setAttendExpanded((v) => !v)}
         />
-      </div>
+      </CollapsibleCard>
 
-      <div class={cardCls}>
-        <div class={cardTitleCls}>⚠️ يحتاجون متابعة</div>
+      <CollapsibleCard title="⚠️ يحتاجون متابعة">
         {followUp.length === 0 ? (
           <div class="text-xs text-taupe text-center py-3">
             كل الطلاب حضروا آخر {arabicPlural(ABSENCE_ALERT_STREAK, HALAQA_FORMS)} — ما شاء الله
@@ -791,7 +811,7 @@ export function StatsScreen() {
           cardLabel="يحتاجون متابعة"
           onToggle={() => setFollowUpExpanded((v) => !v)}
         />
-      </div>
+      </CollapsibleCard>
 
       <button
         type="button"
@@ -807,8 +827,7 @@ export function StatsScreen() {
         🌟 بطاقة نجوم الحضور — للمشاركة
       </button>
 
-      <div class={cardCls}>
-        <div class={cardTitleCls}>تفصيل الطلاب</div>
+      <CollapsibleCard title="تفصيل الطلاب">
         <SearchInput
           compact
           class="mb-3"
@@ -868,7 +887,7 @@ export function StatsScreen() {
             ))}
           </div>
         )}
-      </div>
+      </CollapsibleCard>
 
       {pagesCardOpen && (
         <div

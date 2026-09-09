@@ -46,7 +46,7 @@ beforeEach(() => {
 });
 
 function overallCard(): HTMLElement {
-  return screen.getByText('🥇 الترتيب العام').parentElement as HTMLElement;
+  return screen.getByText('🥇 الترتيب العام').closest('[data-card]') as HTMLElement;
 }
 
 describe('StatsScreen — الترتيب العام', () => {
@@ -82,7 +82,7 @@ describe('StatsScreen — الترتيب العام', () => {
   it('previews three students and expands to the whole list on request', async () => {
     render(<StatsScreen />);
     expect(overallCard().textContent).not.toContain('خالد سعيد');
-    await userEvent.click(screen.getByRole('button', { name: /الترتيب العام$/ }));
+    await userEvent.click(screen.getByRole('button', { name: /^عرض الكل.*الترتيب العام$/ }));
     expect(overallCard().textContent).toContain('خالد سعيد');
   });
 });

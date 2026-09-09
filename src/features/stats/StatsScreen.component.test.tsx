@@ -129,7 +129,7 @@ describe('StatsScreen — leaderboards', () => {
   it('leaves out محمد علي, who has no completed page', () => {
     render(<StatsScreen />);
     // محمد's only record is an evaluation with no newLoh at all.
-    const board = screen.getByText('🏆 الأكثر حفظاً للصفحات').parentElement;
+    const board = screen.getByText('🏆 الأكثر حفظاً للصفحات').closest('[data-card]');
     expect(board?.textContent).toContain('زيد احمد');
     expect(board?.textContent).not.toContain('محمد علي');
   });

@@ -44,7 +44,7 @@ beforeEach(() => {
 });
 
 function attendCard(): HTMLElement {
-  return screen.getByText('✅ الأكثر حضوراً').parentElement as HTMLElement;
+  return screen.getByText('✅ الأكثر حضوراً').closest('[data-card]') as HTMLElement;
 }
 
 describe('StatsScreen — أساس حساب الحضور', () => {

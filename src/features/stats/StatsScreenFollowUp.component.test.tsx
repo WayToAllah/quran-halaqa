@@ -36,7 +36,7 @@ beforeEach(() => {
 });
 
 function cardFor(title: string): HTMLElement {
-  return screen.getByText(title).parentElement as HTMLElement;
+  return screen.getByText(title).closest('[data-card]') as HTMLElement;
 }
 
 describe('StatsScreen — يحتاجون متابعة card', () => {
