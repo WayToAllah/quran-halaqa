@@ -33,6 +33,7 @@ import { useGroupAttendance } from '../../hooks/useGroupAttendance';
 import { GroupAttendanceModal } from './GroupAttendanceModal';
 import { MistakeCounterModal } from './MistakeCounterModal';
 import { MushafModal } from './MushafModal';
+import { mushafWardParam } from '../../domain/mushafLink';
 import { WhatsAppModal } from './WhatsAppModal';
 import {
   summarizeMistakes,
@@ -93,6 +94,16 @@ function tierBadge(state: ScoreFieldState): { label: string; bg: string; color: 
 }
 
 const emptyRow = (): SuraAssignment => ({ sura: '', from: '', to: '' });
+
+/** Which ward the mushaf viewer was opened on. The two "new" targets are
+ *  read-only: they show what is being assigned, not what is being graded. */
+type MushafTarget = 'loh' | 'madi' | 'newLoh' | 'newMadi';
+const MUSHAF_LABEL: Record<MushafTarget, string> = {
+  loh: 'اللوح',
+  madi: 'الماضي',
+  newLoh: 'اللوح الجديد',
+  newMadi: 'الماضي الجديد',
+};
 
 /** How a sura row is titled on screen. Shared with the save-time error message
  * so "السورة الأولى" in the toast is literally the heading the teacher is
@@ -172,13 +183,32 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   const [lohMistakes, setLohMistakes] = useState<MistakeKind[]>([]);
   const [madiMistakes, setMadiMistakes] = useState<MistakeKind[]>([]);
   const [mistakeModal, setMistakeModal] = useState<'loh' | 'madi' | null>(null);
-  const [mushafFor, setMushafFor] = useState<'loh' | 'madi' | null>(null);
+  // 'loh'/'madi' open the ward being GRADED today (mistakes feed the score);
+  // 'newLoh'/'newMadi' open the ward being ASSIGNED today, read-only — there is
+  // no score on that side for a count to land on.
+  const [mushafFor, setMushafFor] = useState<MushafTarget | null>(null);
   // A fresh token per open, so a count from a previous open cannot land on this one.
   const [mushafToken, setMushafToken] = useState('');
 
-  function openMushaf(which: 'loh' | 'madi') {
+  function openMushaf(which: MushafTarget) {
     setMushafToken(`${which}-${Date.now()}`);
     setMushafFor(which);
+  }
+
+  /** The ward each target opens on. The graded sides honour an in-session
+   *  correction to the previous assignment; the new sides read the rows the
+   *  teacher is filling in right now, exactly as typed. */
+  function mushafListFor(which: MushafTarget): readonly SuraAssignment[] {
+    switch (which) {
+      case 'loh':
+        return editedPrevLoh ?? prevLohList;
+      case 'madi':
+        return editedPrevMadi ?? prevMadiList;
+      case 'newLoh':
+        return lohRows;
+      case 'newMadi':
+        return madiRows;
+    }
   }
 
   /** The mushaf counter records plain mistakes; they join the same history the
@@ -904,6 +934,11 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     );
   }
 
+  // Empty until at least one row names a sura — the viewer has nothing to open
+  // on before that, so the button stays disabled instead of opening a blank frame.
+  const newLohWard = mushafWardParam(lohRows);
+  const newMadiWard = mushafWardParam(madiRows);
+
   const cardCls = 'bg-white border border-hairline rounded-2xl p-[18px]';
   // Compact, matched-format pair — both month-named, neither shows the year,
   // so the two stay visually aligned instead of one running longer than the
@@ -1192,6 +1227,18 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
           <div class="flex items-center gap-2 mb-3.5">
             <div class="w-2 h-2 rounded-full bg-forest" />
             <div class="text-[13.5px] font-extrabold text-ink-dark">اللوح الجديد</div>
+            {/* Read-only: this is the ward being GIVEN, so there is no score for
+                a mistake count to feed. Kept mounted and disabled rather than
+                hidden, so the header never changes height mid-entry. */}
+            <button
+              type="button"
+              aria-label="المصحف — اللوح الجديد"
+              disabled={!newLohWard}
+              class="mr-auto text-xs font-semibold text-forest border border-forest/20 rounded-lg px-2.5 py-1.5 disabled:opacity-40"
+              onClick={() => openMushaf('newLoh')}
+            >
+              📖 المصحف
+            </button>
           </div>
           {lohRows.map((row, i) => (
             <SuraRow
@@ -1217,6 +1264,15 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
           <div class="flex items-center gap-2 mb-3.5">
             <div class="w-2 h-2 rounded-full bg-mustard" />
             <div class="text-[13.5px] font-extrabold text-ink-dark">مراجعة الماضي</div>
+            <button
+              type="button"
+              aria-label="المصحف — الماضي الجديد"
+              disabled={!newMadiWard}
+              class="mr-auto text-xs font-semibold text-forest border border-forest/20 rounded-lg px-2.5 py-1.5 disabled:opacity-40"
+              onClick={() => openMushaf('newMadi')}
+            >
+              📖 المصحف
+            </button>
           </div>
           {madiRows.map((row, i) => (
             <SuraRow
@@ -1331,13 +1387,17 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
 
       {mushafFor && (
         <MushafModal
-          label={mushafFor === 'loh' ? 'اللوح' : 'الماضي'}
-          list={
-            mushafFor === 'loh' ? (editedPrevLoh ?? prevLohList) : (editedPrevMadi ?? prevMadiList)
-          }
+          label={MUSHAF_LABEL[mushafFor]}
+          list={mushafListFor(mushafFor)}
           studentName={selectedStudent ? getStudentName(selectedStudent) : ''}
           token={mushafToken}
-          onCount={(count) => applyMushafCount(mushafFor, count)}
+          // Read-only targets pass no handler at all, so a count arriving from
+          // the viewer's close button closes the frame and changes nothing.
+          onCount={
+            mushafFor === 'loh' || mushafFor === 'madi'
+              ? (count) => applyMushafCount(mushafFor, count)
+              : undefined
+          }
           onClose={() => setMushafFor(null)}
         />
       )}
