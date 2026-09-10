@@ -123,7 +123,7 @@ function AppShell() {
         </div>
       </main>
 
-      <nav class="fixed bottom-0 inset-x-0 bg-white border-t border-hairline flex px-1.5 pb-[env(safe-area-inset-bottom)]">
+      <nav class="fixed bottom-0 inset-x-0 z-20 bg-white border-t border-hairline flex px-1.5 pb-[env(safe-area-inset-bottom)]">
         {TABS.map((t) => {
           const active = tab === t.id;
           return (

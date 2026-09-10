@@ -107,26 +107,37 @@ const cardCls = 'bg-white border border-hairline rounded-2xl p-[18px]';
  * `top-[69px]` class by hand — Tailwind needs the value as a literal. */
 const STICKY_TOP = 69;
 
-function CollapsibleCard({
+/**
+ * A stats card with a pinned header.
+ *
+ * The header carries the title and, when the card has a list, the one control
+ * that lengthens or shortens it. There is no separate fold-away chevron: two
+ * controls in one header that both open and close something read as a single
+ * control misbehaving, and عرض أقل already gives the card a short state.
+ *
+ * `onShrink` lets the card restore the reader's position when the list
+ * shortens — see the layout effect below.
+ */
+function StatsCard({
   title,
   action,
   children,
 }: {
   title: string;
-  action?: ComponentChildren;
+  action?: (onShrink: () => void) => ComponentChildren;
   children: ComponentChildren;
 }) {
-  // Open by default. The control lives in the HEADER rather than under the
-  // list: a fifty-row leaderboard used to bury its own "عرض أقل" button at the
-  // bottom, so folding it away meant scrolling the whole thing first.
-  const [open, setOpen] = useState(true);
   const cardRef = useRef<HTMLDivElement>(null);
   const restoreScroll = useRef(false);
 
-  // Closing a card from the middle of its list removes everything below the
-  // header, so the page shrinks under the reader and the same scroll offset
-  // now shows a completely different card. Pull the card back up under the app
-  // bar, so the header lands exactly where the button they just tapped was.
+  // Shortening a list deletes rows below the header, so the page shrinks under
+  // the reader and the same scroll offset now shows a completely different
+  // card. Pull this card back up under the app bar, so the header lands where
+  // the button they just tapped was.
+  //
+  // No dependency array on purpose: the state that shortens the list lives in
+  // the parent, so the flag is set in its handler and has to be honoured by
+  // whichever render happens to come next.
   useLayoutEffect(() => {
     if (!restoreScroll.current) return;
     restoreScroll.current = false;
@@ -134,7 +145,7 @@ function CollapsibleCard({
     if (!el || typeof window.scrollTo !== 'function') return;
     const { top } = el.getBoundingClientRect();
     if (top < STICKY_TOP) window.scrollTo({ top: window.scrollY + top - STICKY_TOP });
-  }, [open]);
+  });
 
   return (
     <div class={cardCls} data-card ref={cardRef}>
@@ -144,39 +155,19 @@ function CollapsibleCard({
           // Pinned just under the 69px app bar, and stretched over the card's
           // own padding so rows scroll behind it edge to edge. Without this the
           // header scrolls away and a long leaderboard becomes impossible to
-          // close from the middle without first scrolling back to the top.
-          //
-          // The list toggle rides along here rather than sitting under the
-          // list: two controls that each open and close something, one at the
-          // top and one at the very bottom, read as one control misbehaving.
+          // shorten from the middle without first scrolling back to the top.
           'sticky top-[69px] z-[5] bg-white flex items-center gap-2 ' +
-          '-mx-[18px] px-[18px] -mt-[18px] pt-[18px] ' +
-          (open ? 'pb-3.5' : 'pb-[18px] -mb-[18px]')
+          '-mx-[18px] px-[18px] -mt-[18px] pt-[18px] pb-3.5'
         }
       >
-        <button
-          type="button"
-          aria-label={title}
-          aria-expanded={open}
-          onClick={() => {
-            // Only on the way closed: opening a card leaves the header where it
-            // already is, and moving the page then would be the jarring part.
-            restoreScroll.current = open;
-            setOpen((v) => !v);
-          }}
-          class="flex-1 min-w-0 flex items-center gap-1.5 text-start"
-        >
-          <span class="text-[13.5px] font-extrabold text-ink-dark truncate">{title}</span>
-          <span
-            class={`text-taupe text-[10px] leading-none transition-transform ${open ? '' : 'rotate-90'}`}
-            aria-hidden="true"
-          >
-            ▼
-          </span>
-        </button>
-        {open && action}
+        <span class="flex-1 min-w-0 text-[13.5px] font-extrabold text-ink-dark truncate">
+          {title}
+        </span>
+        {action?.(() => {
+          restoreScroll.current = true;
+        })}
       </div>
-      {open && children}
+      {children}
     </div>
   );
 }
@@ -492,16 +483,21 @@ export function StatsScreen() {
 
       {/* Sits ABOVE the month picker on purpose: it is the one card the picker
           has no say over, and putting it underneath would imply otherwise. */}
-      <CollapsibleCard
+      <StatsCard
         title="🥇 الترتيب العام"
-        action={
+        action={(onShrink) => (
           <ShowAllToggle
             expanded={overallExpanded}
             total={overall.length}
             cardLabel="الترتيب العام"
-            onToggle={() => setOverallExpanded((v) => !v)}
+            onToggle={() => {
+              // Shrinking back to the preview is the direction that moves the
+              // page under the reader; growing it does not.
+              if (overallExpanded) onShrink();
+              setOverallExpanded((v) => !v);
+            }}
           />
-        }
+        )}
       >
         <div class="text-[10.5px] text-taupe font-semibold mt-0.5 mb-3.5">
           حضور ٤٠٪ · تسميع ٣٠٪ · سطور ٣٠٪ — من بداية التسجيل
@@ -542,7 +538,7 @@ export function StatsScreen() {
             })}
           </div>
         )}
-      </CollapsibleCard>
+      </StatsCard>
 
       <div class="relative">
         <select
@@ -615,7 +611,7 @@ export function StatsScreen() {
         ))}
       </div>
 
-      <CollapsibleCard title="📈 النشاط الأسبوعي">
+      <StatsCard title="📈 النشاط الأسبوعي">
         {weeklyScale.truncated && (
           <div class="text-[10px] text-taupe/70 font-semibold -mt-1 mb-1.5">
             المقياس يبدأ من {toArabicDigits(weeklyScale.baseline)}
@@ -653,9 +649,9 @@ export function StatsScreen() {
             })}
           </div>
         )}
-      </CollapsibleCard>
+      </StatsCard>
 
-      <CollapsibleCard title="🎯 توزيع مستويات التقييم">
+      <StatsCard title="🎯 توزيع مستويات التقييم">
         {scoreDist.every((d) => d.count === 0) ? (
           <div class="text-center text-sm text-taupe py-6">لا يوجد تقييمات مسجلة بعد</div>
         ) : (
@@ -679,18 +675,23 @@ export function StatsScreen() {
             })}
           </div>
         )}
-      </CollapsibleCard>
+      </StatsCard>
 
-      <CollapsibleCard
+      <StatsCard
         title="🏆 الأكثر حفظاً للصفحات"
-        action={
+        action={(onShrink) => (
           <ShowAllToggle
             expanded={pagesExpanded}
             total={topPages.length}
             cardLabel="الأكثر حفظاً للصفحات"
-            onToggle={() => setPagesExpanded((v) => !v)}
+            onToggle={() => {
+              // Shrinking back to the preview is the direction that moves the
+              // page under the reader; growing it does not.
+              if (pagesExpanded) onShrink();
+              setPagesExpanded((v) => !v);
+            }}
           />
-        }
+        )}
       >
         {topPages.length === 0 ? (
           <div class="text-center text-sm text-taupe py-6">لا توجد صفحات مكتملة بعد</div>
@@ -731,7 +732,7 @@ export function StatsScreen() {
             })}
           </div>
         )}
-      </CollapsibleCard>
+      </StatsCard>
 
       <button
         type="button"
@@ -747,16 +748,21 @@ export function StatsScreen() {
         📖 بطاقة نجوم الحفظ — للمشاركة
       </button>
 
-      <CollapsibleCard
+      <StatsCard
         title="✅ الأكثر حضوراً"
-        action={
+        action={(onShrink) => (
           <ShowAllToggle
             expanded={attendExpanded}
             total={attendRows.length}
             cardLabel="الأكثر حضوراً"
-            onToggle={() => setAttendExpanded((v) => !v)}
+            onToggle={() => {
+              // Shrinking back to the preview is the direction that moves the
+              // page under the reader; growing it does not.
+              if (attendExpanded) onShrink();
+              setAttendExpanded((v) => !v);
+            }}
           />
-        }
+        )}
       >
         <div class="flex gap-1.5 mb-3">
           {ATTEND_BASIS_TABS.map((tab) => (
@@ -855,18 +861,23 @@ export function StatsScreen() {
             })}
           </div>
         )}
-      </CollapsibleCard>
+      </StatsCard>
 
-      <CollapsibleCard
+      <StatsCard
         title="⚠️ يحتاجون متابعة"
-        action={
+        action={(onShrink) => (
           <ShowAllToggle
             expanded={followUpExpanded}
             total={followUp.length}
             cardLabel="يحتاجون متابعة"
-            onToggle={() => setFollowUpExpanded((v) => !v)}
+            onToggle={() => {
+              // Shrinking back to the preview is the direction that moves the
+              // page under the reader; growing it does not.
+              if (followUpExpanded) onShrink();
+              setFollowUpExpanded((v) => !v);
+            }}
           />
-        }
+        )}
       >
         {followUp.length === 0 ? (
           <div class="text-xs text-taupe text-center py-3">
@@ -898,7 +909,7 @@ export function StatsScreen() {
             ))}
           </div>
         )}
-      </CollapsibleCard>
+      </StatsCard>
 
       <button
         type="button"
@@ -914,16 +925,21 @@ export function StatsScreen() {
         🌟 بطاقة نجوم الحضور — للمشاركة
       </button>
 
-      <CollapsibleCard
+      <StatsCard
         title="تفصيل الطلاب"
-        action={
+        action={(onShrink) => (
           <ShowAllToggle
             expanded={rowsExpanded}
             total={visibleRows.length}
             cardLabel="تفصيل الطلاب"
-            onToggle={() => setRowsExpanded((v) => !v)}
+            onToggle={() => {
+              // Shrinking back to the preview is the direction that moves the
+              // page under the reader; growing it does not.
+              if (rowsExpanded) onShrink();
+              setRowsExpanded((v) => !v);
+            }}
           />
-        }
+        )}
       >
         <SearchInput
           compact
@@ -987,7 +1003,7 @@ export function StatsScreen() {
             ))}
           </div>
         )}
-      </CollapsibleCard>
+      </StatsCard>
 
       {pagesCardOpen && (
         <div

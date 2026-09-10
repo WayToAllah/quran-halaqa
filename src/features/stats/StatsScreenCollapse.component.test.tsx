@@ -5,7 +5,7 @@ import { StatsScreen } from './StatsScreen';
 import type { SessionRecord, Student } from '../../types';
 
 const students: Student[] = [
-  { id: 's_1', name: 'أنس طارق' },
+  { id: 's_1', name: 'زيد احمد' },
   { id: 's_2', name: 'خالد سعيد' },
   { id: 's_3', name: 'عمر حسن' },
   { id: 's_4', name: 'أنس طارق' },
@@ -15,12 +15,7 @@ const students: Student[] = [
 const DAYS = ['2026-07-01', '2026-07-08', '2026-07-15'];
 
 const records: SessionRecord[] = students.flatMap((s) =>
-  DAYS.map((date, i) => ({
-    id: `r_${s.id}_${i}`,
-    studentId: s.id,
-    date,
-    loh: { score: 90 },
-  })),
+  DAYS.map((date, i) => ({ id: `r_${s.id}_${i}`, studentId: s.id, date, loh: { score: 90 } })),
 );
 
 vi.mock('../../hooks/useStudents', () => ({
@@ -35,30 +30,62 @@ beforeEach(() => {
   vi.useRealTimers();
 });
 
-/** The header button a teacher taps to fold a card away. */
-function header(title: string): HTMLElement {
-  return screen.getByRole('button', { name: title });
-}
-
 function card(title: string): HTMLElement {
-  return header(title).closest('[data-card]') as HTMLElement;
+  return screen.getByText(title).closest('[data-card]') as HTMLElement;
+}
+function cardHeader(title: string): HTMLElement {
+  return card(title).querySelector('[data-card-header]') as HTMLElement;
+}
+function showAll(title: string): HTMLElement {
+  return screen.getByRole('button', { name: new RegExp(`^عرض (الكل|أقل).*${title}$`) });
 }
 
-describe('StatsScreen — collapsible cards', () => {
-  it('leaves you at the header you just tapped, not further down the page', async () => {
-    // Closing a card from its middle shortens the page under you, so the same
-    // scroll position now shows whatever came after it. The card is pulled
-    // back under the app bar, where the button you tapped still is.
+describe('StatsScreen — card headers', () => {
+  it('pins the header so it stays reachable from the middle of a long list', () => {
+    const cls = (render(<StatsScreen />), cardHeader('🥇 الترتيب العام').className);
+    expect(cls).toContain('sticky');
+    expect(cls).toContain('top-[69px]');
+  });
+
+  it('carries the list toggle in the header rather than under the list', () => {
+    render(<StatsScreen />);
+    expect(cardHeader('🥇 الترتيب العام').textContent).toContain('عرض الكل');
+  });
+
+  it('leaves only one control per header — no separate open/close chevron', () => {
+    render(<StatsScreen />);
+    const buttons = cardHeader('🥇 الترتيب العام').querySelectorAll('button');
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0].textContent).toContain('عرض');
+    // The old chevron reported its state this way; nothing in the header
+    // should still be claiming to fold the card away.
+    expect(cardHeader('🥇 الترتيب العام').querySelector('[aria-label="🥇 الترتيب العام"]')).toBe(
+      null,
+    );
+  });
+
+  it('lengthens and shortens the list from that one control', async () => {
+    render(<StatsScreen />);
+    expect(card('🥇 الترتيب العام').textContent).not.toContain('زيد احمد');
+    await userEvent.click(showAll('الترتيب العام'));
+    expect(card('🥇 الترتيب العام').textContent).toContain('زيد احمد');
+    await userEvent.click(showAll('الترتيب العام'));
+    expect(card('🥇 الترتيب العام').textContent).not.toContain('زيد احمد');
+  });
+
+  it('leaves you at the header when عرض أقل shortens the list under you', async () => {
+    render(<StatsScreen />);
+    await userEvent.click(showAll('الترتيب العام'));
+
     const scrollTo = vi.fn();
     const origScroll = window.scrollTo;
     const origRect = Element.prototype.getBoundingClientRect;
     window.scrollTo = scrollTo as unknown as typeof window.scrollTo;
     window.scrollY = 500;
-    // Scrolled 200px into the card: its top is above the viewport.
+    // Scrolled 200px into the card.
     Element.prototype.getBoundingClientRect = () => ({ top: -200 }) as DOMRect;
     try {
-      render(<StatsScreen />);
-      await userEvent.click(header('🥇 الترتيب العام'));
+      await userEvent.click(showAll('الترتيب العام'));
       expect(scrollTo).toHaveBeenCalledWith({ top: 500 - 200 - 69 });
     } finally {
       window.scrollTo = origScroll;
@@ -66,89 +93,19 @@ describe('StatsScreen — collapsible cards', () => {
     }
   });
 
-  it('does not yank the page when the card was already fully in view', async () => {
+  it('does not move the page when عرض الكل lengthens it', async () => {
+    render(<StatsScreen />);
     const scrollTo = vi.fn();
     const origScroll = window.scrollTo;
     const origRect = Element.prototype.getBoundingClientRect;
     window.scrollTo = scrollTo as unknown as typeof window.scrollTo;
-    Element.prototype.getBoundingClientRect = () => ({ top: 300 }) as DOMRect;
+    Element.prototype.getBoundingClientRect = () => ({ top: -200 }) as DOMRect;
     try {
-      render(<StatsScreen />);
-      await userEvent.click(header('🥇 الترتيب العام'));
+      await userEvent.click(showAll('الترتيب العام'));
       expect(scrollTo).not.toHaveBeenCalled();
     } finally {
       window.scrollTo = origScroll;
       Element.prototype.getBoundingClientRect = origRect;
-    }
-  });
-
-  it('opens every card by default', () => {
-    render(<StatsScreen />);
-    expect(card('🥇 الترتيب العام').textContent).toContain('أنس طارق');
-    expect(header('🥇 الترتيب العام').getAttribute('aria-expanded')).toBe('true');
-  });
-
-  it('folds a card away when its header is tapped', async () => {
-    render(<StatsScreen />);
-    await userEvent.click(header('🥇 الترتيب العام'));
-    expect(card('🥇 الترتيب العام').textContent).not.toContain('أنس طارق');
-    expect(header('🥇 الترتيب العام').getAttribute('aria-expanded')).toBe('false');
-  });
-
-  it('opens it again on a second tap', async () => {
-    render(<StatsScreen />);
-    await userEvent.click(header('🥇 الترتيب العام'));
-    await userEvent.click(header('🥇 الترتيب العام'));
-    expect(card('🥇 الترتيب العام').textContent).toContain('أنس طارق');
-  });
-
-  it('keeps the header reachable while the card is open, so nothing needs scrolling past', () => {
-    render(<StatsScreen />);
-    // The control that closes a long list sits at its TOP, not buried under
-    // fifty rows at the bottom — that was the whole complaint.
-    const c = card('🥇 الترتيب العام');
-    expect(c.firstElementChild).toBe(c.querySelector('[data-card-header]'));
-    expect(c.firstElementChild!.contains(header('🥇 الترتيب العام'))).toBe(true);
-  });
-
-  it('pins the header so it is still reachable from the middle of a long list', () => {
-    render(<StatsScreen />);
-    // Scrolled halfway down a fifty-row leaderboard, a header sitting at the
-    // top of the card is off-screen and the card cannot be closed without
-    // scrolling back up. It sticks just below the app bar instead.
-    const cls = (card('🥇 الترتيب العام').querySelector('[data-card-header]') as HTMLElement)
-      .className;
-    expect(cls).toContain('sticky');
-    expect(cls).toContain('top-[69px]');
-  });
-
-  it('keeps the list toggle in the pinned header, not buried under the list', () => {
-    render(<StatsScreen />);
-    // Two controls that both open and close something, one pinned at the top
-    // and one at the very bottom, read as the same control misbehaving. They
-    // sit side by side now: the chevron folds the card, the pill lengthens
-    // the list, and both stay reachable.
-    const row = card('🥇 الترتيب العام').querySelector('[data-card-header]') as HTMLElement;
-    expect(row.textContent).toContain('عرض الكل');
-  });
-
-  it('hides the list toggle while the card is shut', async () => {
-    render(<StatsScreen />);
-    await userEvent.click(header('🥇 الترتيب العام'));
-    expect(card('🥇 الترتيب العام').textContent).not.toContain('عرض الكل');
-  });
-
-  it('folds each card independently', async () => {
-    render(<StatsScreen />);
-    await userEvent.click(header('🥇 الترتيب العام'));
-    expect(header('✅ الأكثر حضوراً').getAttribute('aria-expanded')).toBe('true');
-    expect(card('✅ الأكثر حضوراً').textContent).toContain('أنس طارق');
-  });
-
-  it('gives the other leaderboards the same header control', () => {
-    render(<StatsScreen />);
-    for (const title of ['🏆 الأكثر حفظاً للصفحات', '⚠️ يحتاجون متابعة', 'تفصيل الطلاب']) {
-      expect(header(title).getAttribute('aria-expanded')).toBe('true');
     }
   });
 });
