@@ -72,7 +72,7 @@ describe('StatsScreen — أساس حساب الحضور', () => {
 
   it('marks the active basis for assistive tech and can switch back', async () => {
     render(<StatsScreen />);
-    const halaqaTab = screen.getByRole('button', { name: 'على مستوى الحلقة' });
+    const halaqaTab = screen.getByRole('button', { name: 'كل الحلقة' });
     const personalTab = screen.getByRole('button', { name: 'منذ انضمامه' });
     expect(halaqaTab.getAttribute('aria-pressed')).toBe('true');
 

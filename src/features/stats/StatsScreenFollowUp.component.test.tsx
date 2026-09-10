@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/preact';
+import userEvent from '@testing-library/user-event';
 import { StatsScreen } from './StatsScreen';
 import type { SessionRecord, Student } from '../../types';
 
@@ -63,8 +64,11 @@ describe('StatsScreen — يحتاجون متابعة card', () => {
 });
 
 describe('StatsScreen — students with nothing recorded', () => {
-  it('shows a never-recorded student in تفصيل الطلاب', () => {
+  it('shows a never-recorded student in تفصيل الطلاب', async () => {
     render(<StatsScreen />);
+    // The card previews three rows now, and a student with no records sorts
+    // last — expand before looking for him.
+    await userEvent.click(screen.getByRole('button', { name: /^عرض الكل.*تفصيل الطلاب$/ }));
     expect(cardFor('تفصيل الطلاب').textContent).toContain('عمر حسن');
   });
 

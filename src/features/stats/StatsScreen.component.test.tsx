@@ -148,7 +148,7 @@ describe('StatsScreen — student table', () => {
     await userEvent.type(screen.getByPlaceholderText('ابحث عن طالب…'), 'محمد');
     // The detail table row for زيد احمد should disappear, but leaderboard
     // mentions may remain — check specifically for the "X جلسة · Y آية" row text
-    expect(screen.getByText(/١ جلسة · ٠ آية/)).toBeInTheDocument(); // محمد row
+    expect(screen.getByText(/جلسة واحدة · ٠ آية/)).toBeInTheDocument(); // محمد row
   });
 
   it('switches sort key when a sort tab is clicked', async () => {

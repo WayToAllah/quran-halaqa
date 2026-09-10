@@ -2,7 +2,7 @@ import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useStudents } from '../../hooks/useStudents';
 import { useAllRecords } from '../../hooks/useAllRecords';
-import { arabicPlural, esc, toArabicDigits, toArabicOrdinal } from '../../domain/text';
+import { arabicPlural, toArabicDigits, toArabicOrdinal } from '../../domain/text';
 import {
   ATTENDANCE_BADGE_THRESHOLD,
   getAttendanceRanking,
@@ -70,7 +70,7 @@ interface AttendRow {
 }
 
 const ATTEND_BASIS_TABS: { key: AttendBasis; label: string }[] = [
-  { key: 'halaqa', label: 'على مستوى الحلقة' },
+  { key: 'halaqa', label: 'كل الحلقة' },
   { key: 'personal', label: 'منذ انضمامه' },
   { key: 'days', label: 'أيام الحضور' },
 ];
@@ -92,6 +92,15 @@ const SORT_TABS: { key: StatsSortKey; label: string }[] = [
  * prose and need the same Arabic count agreement the page total gets. */
 const sessionsLabel = (n: number) =>
   arabicPlural(n, { one: 'جلسة واحدة', two: 'جلستين', few: 'جلسات', many: 'جلسة' });
+
+/** "2026-07" → "يوليو ٢٠٢٦". The picker used to show the raw key, which is
+ * both untranslated and in Latin digits next to Arabic-Indic ones. */
+function monthLabel(month: string): string {
+  const d = new Date(`${month}-01T00:00:00`);
+  return Number.isNaN(d.getTime())
+    ? month
+    : d.toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' });
+}
 
 const cardCls = 'bg-white border border-hairline rounded-2xl p-[18px]';
 /** Height of the app bar the card headers pin below. Kept in step with the
@@ -178,6 +187,14 @@ const PREVIEW_COUNT = 3;
 /** Consecutive missed halaqa days before a student is flagged for follow-up. */
 const ABSENCE_ALERT_STREAK = 2;
 
+/** آية واحدة / آيتين / ٣ آيات / ١٢ آية */
+const AYAT_FORMS = {
+  one: 'آية واحدة',
+  two: 'آيتين',
+  few: 'آيات',
+  many: 'آية',
+} as const;
+
 /** حلقة واحدة / حلقتين / ٣ حلقات / ١٢ حلقة */
 const HALAQA_FORMS = {
   one: 'حلقة واحدة',
@@ -247,6 +264,7 @@ export function StatsScreen() {
   const [attendBasis, setAttendBasis] = useState<AttendBasis>('halaqa');
   const [overallExpanded, setOverallExpanded] = useState(false);
   const [followUpExpanded, setFollowUpExpanded] = useState(false);
+  const [rowsExpanded, setRowsExpanded] = useState(false);
 
   const availableMonths = useMemo(() => {
     const months = new Set(records.map((r) => r.date?.slice(0, 7)).filter(Boolean) as string[]);
@@ -343,6 +361,11 @@ export function StatsScreen() {
     return sortStudentStatsRows(filtered, sortKey);
   }, [studentRows, search, sortKey]);
 
+  // Previewed like every other leaderboard. This is the longest card on the
+  // screen — ~50 students at three lines each — and it was the only one that
+  // rendered in full by default, so it buried everything under it.
+  const visibleStudentRows = rowsExpanded ? visibleRows : visibleRows.slice(0, PREVIEW_COUNT);
+
   const followUp = useMemo(
     () => computeFollowUpList(students, filteredRecords, ABSENCE_ALERT_STREAK),
     [students, filteredRecords],
@@ -379,13 +402,10 @@ export function StatsScreen() {
     0,
   );
   /** How the selected period reads on a card: a month name, or كل الفترة. */
-  const periodLabel = useMemo(() => {
-    if (monthFilter === 'all') return 'كل الفترة';
-    const d = new Date(`${monthFilter}-01T00:00:00`);
-    return Number.isNaN(d.getTime())
-      ? monthFilter
-      : d.toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' });
-  }, [monthFilter]);
+  const periodLabel = useMemo(
+    () => (monthFilter === 'all' ? 'كل الفترة' : monthLabel(monthFilter)),
+    [monthFilter],
+  );
 
   const cardData = useMemo(
     () => buildAttendanceCardData(students, filteredRecords, { periodLabel }),
@@ -515,7 +535,7 @@ export function StatsScreen() {
                     </div>
                   </div>
                   <div class="font-extrabold text-forest shrink-0 text-[15px]">
-                    {toArabicDigits(x.points.toFixed(1))}
+                    {toArabicDigits(x.points.toFixed(1)).replace('.', '٫')}
                   </div>
                 </div>
               );
@@ -533,7 +553,7 @@ export function StatsScreen() {
           <option value="all">كل الفترة</option>
           {availableMonths.map((m) => (
             <option key={m} value={m}>
-              {m}
+              {monthLabel(m)}
             </option>
           ))}
         </select>
@@ -894,7 +914,17 @@ export function StatsScreen() {
         🌟 بطاقة نجوم الحضور — للمشاركة
       </button>
 
-      <CollapsibleCard title="تفصيل الطلاب">
+      <CollapsibleCard
+        title="تفصيل الطلاب"
+        action={
+          <ShowAllToggle
+            expanded={rowsExpanded}
+            total={visibleRows.length}
+            cardLabel="تفصيل الطلاب"
+            onToggle={() => setRowsExpanded((v) => !v)}
+          />
+        }
+      >
         <SearchInput
           compact
           class="mb-3"
@@ -907,6 +937,7 @@ export function StatsScreen() {
           {SORT_TABS.map((tab) => (
             <button
               key={tab.key}
+              type="button"
               class={
                 'flex-1 py-1.5 rounded-full text-xs font-bold border ' +
                 (sortKey === tab.key
@@ -922,11 +953,13 @@ export function StatsScreen() {
 
         {visibleRows.length === 0 ? (
           <div class="text-center text-sm text-taupe py-6">
-            {search ? `لا يوجد نتائج لـ "${esc(search)}"` : 'لا يوجد بيانات مطابقة'}
+            {/* No esc() here: JSX escapes text content already, so escaping
+                first would print &amp; back at the user. */}
+            {search ? `لا يوجد نتائج لـ "${search}"` : 'لا يوجد بيانات مطابقة'}
           </div>
         ) : (
           <div class="divide-y divide-[#F5F1E5]">
-            {visibleRows.map((row) => (
+            {visibleStudentRows.map((row) => (
               <div key={row.id} class="py-3">
                 <div class="flex items-center justify-between mb-1.5">
                   <div class="text-sm font-bold text-ink-dark">{row.name}</div>
@@ -947,7 +980,7 @@ export function StatsScreen() {
                   />
                 </div>
                 <div class="text-[11px] text-taupe">
-                  {toArabicDigits(row.sessionsCount)} جلسة · {toArabicDigits(row.ayat)} آية ·{' '}
+                  {sessionsLabel(row.sessionsCount)} · {arabicPlural(row.ayat, AYAT_FORMS)} ·{' '}
                   {row.avg === null ? 'لم يُقيَّم' : `متوسط ${toArabicDigits(row.avg)}٪`}
                 </div>
               </div>

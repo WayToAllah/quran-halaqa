@@ -67,7 +67,7 @@ async function openDaysTab() {
 describe('StatsScreen — ترتيب أيام الحضور', () => {
   it('offers a third basis tab alongside the two percentage bases', () => {
     render(<StatsScreen />);
-    expect(screen.getByRole('button', { name: 'على مستوى الحلقة' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'كل الحلقة' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'منذ انضمامه' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'أيام الحضور' })).toBeTruthy();
   });
@@ -113,7 +113,7 @@ describe('StatsScreen — ترتيب أيام الحضور', () => {
   it('marks the active tab for assistive tech and restores the percentage view on switch back', async () => {
     render(<StatsScreen />);
     const daysTab = screen.getByRole('button', { name: 'أيام الحضور' });
-    const halaqaTab = screen.getByRole('button', { name: 'على مستوى الحلقة' });
+    const halaqaTab = screen.getByRole('button', { name: 'كل الحلقة' });
 
     await openDaysTab();
     expect(daysTab.getAttribute('aria-pressed')).toBe('true');
