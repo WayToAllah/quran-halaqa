@@ -1052,7 +1052,24 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
             {showLohEval && (
               <div>
                 {renderPrevRangeSection('اللوح', 'loh', prevLohList, prevLohInfo, editedPrevLoh)}
-                <label class="text-xs text-taupe">التقييم (من 100)</label>
+                {/* The badge sits on the LABEL line, not in the row below, and
+                    that line keeps a fixed height whether or not a badge is in
+                    it. Both parts matter: dropping the badge into the buttons
+                    row made it wrap to a second line the moment a score became
+                    valid (measured: +42px at 390–412px wide), so the whole form
+                    slid down under the teacher's finger — at the same instant
+                    the keyboard auto-dismisses. */}
+                <div class="flex items-center gap-2 min-h-[26px]">
+                  <label class="text-xs text-taupe">التقييم (من 100)</label>
+                  {lohTier && (
+                    <span
+                      class="text-[11px] font-bold px-2.5 py-1 rounded-full"
+                      style={{ background: lohTier.bg, color: lohTier.color }}
+                    >
+                      {lohTier.label}
+                    </span>
+                  )}
+                </div>
                 <div class="flex items-center gap-2 mt-1 flex-wrap">
                   <input
                     type="number"
@@ -1072,14 +1089,6 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
                       autoCloseScoreKeyboard(e, val);
                     }}
                   />
-                  {lohTier && (
-                    <span
-                      class="text-[11px] font-bold px-2.5 py-1 rounded-full"
-                      style={{ background: lohTier.bg, color: lohTier.color }}
-                    >
-                      {lohTier.label}
-                    </span>
-                  )}
                   <button
                     type="button"
                     class="mr-auto text-xs font-semibold text-forest border border-forest/20 rounded-lg px-2.5 py-2"
@@ -1118,7 +1127,17 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
                   prevMadiInfo,
                   editedPrevMadi,
                 )}
-                <label class="text-xs text-taupe">التقييم (من 100)</label>
+                <div class="flex items-center gap-2 min-h-[26px]">
+                  <label class="text-xs text-taupe">التقييم (من 100)</label>
+                  {madiTier && (
+                    <span
+                      class="text-[11px] font-bold px-2.5 py-1 rounded-full"
+                      style={{ background: madiTier.bg, color: madiTier.color }}
+                    >
+                      {madiTier.label}
+                    </span>
+                  )}
+                </div>
                 <div class="flex items-center gap-2 mt-1 flex-wrap">
                   <input
                     type="number"
@@ -1138,14 +1157,6 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
                       autoCloseScoreKeyboard(e, val);
                     }}
                   />
-                  {madiTier && (
-                    <span
-                      class="text-[11px] font-bold px-2.5 py-1 rounded-full"
-                      style={{ background: madiTier.bg, color: madiTier.color }}
-                    >
-                      {madiTier.label}
-                    </span>
-                  )}
                   <button
                     type="button"
                     class="mr-auto text-xs font-semibold text-forest border border-forest/20 rounded-lg px-2.5 py-2"
