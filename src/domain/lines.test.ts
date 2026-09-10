@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { LINE_FIRST_AYAH, LINE_LAST_AYAH, TOTAL_LINES, LINES_PER_FULL_PAGE } from './lineTable';
-import { completedLines } from './lines';
+import { linesInPathSpan } from './lines';
+import { computeLohSpan, computeTopPages } from './statsScreen';
+import type { SessionRecord } from '../types';
 import { TOTAL_AYAT, globalAyahIndex } from './pages';
-import type { DatedAssignment } from './pages';
 
 describe('the mushaf line table', () => {
   it('holds every line of the Madinah mushaf', () => {
@@ -41,59 +42,62 @@ describe('the mushaf line table', () => {
   });
 });
 
-describe('completedLines', () => {
-  const on = (item: { sura: string; from?: string; to?: string }): DatedAssignment => ({
-    item,
-    date: '2026-07-01',
+describe('linesInPathSpan — the span model, one level finer than pages', () => {
+  const students = [{ id: 's_1', name: 'زيد' }];
+
+  function linesFor(records: SessionRecord[]): number {
+    const span = computeLohSpan(students[0], records, 'all');
+    return span ? linesInPathSpan(span.startPos, span.endPos, span.direction) : 0;
+  }
+  function pagesFor(records: SessionRecord[]): number {
+    return computeTopPages(students, records, Infinity, 'all')[0]?.pages ?? 0;
+  }
+
+  /** Two assignments two months apart with the weeks between unrecorded. */
+  const withGap: SessionRecord[] = [
+    {
+      id: 'r1',
+      studentId: 's_1',
+      date: '2026-05-01',
+      newLoh: [{ sura: 'الحاقة', from: '38', to: '52' }],
+    },
+    {
+      id: 'r2',
+      studentId: 's_1',
+      date: '2026-07-01',
+      newLoh: [{ sura: 'التحريم', from: '1', to: '12' }],
+      loh: { score: 90 },
+    },
+    { id: 'g1', studentId: 's_1', date: '2026-08-01', loh: { score: 90 } },
+  ];
+
+  it('credits the ground between two assignments, exactly as the pages card does', () => {
+    // An unrecorded week must not punch a permanent hole in a student's total.
+    expect(pagesFor(withGap)).toBe(6);
+    expect(linesFor(withGap)).toBeGreaterThan(6 * 15);
   });
 
-  it('counts nothing for a student with no assignments', () => {
-    expect(completedLines([])).toBe(0);
+  it('keeps ground the student had to repeat, exactly as the pages card does', () => {
+    const repeated: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-01', newLoh: [{ sura: 'الفاتحة' }] },
+      { id: 'r2', studentId: 's_1', date: '2026-07-08', loh: { score: 40, stars: 0 } },
+    ];
+    expect(pagesFor(repeated)).toBe(1);
+    expect(linesFor(repeated)).toBe(7);
   });
 
-  it('credits a beginner who memorized only the opening two ayat of البقرة', () => {
-    // The whole reason for counting lines: البقرة ١–٢ fills the first line of
-    // page 2 exactly. Under whole-page counting this student scored zero for
-    // months while turning up every week.
-    expect(completedLines([on({ sura: 'البقرة', from: '1', to: '2' })])).toBe(1);
+  it('agrees with the pages count whenever a span is whole pages', () => {
+    const fatiha: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-07-01', newLoh: [{ sura: 'الفاتحة' }] },
+      { id: 'r2', studentId: 's_1', date: '2026-07-08', loh: { score: 90 } },
+    ];
+    expect(pagesFor(fatiha)).toBe(1);
+    // Page 1 carries seven lines of Qur'an; the sura header is not one.
+    expect(linesFor(fatiha)).toBe(7);
   });
 
-  it('gives no credit for part of a line', () => {
-    expect(completedLines([on({ sura: 'البقرة', from: '1', to: '1' })])).toBe(0);
-  });
-
-  it('credits a whole short sura', () => {
-    expect(completedLines([on({ sura: 'الإخلاص' })])).toBeGreaterThan(0);
-  });
-
-  it('does not count the same ground twice when it is re-assigned', () => {
-    const once = completedLines([on({ sura: 'الإخلاص' })]);
-    const twice = completedLines([on({ sura: 'الإخلاص' }), on({ sura: 'الإخلاص' })]);
-    expect(twice).toBe(once);
-  });
-
-  it('does not credit the gap between two separate assignments', () => {
-    // الناس and النصر with nothing in between: the lines lying between them
-    // were never memorized and must not be counted.
-    const ends = completedLines([on({ sura: 'الناس' }), on({ sura: 'النصر' })]);
-    const span = completedLines([
-      on({ sura: 'النصر' }),
-      on({ sura: 'الكافرون' }),
-      on({ sura: 'المسد' }),
-      on({ sura: 'الإخلاص' }),
-      on({ sura: 'الفلق' }),
-      on({ sura: 'الناس' }),
-    ]);
-    expect(ends).toBeLessThan(span);
-  });
-
-  it('adds up across assignments that join into one run', () => {
-    const first = completedLines([on({ sura: 'الفلق' })]);
-    const both = completedLines([on({ sura: 'الفلق' }), on({ sura: 'الناس' })]);
-    expect(both).toBeGreaterThan(first);
-  });
-
-  it('ignores an assignment with no usable date', () => {
-    expect(completedLines([{ item: { sura: 'الإخلاص' }, date: '' }])).toBe(0);
+  it('counts nothing for an empty or backwards span', () => {
+    expect(linesInPathSpan(0, 0, 'descending')).toBe(0);
+    expect(linesInPathSpan(50, 10, 'descending')).toBe(0);
   });
 });

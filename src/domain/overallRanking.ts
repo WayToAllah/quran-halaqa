@@ -1,10 +1,9 @@
 import type { ScoreEval, SessionRecord, Student } from '../types';
 import { getPersonalAttendanceRanking } from './attendance';
-import { completedLines } from './lines';
+import { linesInPathSpan } from './lines';
 import { LINES_PER_FULL_PAGE } from './lineTable';
-import type { DatedAssignment } from './pages';
 import { hasScore } from './scoring';
-import { gradedAssignmentIds, lohAssignmentsOf } from './statsScreen';
+import { computeLohSpan } from './statsScreen';
 import { recordsForStudent } from './students';
 
 /**
@@ -146,15 +145,11 @@ export function computeOverallRanking(
     const recitationScore =
       (evalTotal + PRIOR_EVAL_COUNT * PRIOR_EVAL_SCORE) / (evalCount + PRIOR_EVAL_COUNT);
 
-    // Only assignments actually recited afterwards count as ground covered —
-    // the same rule the pages leaderboard applies, so the two never disagree.
-    const graded = gradedAssignmentIds(recs);
-    const assignments: DatedAssignment[] = [];
-    for (const r of recs) {
-      if (!graded.has(r.id) || !r.date) continue;
-      for (const item of lohAssignmentsOf(r)) assignments.push({ item, date: r.date });
-    }
-    const lines = completedLines(assignments);
+    // The SAME span the pages leaderboard measures, counted in lines instead
+    // of pages. Both cards now answer "how far has he travelled" identically;
+    // only the unit differs, so they can never disagree about a student.
+    const span = computeLohSpan(student, allRecords, 'all');
+    const lines = span ? linesInPathSpan(span.startPos, span.endPos, span.direction) : 0;
 
     // Attended days, not record count: two records on one day is one session's
     // worth of opportunity, and attendance is counted in days everywhere else.

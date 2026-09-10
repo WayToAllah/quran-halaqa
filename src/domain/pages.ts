@@ -246,7 +246,9 @@ export function pathPositionOfGlobal(g: number, direction: MemorizationDirection
 }
 
 /** The global ayah ordinal at a path position, in the given direction. */
-function globalAtPathPosition(pos: number, direction: MemorizationDirection): number {
+/** Exported so the line-level span can walk the same path the page-level one
+ * does — the two must not disagree about what a span covers. */
+export function globalAtPathPosition(pos: number, direction: MemorizationDirection): number {
   if (pos < 1 || pos > TOTAL_AYAT) return 0;
   return direction === 'ascending' ? pos : LOH_PATH[pos - 1];
 }
