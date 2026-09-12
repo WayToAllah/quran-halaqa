@@ -23,6 +23,8 @@ import {
   type StatsSortKey,
 } from '../../domain/statsScreen';
 import { computeOverallRanking } from '../../domain/overallRanking';
+import { computeJuzDistribution, FATIHA_JUZ } from '../../domain/juzDistribution';
+import { juzLabel } from '../../domain/juz';
 import { useTenant } from '../tenant/TenantContext';
 import {
   buildAttendanceCardData,
@@ -255,6 +257,7 @@ export function StatsScreen() {
   const [attendBasis, setAttendBasis] = useState<AttendBasis>('halaqa');
   const [overallExpanded, setOverallExpanded] = useState(false);
   const [followUpExpanded, setFollowUpExpanded] = useState(false);
+  const [juzNamesOpen, setJuzNamesOpen] = useState(false);
   const [rowsExpanded, setRowsExpanded] = useState(false);
 
   const availableMonths = useMemo(() => {
@@ -282,6 +285,10 @@ export function StatsScreen() {
   );
   const weeklyBuckets = useMemo(() => computeWeeklyBuckets(filteredRecords), [filteredRecords]);
   const scoreDist = useMemo(() => computeScoreDistribution(filteredRecords), [filteredRecords]);
+  // Unfiltered on purpose: where a student stands is the end of a path walked
+  // over their whole history, not something a month window can answer. Narrowing
+  // to one month would move every student who happened not to recite in it.
+  const juzDist = useMemo(() => computeJuzDistribution(students, records), [students, records]);
   // Unfiltered records on purpose: a page is cumulative, so which pages are
   // complete is settled over the whole history and only then narrowed to the
   // month the finishing session fell in (computeTopPages does the narrowing).
@@ -674,6 +681,60 @@ export function StatsScreen() {
               );
             })}
           </div>
+        )}
+      </StatsCard>
+
+      <StatsCard
+        title="🧭 توزيع الطلاب على الأجزاء"
+        action={() => (
+          <button
+            type="button"
+            onClick={() => setJuzNamesOpen((v) => !v)}
+            aria-expanded={juzNamesOpen}
+            aria-label={`${juzNamesOpen ? 'إخفاء الأسماء' : 'عرض الأسماء'} — توزيع الطلاب على الأجزاء`}
+            class="shrink-0 px-2.5 py-1 rounded-full text-[11px] font-bold text-forest border border-hairline"
+          >
+            {juzNamesOpen ? 'إخفاء الأسماء' : 'عرض الأسماء'}
+          </button>
+        )}
+      >
+        {juzDist.rows.length === 0 ? (
+          <div class="text-center text-sm text-taupe py-6">لا يوجد حفظ مُسمَّع بعد</div>
+        ) : (
+          <>
+            <div class="space-y-2.5">
+              {juzDist.rows.map((r) => (
+                <div key={r.juz}>
+                  <div class="flex items-center gap-2.5">
+                    <div class="w-[72px] shrink-0">
+                      <div class="text-xs text-[#5B5646] font-bold truncate">{r.name}</div>
+                      <div class="text-[10px] text-taupe">
+                        {r.juz === FATIHA_JUZ ? 'قبل جزء عمّ' : `الجزء ${toArabicDigits(r.juz)}`}
+                      </div>
+                    </div>
+                    <div class="flex-1 h-2 rounded-full bg-[#F1ECDD] overflow-hidden">
+                      <div
+                        class="h-full rounded-full"
+                        style={{ width: `${r.pct}%`, background: '#0F3D2E' }}
+                      />
+                    </div>
+                    <div class="w-6 text-xs text-taupe text-left shrink-0">
+                      {toArabicDigits(r.count)}
+                    </div>
+                  </div>
+                  {juzNamesOpen && (
+                    <div class="pr-[82px] pt-1 text-[11px] text-taupe leading-relaxed">
+                      {r.students.map((s) => s.name).join(' · ')}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div class="pt-3 text-[11px] text-taupe">
+              موزَّعين على {juzLabel(juzDist.rows.length)}
+              {juzDist.notStarted > 0 && ` · ${toArabicDigits(juzDist.notStarted)} لم يُسمِّع بعد`}
+            </div>
+          </>
         )}
       </StatsCard>
 
