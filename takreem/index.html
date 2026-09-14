@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>حفل تكريم حفظة القرآن — مسجد التيسير</title>
+<meta name="theme-color" content="#0b2a22">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@700&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --night:#07231d; --card:#0f4133;
+  --gold:#e8c877; --gold2:#c9a44f;
+  --ink:#fdf8ec; --muted:#bcd7cb;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font-family:'Tajawal',system-ui,-apple-system,'Segoe UI',sans-serif;
+  background:
+    radial-gradient(1200px 600px at 50% -10%, rgba(20,88,68,.35) 0%, transparent 60%),
+    linear-gradient(160deg,#061d18 0%,#0a2f26 45%,#061d18 100%);
+  color:var(--ink); min-height:100vh; padding:14px 12px 40px;
+}
+.wrap{max-width:620px;margin:0 auto}
+
+/* ---------- admin toolbar ---------- */
+.bar{background:#0e3a2e;border:1px solid #1d5a49;border-radius:16px;padding:12px;margin-bottom:14px}
+.bar h2{margin:0 0 10px;font-size:15px;color:var(--gold);font-weight:800}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row>*{flex:1 1 140px}
+.fld{display:block;margin-bottom:8px}
+.fld span{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+input{
+  width:100%;padding:10px 12px;border-radius:12px;border:1px solid #24705b;
+  background:#082a22;color:var(--ink);font-family:inherit;font-size:15px
+}
+input::placeholder{color:#6e9689}
+button{font-family:inherit;cursor:pointer;border:0}
+.btn{padding:11px 14px;border-radius:12px;font-size:14px;font-weight:700;background:#1a6650;color:#eafff6}
+.btn.gold{background:linear-gradient(180deg,#f0d489,#c9a44f);color:#3a2c08}
+.btn.ghost{background:transparent;border:1px solid #2a7a63;color:#cfeade}
+.btn.danger{background:transparent;border:1px solid #7a3a2a;color:#ffc2b5}
+.btn:disabled{opacity:.5}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.btns .btn{flex:1 1 130px}
+.hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.7}
+.err{color:#ffb4a8;font-size:13px;margin-top:8px;line-height:1.8}
+
+/* ---------- poster ---------- */
+.poster{
+  position:relative;border-radius:22px;padding:20px 14px 24px;
+  background:
+    radial-gradient(700px 300px at 50% 0%, rgba(232,200,119,.10), transparent 65%),
+    linear-gradient(170deg,#0c3a2e 0%,#0a2c23 55%,#082720 100%);
+  box-shadow:0 18px 50px rgba(0,0,0,.45);
+  border:1px solid rgba(232,200,119,.30);
+  overflow:hidden;
+}
+.poster::before,.poster::after{
+  content:"";position:absolute;width:190px;height:190px;border-radius:50%;
+  background:radial-gradient(circle,rgba(232,200,119,.13),transparent 70%);pointer-events:none
+}
+.poster::before{top:-90px;right:-70px}
+.poster::after{bottom:-100px;left:-70px}
+.frame{position:absolute;inset:8px;border:1px solid rgba(232,200,119,.35);border-radius:16px;pointer-events:none}
+.frame i{position:absolute;width:14px;height:14px;border:2px solid var(--gold);opacity:.9}
+.frame i:nth-child(1){top:-1px;right:-1px;border-left:0;border-bottom:0;border-top-right-radius:6px}
+.frame i:nth-child(2){top:-1px;left:-1px;border-right:0;border-bottom:0;border-top-left-radius:6px}
+.frame i:nth-child(3){bottom:-1px;right:-1px;border-left:0;border-top:0;border-bottom-right-radius:6px}
+.frame i:nth-child(4){bottom:-1px;left:-1px;border-right:0;border-top:0;border-bottom-left-radius:6px}
+
+.head{position:relative;text-align:center;padding:6px 6px 2px}
+.crest{font-size:30px;line-height:1}
+.kicker{
+  display:inline-block;margin-top:8px;font-size:12px;letter-spacing:.5px;
+  color:#0d3025;background:linear-gradient(180deg,#f2d99a,#cfab5c);border-radius:999px;padding:4px 14px;font-weight:800
+}
+h1{
+  font-family:'Amiri','Tajawal',serif;font-size:27px;line-height:1.5;margin:10px 0 4px;
+  color:var(--gold);text-shadow:0 2px 14px rgba(232,200,119,.25)
+}
+.sub{font-size:14px;color:#d8ece2;margin:0}
+.ornament{display:flex;align-items:center;gap:10px;margin:14px 6px 4px;color:rgba(232,200,119,.55)}
+.ornament span{flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(232,200,119,.6),transparent)}
+.meta{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:12px 0 4px}
+.chip{
+  background:rgba(232,200,119,.10);border:1px solid rgba(232,200,119,.35);
+  color:#f4e7c4;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600
+}
+.intro{text-align:center;font-size:14px;line-height:2;color:#dcefe6;margin:14px 8px 4px}
+.count{
+  text-align:center;font-size:13px;color:#0d3025;font-weight:800;margin:14px auto 4px;
+  background:linear-gradient(180deg,#f2d99a,#cfab5c);border-radius:999px;padding:6px 16px;width:fit-content
+}
+.tally{text-align:center;font-size:13px;color:#a9ecc9;font-weight:700;margin:0 0 8px}
+
+ul.list{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:8px}
+@media(min-width:520px){ul.list{grid-template-columns:1fr 1fr}}
+.item{
+  display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;
+  background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.02));
+  border:1px solid rgba(232,200,119,.22);transition:border-color .2s,background .2s
+}
+.item.done{border-color:rgba(120,255,190,.45);background:linear-gradient(180deg,rgba(120,255,190,.10),rgba(120,255,190,.03))}
+.num{
+  flex:0 0 28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:800;color:#3a2c08;background:linear-gradient(180deg,#f3dca6,#c9a44f)
+}
+.nm{font-size:16px;font-weight:700;color:#fff8e8;line-height:1.6}
+.star{color:var(--gold);font-size:13px;opacity:.85}
+.sp{flex:1}
+.badge{font-size:12px;font-weight:700;border-radius:999px;padding:4px 9px;white-space:nowrap}
+.badge.yes{background:rgba(120,255,190,.14);color:#aef3d2;border:1px solid rgba(120,255,190,.4)}
+.badge.no{background:rgba(255,255,255,.06);color:#9fbdb1;border:1px solid rgba(255,255,255,.12)}
+.tap{
+  flex:0 0 auto;border-radius:12px;padding:9px 14px;font-size:13px;font-weight:800;
+  background:linear-gradient(180deg,#f0d489,#c9a44f);color:#3a2c08
+}
+.tap.on{background:rgba(120,255,190,.16);color:#b8f5d8;border:1px solid rgba(120,255,190,.45)}
+.tap:disabled{opacity:.6}
+.rm{
+  flex:0 0 auto;border-radius:10px;padding:6px 10px;font-size:12px;font-weight:700;
+  background:rgba(255,255,255,.08);color:#ffd9d2;border:1px solid rgba(255,140,120,.35)
+}
+.foot{text-align:center;margin-top:18px;font-size:13px;color:#cfe6db;line-height:2}
+.foot b{color:var(--gold)}
+.dua{font-family:'Amiri',serif;font-size:16px;color:var(--gold);margin-top:6px}
+.note{text-align:center;font-size:12px;color:#9fbdb1;margin-top:10px;line-height:1.8}
+
+.exbox{margin-top:14px;background:#0e3a2e;border:1px solid #1d5a49;border-radius:16px;padding:12px}
+.exbox h3{margin:0 0 8px;font-size:14px;color:#ffc9bd}
+.exrow{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:15px;border-bottom:1px dashed #1d5a49}
+.exrow:last-child{border-bottom:0}
+.exrow b{flex:1;font-weight:600;color:#e9f5ef}
+.empty{color:var(--muted);font-size:13px;text-align:center;padding:18px}
+.exporting .tap,.exporting .rm{display:none !important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.toast{
+  position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:9;
+  background:#0d3a2d;border:1px solid var(--gold2);color:var(--ink);
+  padding:10px 18px;border-radius:999px;font-size:14px;font-weight:700;
+  opacity:0;pointer-events:none;transition:opacity .25s;max-width:90vw;text-align:center
+}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="bar" id="login" hidden>
+    <h2>تسجيل الدخول (المحفّظ فقط)</h2>
+    <label class="fld"><span>البريد</span><input id="email" type="email" autocomplete="username" inputmode="email"></label>
+    <label class="fld"><span>كلمة المرور</span><input id="pass" type="password" autocomplete="current-password"></label>
+    <div class="btns"><button class="btn gold" id="btn-login">دخول</button></div>
+    <div class="err" id="login-err"></div>
+    <div class="hint">صفحة مؤقتة لتجهيز كشف التكريم. الدخول بنفس حساب تطبيق الحلقة، ولا يتم أي تعديل على بيانات الطلاب.</div>
+  </div>
+
+  <div class="bar" id="ctrl" hidden>
+    <h2>تجهيز كشف التكريم</h2>
+    <label class="fld"><span>عنوان الحفل</span><input id="f-title" value="حفل تكريم حفظة كتاب الله"></label>
+    <div class="row">
+      <label class="fld"><span>التاريخ</span><input id="f-date" placeholder="الجمعة ١٨ سبتمبر"></label>
+      <label class="fld"><span>الوقت</span><input id="f-time" placeholder="بعد صلاة العشاء"></label>
+    </div>
+    <label class="fld"><span>المكان</span><input id="f-place" value="مسجد التيسير"></label>
+    <div class="btns">
+      <button class="btn ghost" id="btn-all">تحديد الكل</button>
+      <button class="btn gold" id="btn-link">نسخ رابط الأولياء</button>
+      <button class="btn" id="btn-text">نسخ الأسماء نصًا</button>
+      <button class="btn" id="btn-img">حفظ كصورة</button>
+      <button class="btn danger" id="btn-reset">تصفير التأكيدات</button>
+    </div>
+    <div class="hint" id="ctrl-hint">✕ بجوار الاسم = استبعاد من الكشف فقط، ولا يحذف الطالب من التطبيق. التأكيدات بتظهر لايف جنب كل اسم.</div>
+  </div>
+
+  <div class="poster" id="poster">
+    <div class="frame"><i></i><i></i><i></i><i></i></div>
+    <div class="head">
+      <div class="crest">🕌</div>
+      <div class="kicker">حلقة متابعة حفظ القرآن</div>
+      <h1 id="p-title">حفل تكريم حفظة كتاب الله</h1>
+      <p class="sub" id="p-place">مسجد التيسير</p>
+      <div class="meta" id="p-meta"></div>
+    </div>
+    <div class="ornament"><span></span>۞<span></span></div>
+    <p class="intro" id="p-intro">
+      يسرّنا دعوة أولياء الأمور لحضور تكريم أبنائهم من طلاب الحلقة،
+      ونرجو التكرّم بتأكيد حضور الابن بالضغط على زر التأكيد بجوار اسمه.
+    </p>
+    <div class="count" id="p-count"></div>
+    <div class="tally" id="p-tally"></div>
+    <ul class="list" id="p-list"><li class="empty">جارٍ التحميل…</li></ul>
+    <div class="ornament"><span></span>۞<span></span></div>
+    <div class="foot">
+      <div>نسأل الله أن يجعلهم من <b>أهل القرآن</b> وخاصته</div>
+      <div class="dua">﴿وَقُل رَّبِّ زِدْنِي عِلْمًا﴾</div>
+    </div>
+    <div class="note" id="p-note" hidden>اضغط على «تأكيد» بجوار اسم ابنك — ضغطة واحدة تكفي، وتقدر تلغيها بضغطة تانية.</div>
+  </div>
+
+  <div class="exbox" id="exbox" hidden>
+    <h3>مستبعدون من الكشف</h3>
+    <div id="exlist"></div>
+  </div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var FB = {
+    apiKey: "AIzaSyCLzsd-tyAPKoS6HQ-Kw6LEwaxPSibbKSg",
+    authDomain: "quran-app-abe52.firebaseapp.com",
+    databaseURL: "https://quran-app-abe52-default-rtdb.firebaseio.com",
+    projectId: "quran-app-abe52",
+    storageBucket: "quran-app-abe52.firebasestorage.app",
+    messagingSenderId: "484959710944",
+    appId: "1:484959710944:web:454059b1f2136c0d73aa85"
+  };
+  var CONFIRM_NODE = 'takreemConfirms';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var arNum = function (n) {
+    return String(n).replace(/[0-9]/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'[+d]; });
+  };
+  function esc(t) {
+    return String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  // RTDB keys may not contain . $ # [ ] /
+  function fbKey(id) { return String(id).replace(/[.$#\[\]\/]/g, '_'); }
+
+  var names = [];      // [{id,name}]
+  var removed = {};    // id -> true
+  var confirms = {};   // fbKey(id) -> {name, ts}
+  var cfg = { title: '', date: '', time: '', place: '' };
+  var shared = false;
+  var busy = {};
+
+  // ---------- base64url ----------
+  function enc(obj) {
+    var bytes = new TextEncoder().encode(JSON.stringify(obj)), s = '';
+    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function dec(str) {
+    var b = str.replace(/-/g, '+').replace(/_/g, '/');
+    while (b.length % 4) b += '=';
+    var bin = atob(b), bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return JSON.parse(new TextDecoder().decode(bytes));
+  }
+
+  // ---------- toast ----------
+  var toastTimer;
+  function toast(msg) {
+    var el = $('toast');
+    el.textContent = msg; el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove('show'); }, 2600);
+  }
+
+  // ---------- render ----------
+  function visible() { return names.filter(function (s) { return !removed[s.id]; }); }
+  function isDone(s) { return !!confirms[fbKey(s.id)]; }
+
+  function renderPoster() {
+    $('p-title').textContent = cfg.title || 'حفل تكريم حفظة كتاب الله';
+    $('p-place').textContent = cfg.place || 'مسجد التيسير';
+
+    var meta = '';
+    if (cfg.date) meta += '<div class="chip">📅 ' + esc(cfg.date) + '</div>';
+    if (cfg.time) meta += '<div class="chip">🕰 ' + esc(cfg.time) + '</div>';
+    $('p-meta').innerHTML = meta;
+
+    var list = visible();
+    $('p-count').textContent = list.length
+      ? 'عدد المكرَّمين: ' + arNum(list.length) + ' طالبًا'
+      : 'لم يُختَر أي طالب بعد';
+
+    var done = list.filter(isDone).length;
+    $('p-tally').textContent = list.length
+      ? '✅ أكّد الحضور: ' + arNum(done) + ' من ' + arNum(list.length)
+      : '';
+
+    $('p-note').hidden = !shared;
+
+    if (!list.length) {
+      $('p-list').innerHTML = '<li class="empty">لا توجد أسماء في الكشف</li>';
+    } else {
+      $('p-list').innerHTML = list.map(function (s, i) {
+        var d = isDone(s), tail;
+        if (shared) {
+          tail = '<button class="tap' + (d ? ' on' : '') + '" data-c="' + esc(s.id) + '">' +
+                 (d ? '✅ تم التأكيد' : 'تأكيد') + '</button>';
+        } else {
+          tail = '<span class="badge ' + (d ? 'yes">✅ مؤكَّد' : 'no">بانتظار') + '</span>' +
+                 '<button class="rm" data-rm="' + esc(s.id) + '" aria-label="استبعاد">✕</button>';
+        }
+        return '<li class="item' + (d ? ' done' : '') + '">' +
+          '<span class="num">' + arNum(i + 1) + '</span>' +
+          '<span class="nm">' + esc(s.name) + '</span>' +
+          '<span class="star">★</span><span class="sp"></span>' + tail + '</li>';
+      }).join('');
+    }
+    renderExcluded();
+  }
+
+  function renderExcluded() {
+    if (shared) return;
+    var out = names.filter(function (s) { return removed[s.id]; });
+    $('exbox').hidden = out.length === 0;
+    $('exlist').innerHTML = out.map(function (s) {
+      return '<div class="exrow"><b>' + esc(s.name) + '</b>' +
+        '<button class="btn ghost" data-back="' + esc(s.id) + '">إرجاع</button></div>';
+    }).join('');
+  }
+
+  // ---------- REST helpers (parent side: no SDK at all) ----------
+  var tokenCache = null;
+  function anonToken() {
+    if (tokenCache && tokenCache.exp > Date.now()) return Promise.resolve(tokenCache.t);
+    return fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + FB.apiKey, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ returnSecureToken: true })
+    }).then(function (r) {
+      if (!r.ok) throw new Error('anon-auth');
+      return r.json();
+    }).then(function (j) {
+      tokenCache = { t: j.idToken, exp: Date.now() + 50 * 60 * 1000 };
+      return j.idToken;
+    });
+  }
+  function dbUrl(path, token) {
+    return FB.databaseURL + '/' + path + '.json' + (token ? '?auth=' + encodeURIComponent(token) : '');
+  }
+  // Try authenticated first, fall back to unauthenticated (in case the node is public).
+  function restCall(path, method, body) {
+    var opts = { method: method };
+    if (body !== undefined) {
+      opts.headers = { 'Content-Type': 'application/json' };
+      opts.body = JSON.stringify(body);
+    }
+    return anonToken()
+      .then(function (t) { return fetch(dbUrl(path, t), opts); }, function () {
+        return fetch(dbUrl(path, null), opts);
+      })
+      .then(function (r) {
+        if (!r.ok) {
+          if (r.status === 401 || r.status === 403) {
+            return fetch(dbUrl(path, null), opts).then(function (r2) {
+              if (!r2.ok) throw new Error('denied');
+              return r2.json();
+            });
+          }
+          throw new Error('http-' + r.status);
+        }
+        return r.json();
+      });
+  }
+
+  function loadConfirmsRest() {
+    return restCall(CONFIRM_NODE, 'GET').then(function (val) {
+      confirms = val || {};
+      renderPoster();
+    });
+  }
+
+  function toggleConfirm(id) {
+    var s = names.filter(function (x) { return x.id === id; })[0];
+    if (!s || busy[id]) return;
+    busy[id] = true;
+
+    var k = fbKey(id), on = !!confirms[k];
+    // optimistic
+    if (on) delete confirms[k];
+    else confirms[k] = { name: s.name, ts: Date.now() };
+    renderPoster();
+
+    var req = on
+      ? restCall(CONFIRM_NODE + '/' + k, 'DELETE')
+      : restCall(CONFIRM_NODE + '/' + k, 'PUT', { name: s.name, ts: Date.now() });
+
+    req.then(function () {
+      toast(on ? 'تم إلغاء التأكيد' : 'تم تأكيد حضور ' + s.name + ' ✅');
+    }).catch(function () {
+      // revert
+      if (on) confirms[k] = { name: s.name, ts: Date.now() };
+      else delete confirms[k];
+      renderPoster();
+      toast('تعذّر حفظ التأكيد، حاول تاني');
+    }).then(function () { busy[id] = false; });
+  }
+
+  // ---------- events ----------
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (!t.dataset) return;
+    if (t.dataset.rm) { removed[t.dataset.rm] = true; renderPoster(); }
+    else if (t.dataset.back) { delete removed[t.dataset.back]; renderPoster(); }
+    else if (t.dataset.c) { toggleConfirm(t.dataset.c); }
+  });
+
+  function readCfg() {
+    cfg.title = $('f-title').value.trim();
+    cfg.date = $('f-date').value.trim();
+    cfg.time = $('f-time').value.trim();
+    cfg.place = $('f-place').value.trim();
+  }
+
+  function bindAdmin() {
+    ['f-title', 'f-date', 'f-time', 'f-place'].forEach(function (id) {
+      $(id).addEventListener('input', function () { readCfg(); renderPoster(); });
+    });
+
+    $('btn-all').addEventListener('click', function () { removed = {}; renderPoster(); });
+
+    $('btn-link').addEventListener('click', function () {
+      readCfg();
+      var payload = {
+        v: 2, t: cfg.title, d: cfg.date, h: cfg.time, p: cfg.place,
+        n: visible().map(function (s) { return [s.id, s.name]; })
+      };
+      copy(location.origin + location.pathname + '?d=' + enc(payload), 'تم نسخ رابط الأولياء');
+    });
+
+    $('btn-text').addEventListener('click', function () {
+      readCfg();
+      var lines = [cfg.title || 'حفل تكريم حفظة كتاب الله'];
+      if (cfg.place) lines.push('📍 ' + cfg.place);
+      if (cfg.date) lines.push('📅 ' + cfg.date + (cfg.time ? ' — ' + cfg.time : ''));
+      lines.push('');
+      visible().forEach(function (s, i) {
+        lines.push(arNum(i + 1) + '. ' + s.name + (isDone(s) ? ' ✅' : ''));
+      });
+      lines.push('');
+      lines.push('نرجو تأكيد حضور الابن. جزاكم الله خيرًا.');
+      copy(lines.join('\n'), 'تم نسخ الأسماء');
+    });
+
+    $('btn-img').addEventListener('click', saveImage);
+
+    $('btn-reset').addEventListener('click', function () {
+      if (!window.confirm('تصفير كل التأكيدات؟ الأسماء والطلاب لن تتأثر.')) return;
+      window.firebase.database().ref(CONFIRM_NODE).remove()
+        .then(function () { toast('تم تصفير التأكيدات'); })
+        .catch(function () { toast('تعذّر التصفير'); });
+    });
+  }
+
+  function copy(text, okMsg) {
+    var done = function () { toast(okMsg); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text, done); });
+    } else fallbackCopy(text, done);
+  }
+  function fallbackCopy(text, done) {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.className = 'sr'; document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { toast('تعذّر النسخ تلقائيًا'); }
+    document.body.removeChild(ta);
+  }
+
+  function loadScript(src) {
+    return new Promise(function (res, rej) {
+      var s = document.createElement('script');
+      s.src = src; s.onload = res; s.onerror = function () { rej(new Error(src)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function saveImage() {
+    var p = $('poster');
+    p.classList.add('exporting');
+    var go = function () {
+      window.html2canvas(p, { backgroundColor: '#07231d', scale: 2, useCORS: true })
+        .then(function (canvas) {
+          p.classList.remove('exporting');
+          var a = document.createElement('a');
+          a.download = 'تكريم-الحلقة.png';
+          a.href = canvas.toDataURL('image/png');
+          a.click();
+        })
+        .catch(function () { p.classList.remove('exporting'); toast('تعذّر إنشاء الصورة'); });
+    };
+    if (window.html2canvas) go();
+    else loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js')
+      .then(go, function () { p.classList.remove('exporting'); toast('تعذّر تحميل أداة الصورة'); });
+  }
+
+  // ---------- admin (SDK) ----------
+  function initFirebase() {
+    return loadScript('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js')
+      .then(function () {
+        return Promise.all([
+          loadScript('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js'),
+          loadScript('https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js')
+        ]);
+      })
+      .then(function () {
+        window.firebase.initializeApp(FB);
+        return new Promise(function (res) {
+          window.firebase.auth().onAuthStateChanged(function (u) { res(u); });
+        });
+      });
+  }
+
+  function loadStudents() {
+    // Read-only on students. The only write this page ever makes is on takreemConfirms.
+    return window.firebase.database().ref('students').once('value').then(function (snap) {
+      var val = snap.val() || {};
+      names = Object.keys(val).map(function (k) { return val[k]; })
+        .filter(function (s) { return s && s.id && s.name; })
+        .map(function (s) { return { id: String(s.id), name: String(s.name) }; })
+        .sort(function (a, b) { return a.name.localeCompare(b.name, 'ar'); });
+      $('ctrl').hidden = false;
+      $('login').hidden = true;
+      readCfg();
+      renderPoster();
+      // live confirmations
+      window.firebase.database().ref(CONFIRM_NODE).on('value', function (s2) {
+        confirms = s2.val() || {};
+        renderPoster();
+      }, function () { /* ignore read errors */ });
+    });
+  }
+
+  function showLogin() {
+    $('login').hidden = false;
+    $('p-list').innerHTML = '<li class="empty">سجّل الدخول لعرض الأسماء</li>';
+    $('btn-login').addEventListener('click', function () {
+      var b = $('btn-login');
+      b.disabled = true; $('login-err').textContent = '';
+      window.firebase.auth()
+        .signInWithEmailAndPassword($('email').value.trim(), $('pass').value)
+        .then(loadStudents)
+        .catch(function (err) {
+          $('login-err').textContent = 'تعذّر الدخول: ' + (err && err.code ? err.code : 'خطأ');
+        })
+        .then(function () { b.disabled = false; });
+    });
+  }
+
+  // ---------- boot ----------
+  var q = new URLSearchParams(location.search);
+  var data = q.get('d');
+
+  if (data) {
+    shared = true;
+    try {
+      var o = dec(data);
+      cfg = { title: o.t || '', date: o.d || '', time: o.h || '', place: o.p || '' };
+      names = (o.n || []).map(function (e, i) {
+        return Array.isArray(e) ? { id: String(e[0]), name: String(e[1]) } : { id: 'x' + i, name: String(e) };
+      });
+      renderPoster();
+      loadConfirmsRest().catch(function () { /* stays tappable */ });
+    } catch (e) {
+      $('p-list').innerHTML = '<li class="empty">الرابط غير صالح أو ناقص</li>';
+      $('p-count').textContent = '';
+    }
+  } else {
+    bindAdmin();
+    initFirebase().then(function (user) {
+      if (user) return loadStudents();
+      showLogin();
+    }).catch(function () {
+      $('p-list').innerHTML = '<li class="empty">تعذّر الاتصال بالخادم</li>';
+    });
+  }
+})();
+</script>
+</body>
+</html>
