@@ -7,6 +7,7 @@ import {
   enrolledHalaqaDates,
   firstRecordDate,
   getAttendanceRanking,
+  getDaysAttendedRanking,
   getPersonalAttendanceRanking,
   rankBadgeEmoji,
   sortedHalaqaDatesDesc,
@@ -276,5 +277,79 @@ describe('getPersonalAttendanceRanking', () => {
     const withGhost = [...students, { id: 's_9', name: 'شبح' } as Student];
     const { list } = getPersonalAttendanceRanking(withGhost, halaqa, halaqa);
     expect(list.some((x) => x.id === 's_9')).toBe(false);
+  });
+});
+
+describe('getDaysAttendedRanking', () => {
+  const students: Student[] = [
+    { id: 's_1', name: 'أحمد' } as Student,
+    { id: 's_2', name: 'باسم' } as Student,
+    { id: 's_3', name: 'تامر' } as Student,
+  ];
+
+  it('ranks by raw attended days, not by percentage', () => {
+    // s_3 has a perfect percentage on a single day; s_1 turned up three times.
+    // The percentage ranking would put s_3 first — this one must not.
+    const recs: SessionRecord[] = [
+      { id: 'a', studentId: 's_1', date: '2026-07-01' },
+      { id: 'b', studentId: 's_1', date: '2026-07-02' },
+      { id: 'c', studentId: 's_1', date: '2026-07-03' },
+      { id: 'd', studentId: 's_2', date: '2026-07-01' },
+      { id: 'e', studentId: 's_2', date: '2026-07-02' },
+      { id: 'f', studentId: 's_3', date: '2026-07-03' },
+    ];
+    const { list } = getDaysAttendedRanking(students, recs);
+    expect(list.map((x) => x.id)).toEqual(['s_1', 's_2', 's_3']);
+    expect(list.map((x) => x.rank)).toEqual([1, 2, 3]);
+    expect(list[0].uniqueDays).toBe(3);
+  });
+
+  it('ranks densely — equal day counts share a rank with no gap after them', () => {
+    const recs: SessionRecord[] = [
+      { id: 'a', studentId: 's_1', date: '2026-07-01' },
+      { id: 'b', studentId: 's_1', date: '2026-07-02' },
+      { id: 'c', studentId: 's_2', date: '2026-07-01' },
+      { id: 'd', studentId: 's_2', date: '2026-07-02' },
+      { id: 'e', studentId: 's_3', date: '2026-07-01' },
+    ];
+    const { list } = getDaysAttendedRanking(students, recs);
+    expect(list.find((x) => x.id === 's_1')!.rank).toBe(1);
+    expect(list.find((x) => x.id === 's_2')!.rank).toBe(1);
+    expect(list.find((x) => x.id === 's_3')!.rank).toBe(2);
+  });
+
+  it('carries the halaqa-wide percentage alongside the day count', () => {
+    const recs: SessionRecord[] = [
+      { id: 'a', studentId: 's_1', date: '2026-07-01' },
+      { id: 'b', studentId: 's_1', date: '2026-07-02' },
+      { id: 'c', studentId: 's_2', date: '2026-07-01' },
+      { id: 'd', studentId: 's_3', date: '2026-07-03' },
+      { id: 'e', studentId: 's_3', date: '2026-07-04' },
+    ];
+    const { totalHalaqaDays, list } = getDaysAttendedRanking(students, recs);
+    expect(totalHalaqaDays).toBe(4);
+    expect(list.find((x) => x.id === 's_2')!.attendPct).toBe(25);
+    expect(list.find((x) => x.id === 's_1')!.attendPct).toBe(50);
+  });
+
+  it('counts an excluded halaqa date in the day count, matching production', () => {
+    // Deliberate: EXCLUDED_HALAQA_DATES comes out of the denominator so nobody is
+    // punished for missing a make-up day, but a student who did turn up still gets
+    // the day. Production does exactly this; the new tab inherits it rather than
+    // diverging from the other two.
+    const recs: SessionRecord[] = [
+      { id: 'a', studentId: 's_1', date: '2026-07-01' },
+      { id: 'b', studentId: 's_1', date: EXCLUDED_HALAQA_DATES[0] },
+    ];
+    const { totalHalaqaDays, list } = getDaysAttendedRanking([students[0]], recs);
+    expect(totalHalaqaDays).toBe(1);
+    expect(list[0].uniqueDays).toBe(2);
+    expect(list[0].attendPct).toBe(100); // capped, not 200
+  });
+
+  it('leaves out students with no record inside the window', () => {
+    const recs: SessionRecord[] = [{ id: 'a', studentId: 's_1', date: '2026-07-01' }];
+    const { list } = getDaysAttendedRanking(students, recs);
+    expect(list.map((x) => x.id)).toEqual(['s_1']);
   });
 });

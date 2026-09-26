@@ -129,7 +129,7 @@ describe('StatsScreen — leaderboards', () => {
   it('leaves out محمد علي, who has no completed page', () => {
     render(<StatsScreen />);
     // محمد's only record is an evaluation with no newLoh at all.
-    const board = screen.getByText('🏆 الأكثر حفظاً للصفحات').parentElement;
+    const board = screen.getByText('🏆 الأكثر حفظاً للصفحات').closest('[data-card]');
     expect(board?.textContent).toContain('زيد احمد');
     expect(board?.textContent).not.toContain('محمد علي');
   });
@@ -148,7 +148,7 @@ describe('StatsScreen — student table', () => {
     await userEvent.type(screen.getByPlaceholderText('ابحث عن طالب…'), 'محمد');
     // The detail table row for زيد احمد should disappear, but leaderboard
     // mentions may remain — check specifically for the "X جلسة · Y آية" row text
-    expect(screen.getByText(/١ جلسة · ٠ آية/)).toBeInTheDocument(); // محمد row
+    expect(screen.getByText(/جلسة واحدة · ٠ آية/)).toBeInTheDocument(); // محمد row
   });
 
   it('switches sort key when a sort tab is clicked', async () => {

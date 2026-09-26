@@ -10,8 +10,12 @@ interface Props {
   studentName: string;
   /** Distinguishes this open from any earlier one, so a stale message is dropped. */
   token: string;
-  /** Number of mistakes the teacher tapped while the viewer was open. */
-  onCount: (count: number) => void;
+  /** Number of mistakes the teacher tapped while the viewer was open. Omitted
+   *  when the viewer is opened just to READ a ward (the new assignment has no
+   *  score to feed), in which case the count is dropped — but the message is
+   *  still what closes the frame, because the viewer's own close button is
+   *  what sends it. */
+  onCount?: (count: number) => void;
   onClose: () => void;
 }
 
@@ -41,7 +45,7 @@ export function MushafModal({ label, list, studentName, token, onCount, onClose 
       const count = readMushafCount(e.data, token);
       if (count === null || closedRef.current) return;
       closedRef.current = true;
-      onCount(count);
+      onCount?.(count);
       onClose();
     }
     window.addEventListener('message', onMessage);

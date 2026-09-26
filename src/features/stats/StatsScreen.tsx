@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import type { ComponentChildren } from 'preact';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useStudents } from '../../hooks/useStudents';
 import { useAllRecords } from '../../hooks/useAllRecords';
-import { arabicPlural, esc, toArabicDigits, toArabicOrdinal } from '../../domain/text';
+import { arabicPlural, toArabicDigits, toArabicOrdinal } from '../../domain/text';
 import {
   ATTENDANCE_BADGE_THRESHOLD,
   getAttendanceRanking,
+  getDaysAttendedRanking,
   getPersonalAttendanceRanking,
 } from '../../domain/attendance';
 import {
@@ -20,6 +22,9 @@ import {
   countRecentlyActiveStudents,
   type StatsSortKey,
 } from '../../domain/statsScreen';
+import { computeOverallRanking } from '../../domain/overallRanking';
+import { computeJuzDistribution, FATIHA_JUZ } from '../../domain/juzDistribution';
+import { juzLabel } from '../../domain/juz';
 import { useTenant } from '../tenant/TenantContext';
 import {
   buildAttendanceCardData,
@@ -53,9 +58,9 @@ function rankStyle(rank: number) {
   return RANK_COLORS[rank - 1] ?? RANK_FALLBACK;
 }
 
-type AttendBasis = 'halaqa' | 'personal';
+type AttendBasis = 'halaqa' | 'personal' | 'days';
 
-/** Row shape shared by both attendance bases; `days`/`ofDays` are the numerator
+/** Row shape shared by all attendance bases; `days`/`ofDays` are the numerator
  * and denominator behind the percentage, whichever basis produced them. */
 interface AttendRow {
   id: string;
@@ -67,8 +72,9 @@ interface AttendRow {
 }
 
 const ATTEND_BASIS_TABS: { key: AttendBasis; label: string }[] = [
-  { key: 'halaqa', label: 'على مستوى الحلقة' },
+  { key: 'halaqa', label: 'كل الحلقة' },
   { key: 'personal', label: 'منذ انضمامه' },
+  { key: 'days', label: 'أيام الحضور' },
 ];
 
 function attendBarColor(pct: number): string {
@@ -89,8 +95,84 @@ const SORT_TABS: { key: StatsSortKey; label: string }[] = [
 const sessionsLabel = (n: number) =>
   arabicPlural(n, { one: 'جلسة واحدة', two: 'جلستين', few: 'جلسات', many: 'جلسة' });
 
+/** "2026-07" → "يوليو ٢٠٢٦". The picker used to show the raw key, which is
+ * both untranslated and in Latin digits next to Arabic-Indic ones. */
+function monthLabel(month: string): string {
+  const d = new Date(`${month}-01T00:00:00`);
+  return Number.isNaN(d.getTime())
+    ? month
+    : d.toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' });
+}
+
 const cardCls = 'bg-white border border-hairline rounded-2xl p-[18px]';
-const cardTitleCls = 'text-[13.5px] font-extrabold text-ink-dark mb-3.5';
+/** Height of the app bar the card headers pin below. Kept in step with the
+ * `top-[69px]` class by hand — Tailwind needs the value as a literal. */
+const STICKY_TOP = 69;
+
+/**
+ * A stats card with a pinned header.
+ *
+ * The header carries the title and, when the card has a list, the one control
+ * that lengthens or shortens it. There is no separate fold-away chevron: two
+ * controls in one header that both open and close something read as a single
+ * control misbehaving, and عرض أقل already gives the card a short state.
+ *
+ * `onShrink` lets the card restore the reader's position when the list
+ * shortens — see the layout effect below.
+ */
+function StatsCard({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: (onShrink: () => void) => ComponentChildren;
+  children: ComponentChildren;
+}) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const restoreScroll = useRef(false);
+
+  // Shortening a list deletes rows below the header, so the page shrinks under
+  // the reader and the same scroll offset now shows a completely different
+  // card. Pull this card back up under the app bar, so the header lands where
+  // the button they just tapped was.
+  //
+  // No dependency array on purpose: the state that shortens the list lives in
+  // the parent, so the flag is set in its handler and has to be honoured by
+  // whichever render happens to come next.
+  useLayoutEffect(() => {
+    if (!restoreScroll.current) return;
+    restoreScroll.current = false;
+    const el = cardRef.current;
+    if (!el || typeof window.scrollTo !== 'function') return;
+    const { top } = el.getBoundingClientRect();
+    if (top < STICKY_TOP) window.scrollTo({ top: window.scrollY + top - STICKY_TOP });
+  });
+
+  return (
+    <div class={cardCls} data-card ref={cardRef}>
+      <div
+        data-card-header
+        class={
+          // Pinned just under the 69px app bar, and stretched over the card's
+          // own padding so rows scroll behind it edge to edge. Without this the
+          // header scrolls away and a long leaderboard becomes impossible to
+          // shorten from the middle without first scrolling back to the top.
+          'sticky top-[69px] z-[5] bg-white flex items-center gap-2 ' +
+          '-mx-[18px] px-[18px] -mt-[18px] pt-[18px] pb-3.5'
+        }
+      >
+        <span class="flex-1 min-w-0 text-[13.5px] font-extrabold text-ink-dark truncate">
+          {title}
+        </span>
+        {action?.(() => {
+          restoreScroll.current = true;
+        })}
+      </div>
+      {children}
+    </div>
+  );
+}
 
 /** How many rows a leaderboard shows before عرض الكل is tapped. */
 const PREVIEW_COUNT = 3;
@@ -98,12 +180,28 @@ const PREVIEW_COUNT = 3;
 /** Consecutive missed halaqa days before a student is flagged for follow-up. */
 const ABSENCE_ALERT_STREAK = 2;
 
+/** آية واحدة / آيتين / ٣ آيات / ١٢ آية */
+const AYAT_FORMS = {
+  one: 'آية واحدة',
+  two: 'آيتين',
+  few: 'آيات',
+  many: 'آية',
+} as const;
+
 /** حلقة واحدة / حلقتين / ٣ حلقات / ١٢ حلقة */
 const HALAQA_FORMS = {
   one: 'حلقة واحدة',
   two: 'حلقتين',
   few: 'حلقات',
   many: 'حلقة',
+} as const;
+
+/** يوم واحد / يومين / ٣ أيام / ١٢ يوم */
+const DAY_FORMS = {
+  one: 'يوم واحد',
+  two: 'يومين',
+  few: 'أيام',
+  many: 'يوم',
 } as const;
 
 /**
@@ -131,7 +229,7 @@ function ShowAllToggle({
       onClick={onToggle}
       aria-label={`${text} — ${cardLabel}`}
       aria-expanded={expanded}
-      class="w-full mt-2.5 py-2 rounded-full text-xs font-bold text-forest border border-hairline"
+      class="shrink-0 px-2.5 py-1 rounded-full text-[11px] font-bold text-forest border border-hairline"
     >
       {text}
     </button>
@@ -157,7 +255,10 @@ export function StatsScreen() {
   const [pagesExpanded, setPagesExpanded] = useState(false);
   const [attendExpanded, setAttendExpanded] = useState(false);
   const [attendBasis, setAttendBasis] = useState<AttendBasis>('halaqa');
+  const [overallExpanded, setOverallExpanded] = useState(false);
   const [followUpExpanded, setFollowUpExpanded] = useState(false);
+  const [juzNamesOpen, setJuzNamesOpen] = useState(false);
+  const [rowsExpanded, setRowsExpanded] = useState(false);
 
   const availableMonths = useMemo(() => {
     const months = new Set(records.map((r) => r.date?.slice(0, 7)).filter(Boolean) as string[]);
@@ -184,6 +285,10 @@ export function StatsScreen() {
   );
   const weeklyBuckets = useMemo(() => computeWeeklyBuckets(filteredRecords), [filteredRecords]);
   const scoreDist = useMemo(() => computeScoreDistribution(filteredRecords), [filteredRecords]);
+  // Unfiltered on purpose: where a student stands is the end of a path walked
+  // over their whole history, not something a month window can answer. Narrowing
+  // to one month would move every student who happened not to recite in it.
+  const juzDist = useMemo(() => computeJuzDistribution(students, records), [students, records]);
   // Unfiltered records on purpose: a page is cumulative, so which pages are
   // complete is settled over the whole history and only then narrowed to the
   // month the finishing session fell in (computeTopPages does the narrowing).
@@ -211,28 +316,39 @@ export function StatsScreen() {
     () => getPersonalAttendanceRanking(students, filteredRecords, records).list,
     [students, filteredRecords, records],
   );
-  /** Both rankings flattened to one row shape so the card renders once. */
-  const attendRows = useMemo<AttendRow[]>(
-    () =>
-      attendBasis === 'halaqa'
-        ? topAttend.map((x) => ({
-            id: x.id,
-            name: x.name,
-            rank: x.rank,
-            attendPct: x.attendPct,
-            days: x.uniqueDays,
-            ofDays: summary.totalHalaqaDays,
-          }))
-        : topAttendPersonal.map((x) => ({
-            id: x.id,
-            name: x.name,
-            rank: x.rank,
-            attendPct: x.attendPct,
-            days: x.attendedDays,
-            ofDays: x.enrolledDays,
-          })),
-    [attendBasis, topAttend, topAttendPersonal, summary.totalHalaqaDays],
+  const topAttendDays = useMemo(
+    () => getDaysAttendedRanking(students, filteredRecords).list,
+    [students, filteredRecords],
   );
+  /** All three rankings flattened to one row shape so the card renders once. */
+  const attendRows = useMemo<AttendRow[]>(() => {
+    if (attendBasis === 'personal') {
+      return topAttendPersonal.map((x) => ({
+        id: x.id,
+        name: x.name,
+        rank: x.rank,
+        attendPct: x.attendPct,
+        days: x.attendedDays,
+        ofDays: x.enrolledDays,
+      }));
+    }
+    const source = attendBasis === 'days' ? topAttendDays : topAttend;
+    return source.map((x) => ({
+      id: x.id,
+      name: x.name,
+      rank: x.rank,
+      attendPct: x.attendPct,
+      days: x.uniqueDays,
+      ofDays: summary.totalHalaqaDays,
+    }));
+  }, [attendBasis, topAttend, topAttendPersonal, topAttendDays, summary.totalHalaqaDays]);
+  // Deliberately reads `records`, never `filteredRecords`: the overall ranking
+  // is cumulative by design (see computeOverallRanking), so the month chips do
+  // not narrow it. The card says so on its face — a leaderboard that silently
+  // ignores the filter sitting above it would just read as a bug.
+  const overall = useMemo(() => computeOverallRanking(students, records), [students, records]);
+  const visibleOverall = overallExpanded ? overall : overall.slice(0, PREVIEW_COUNT);
+
   const studentRows = useMemo(
     () => computeStudentStatsRows(students, filteredRecords, summary.totalHalaqaDays),
     [students, filteredRecords, summary.totalHalaqaDays],
@@ -243,6 +359,11 @@ export function StatsScreen() {
     return sortStudentStatsRows(filtered, sortKey);
   }, [studentRows, search, sortKey]);
 
+  // Previewed like every other leaderboard. This is the longest card on the
+  // screen — ~50 students at three lines each — and it was the only one that
+  // rendered in full by default, so it buried everything under it.
+  const visibleStudentRows = rowsExpanded ? visibleRows : visibleRows.slice(0, PREVIEW_COUNT);
+
   const followUp = useMemo(
     () => computeFollowUpList(students, filteredRecords, ABSENCE_ALERT_STREAK),
     [students, filteredRecords],
@@ -252,10 +373,13 @@ export function StatsScreen() {
   const visiblePages = pagesExpanded ? topPages : topPages.slice(0, PREVIEW_COUNT);
   const visibleAttend = attendExpanded ? attendRows : attendRows.slice(0, PREVIEW_COUNT);
   /** Index of the first student under the نجم الحضور line, or -1. Only ever
-   * reached in the expanded list, since the preview is the top of the table. */
-  const firstBelowThreshold = visibleAttend.findIndex(
-    (x) => x.attendPct < ATTENDANCE_BADGE_THRESHOLD,
-  );
+   * reached in the expanded list, since the preview is the top of the table.
+   * Suppressed under the days basis: the order there is by day count, so the
+   * percentages don't descend and the line would appear mid-list at random. */
+  const firstBelowThreshold =
+    attendBasis === 'days'
+      ? -1
+      : visibleAttend.findIndex((x) => x.attendPct < ATTENDANCE_BADGE_THRESHOLD);
 
   // Share of the currently active roster that turns up on a typical halaqa
   // day. Denominator is the recently-active count, not every registered
@@ -276,13 +400,10 @@ export function StatsScreen() {
     0,
   );
   /** How the selected period reads on a card: a month name, or كل الفترة. */
-  const periodLabel = useMemo(() => {
-    if (monthFilter === 'all') return 'كل الفترة';
-    const d = new Date(`${monthFilter}-01T00:00:00`);
-    return Number.isNaN(d.getTime())
-      ? monthFilter
-      : d.toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' });
-  }, [monthFilter]);
+  const periodLabel = useMemo(
+    () => (monthFilter === 'all' ? 'كل الفترة' : monthLabel(monthFilter)),
+    [monthFilter],
+  );
 
   const cardData = useMemo(
     () => buildAttendanceCardData(students, filteredRecords, { periodLabel }),
@@ -367,6 +488,65 @@ export function StatsScreen() {
     <div class="p-[18px] pb-[100px] space-y-3.5" dir="rtl">
       <div class="text-[19px] font-extrabold text-ink-dark mb-1">إحصائيات</div>
 
+      {/* Sits ABOVE the month picker on purpose: it is the one card the picker
+          has no say over, and putting it underneath would imply otherwise. */}
+      <StatsCard
+        title="🥇 الترتيب العام"
+        action={(onShrink) => (
+          <ShowAllToggle
+            expanded={overallExpanded}
+            total={overall.length}
+            cardLabel="الترتيب العام"
+            onToggle={() => {
+              // Shrinking back to the preview is the direction that moves the
+              // page under the reader; growing it does not.
+              if (overallExpanded) onShrink();
+              setOverallExpanded((v) => !v);
+            }}
+          />
+        )}
+      >
+        <div class="text-[10.5px] text-taupe font-semibold mt-0.5 mb-3.5">
+          حضور ٤٠٪ · تسميع ٣٠٪ · سطور ٣٠٪ — من بداية التسجيل
+          <br />
+          السطور: ٥ سطور في الجلسة (ثلث صفحة) = ١٠٠
+        </div>
+        {overall.length === 0 ? (
+          <div class="text-center text-sm text-taupe py-6">لا توجد بيانات كافية بعد</div>
+        ) : (
+          <div class="space-y-2">
+            {visibleOverall.map((x) => {
+              const rc = rankStyle(x.rank);
+              return (
+                <div
+                  key={x.id}
+                  class="flex items-center gap-3 py-1.5 border-b border-[#F5F1E5] last:border-0"
+                >
+                  <div
+                    class="w-[26px] h-[26px] rounded-full flex items-center justify-center text-xs font-extrabold shrink-0"
+                    style={{ background: rc.bg, color: rc.color }}
+                    title={`المركز ${toArabicOrdinal(x.rank)} في الترتيب العام`}
+                  >
+                    {toArabicDigits(x.rank)}
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-sm font-bold text-ink-dark truncate">{x.name}</div>
+                    <div class="text-xs text-taupe">
+                      حضور {toArabicDigits(x.attendPct)}٪ · تسميع{' '}
+                      {toArabicDigits(Math.round(x.recitationScore))} · سطور{' '}
+                      {toArabicDigits(x.linesScore)}
+                    </div>
+                  </div>
+                  <div class="font-extrabold text-forest shrink-0 text-[15px]">
+                    {toArabicDigits(x.points.toFixed(1)).replace('.', '٫')}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </StatsCard>
+
       <div class="relative">
         <select
           class="w-full appearance-none border border-hairline rounded-xl px-4 py-3 pl-10 text-sm font-semibold bg-white text-ink-dark"
@@ -376,7 +556,7 @@ export function StatsScreen() {
           <option value="all">كل الفترة</option>
           {availableMonths.map((m) => (
             <option key={m} value={m}>
-              {m}
+              {monthLabel(m)}
             </option>
           ))}
         </select>
@@ -438,8 +618,7 @@ export function StatsScreen() {
         ))}
       </div>
 
-      <div class={cardCls}>
-        <div class={cardTitleCls}>📈 النشاط الأسبوعي</div>
+      <StatsCard title="📈 النشاط الأسبوعي">
         {weeklyScale.truncated && (
           <div class="text-[10px] text-taupe/70 font-semibold -mt-1 mb-1.5">
             المقياس يبدأ من {toArabicDigits(weeklyScale.baseline)}
@@ -477,10 +656,9 @@ export function StatsScreen() {
             })}
           </div>
         )}
-      </div>
+      </StatsCard>
 
-      <div class={cardCls}>
-        <div class={cardTitleCls}>🎯 توزيع مستويات التقييم</div>
+      <StatsCard title="🎯 توزيع مستويات التقييم">
         {scoreDist.every((d) => d.count === 0) ? (
           <div class="text-center text-sm text-taupe py-6">لا يوجد تقييمات مسجلة بعد</div>
         ) : (
@@ -504,10 +682,78 @@ export function StatsScreen() {
             })}
           </div>
         )}
-      </div>
+      </StatsCard>
 
-      <div class={cardCls}>
-        <div class={cardTitleCls}>🏆 الأكثر حفظاً للصفحات</div>
+      <StatsCard
+        title="🧭 توزيع الطلاب على الأجزاء"
+        action={() => (
+          <button
+            type="button"
+            onClick={() => setJuzNamesOpen((v) => !v)}
+            aria-expanded={juzNamesOpen}
+            aria-label={`${juzNamesOpen ? 'إخفاء الأسماء' : 'عرض الأسماء'} — توزيع الطلاب على الأجزاء`}
+            class="shrink-0 px-2.5 py-1 rounded-full text-[11px] font-bold text-forest border border-hairline"
+          >
+            {juzNamesOpen ? 'إخفاء الأسماء' : 'عرض الأسماء'}
+          </button>
+        )}
+      >
+        {juzDist.rows.length === 0 ? (
+          <div class="text-center text-sm text-taupe py-6">لا يوجد حفظ مُسمَّع بعد</div>
+        ) : (
+          <>
+            <div class="space-y-2.5">
+              {juzDist.rows.map((r) => (
+                <div key={r.juz}>
+                  <div class="flex items-center gap-2.5">
+                    <div class="w-[72px] shrink-0">
+                      <div class="text-xs text-[#5B5646] font-bold truncate">{r.name}</div>
+                      <div class="text-[10px] text-taupe">
+                        {r.juz === FATIHA_JUZ ? 'قبل جزء عمّ' : `الجزء ${toArabicDigits(r.juz)}`}
+                      </div>
+                    </div>
+                    <div class="flex-1 h-2 rounded-full bg-[#F1ECDD] overflow-hidden">
+                      <div
+                        class="h-full rounded-full"
+                        style={{ width: `${r.pct}%`, background: '#0F3D2E' }}
+                      />
+                    </div>
+                    <div class="w-6 text-xs text-taupe text-left shrink-0">
+                      {toArabicDigits(r.count)}
+                    </div>
+                  </div>
+                  {juzNamesOpen && (
+                    <div class="pr-[82px] pt-1 text-[11px] text-taupe leading-relaxed">
+                      {r.students.map((s) => s.name).join(' · ')}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div class="pt-3 text-[11px] text-taupe">
+              موزَّعين على {juzLabel(juzDist.rows.length)}
+              {juzDist.notStarted > 0 && ` · ${toArabicDigits(juzDist.notStarted)} لم يُسمِّع بعد`}
+            </div>
+          </>
+        )}
+      </StatsCard>
+
+      <StatsCard
+        title="🏆 الأكثر حفظاً للصفحات"
+        action={(onShrink) => (
+          <ShowAllToggle
+            expanded={pagesExpanded}
+            total={topPages.length}
+            cardLabel="الأكثر حفظاً للصفحات"
+            onToggle={() => {
+              // Shrinking back to the preview is the direction that moves the
+              // page under the reader; growing it does not.
+              if (pagesExpanded) onShrink();
+              setPagesExpanded((v) => !v);
+            }}
+          />
+        )}
+      >
         {topPages.length === 0 ? (
           <div class="text-center text-sm text-taupe py-6">لا توجد صفحات مكتملة بعد</div>
         ) : (
@@ -547,13 +793,7 @@ export function StatsScreen() {
             })}
           </div>
         )}
-        <ShowAllToggle
-          expanded={pagesExpanded}
-          total={topPages.length}
-          cardLabel="الأكثر حفظاً للصفحات"
-          onToggle={() => setPagesExpanded((v) => !v)}
-        />
-      </div>
+      </StatsCard>
 
       <button
         type="button"
@@ -569,8 +809,22 @@ export function StatsScreen() {
         📖 بطاقة نجوم الحفظ — للمشاركة
       </button>
 
-      <div class={cardCls}>
-        <div class={cardTitleCls}>✅ الأكثر حضوراً</div>
+      <StatsCard
+        title="✅ الأكثر حضوراً"
+        action={(onShrink) => (
+          <ShowAllToggle
+            expanded={attendExpanded}
+            total={attendRows.length}
+            cardLabel="الأكثر حضوراً"
+            onToggle={() => {
+              // Shrinking back to the preview is the direction that moves the
+              // page under the reader; growing it does not.
+              if (attendExpanded) onShrink();
+              setAttendExpanded((v) => !v);
+            }}
+          />
+        )}
+      >
         <div class="flex gap-1.5 mb-3">
           {ATTEND_BASIS_TABS.map((tab) => (
             <button
@@ -592,7 +846,9 @@ export function StatsScreen() {
         <div class="text-[11px] text-taupe mb-2.5">
           {attendBasis === 'halaqa'
             ? 'النسبة من كل أيام الحلقة — مقياس واحد للجميع'
-            : 'النسبة من أيام الحلقة بعد انضمام الطالب — زي صفحة ولي الأمر'}
+            : attendBasis === 'personal'
+              ? 'النسبة من أيام الحلقة بعد انضمام الطالب — زي صفحة ولي الأمر'
+              : 'الترتيب بعدد أيام الحضور نفسه — الأكثر التزاماً بالعدد'}
         </div>
         {attendRows.length === 0 ? (
           <div class="text-center text-sm text-taupe py-6">لا يوجد بيانات</div>
@@ -624,38 +880,66 @@ export function StatsScreen() {
                       <div
                         class={
                           'text-sm font-bold truncate ' +
-                          (below ? 'text-[#5B5646]' : 'text-ink-dark')
+                          (below && attendBasis !== 'days' ? 'text-[#5B5646]' : 'text-ink-dark')
                         }
                       >
                         {x.name}
                       </div>
                       <div class="text-xs text-taupe">
-                        المركز {toArabicOrdinal(x.rank)} · {toArabicDigits(x.days)} يوم حضور من{' '}
-                        {toArabicDigits(x.ofDays)}
+                        {attendBasis === 'days' ? (
+                          <>
+                            المركز {toArabicOrdinal(x.rank)} · من {toArabicDigits(x.ofDays)} يوم
+                            حلقة
+                          </>
+                        ) : (
+                          <>
+                            المركز {toArabicOrdinal(x.rank)} · {toArabicDigits(x.days)} يوم حضور من{' '}
+                            {toArabicDigits(x.ofDays)}
+                          </>
+                        )}
                       </div>
                     </div>
-                    <div
-                      class="font-extrabold shrink-0"
-                      style={{ color: attendBarColor(x.attendPct) }}
-                    >
-                      {toArabicDigits(x.attendPct)}٪
-                    </div>
+                    {attendBasis === 'days' ? (
+                      <div class="shrink-0 text-center leading-tight">
+                        <div class="font-extrabold" style={{ color: attendBarColor(x.attendPct) }}>
+                          {arabicPlural(x.days, DAY_FORMS)}
+                        </div>
+                        <div class="text-[10px] font-bold text-taupe">
+                          {toArabicDigits(x.attendPct)}٪
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        class="font-extrabold shrink-0"
+                        style={{ color: attendBarColor(x.attendPct) }}
+                      >
+                        {toArabicDigits(x.attendPct)}٪
+                      </div>
+                    )}
                   </div>
                 </div>
               );
             })}
           </div>
         )}
-        <ShowAllToggle
-          expanded={attendExpanded}
-          total={attendRows.length}
-          cardLabel="الأكثر حضوراً"
-          onToggle={() => setAttendExpanded((v) => !v)}
-        />
-      </div>
+      </StatsCard>
 
-      <div class={cardCls}>
-        <div class={cardTitleCls}>⚠️ يحتاجون متابعة</div>
+      <StatsCard
+        title="⚠️ يحتاجون متابعة"
+        action={(onShrink) => (
+          <ShowAllToggle
+            expanded={followUpExpanded}
+            total={followUp.length}
+            cardLabel="يحتاجون متابعة"
+            onToggle={() => {
+              // Shrinking back to the preview is the direction that moves the
+              // page under the reader; growing it does not.
+              if (followUpExpanded) onShrink();
+              setFollowUpExpanded((v) => !v);
+            }}
+          />
+        )}
+      >
         {followUp.length === 0 ? (
           <div class="text-xs text-taupe text-center py-3">
             كل الطلاب حضروا آخر {arabicPlural(ABSENCE_ALERT_STREAK, HALAQA_FORMS)} — ما شاء الله
@@ -686,13 +970,7 @@ export function StatsScreen() {
             ))}
           </div>
         )}
-        <ShowAllToggle
-          expanded={followUpExpanded}
-          total={followUp.length}
-          cardLabel="يحتاجون متابعة"
-          onToggle={() => setFollowUpExpanded((v) => !v)}
-        />
-      </div>
+      </StatsCard>
 
       <button
         type="button"
@@ -708,8 +986,22 @@ export function StatsScreen() {
         🌟 بطاقة نجوم الحضور — للمشاركة
       </button>
 
-      <div class={cardCls}>
-        <div class={cardTitleCls}>تفصيل الطلاب</div>
+      <StatsCard
+        title="تفصيل الطلاب"
+        action={(onShrink) => (
+          <ShowAllToggle
+            expanded={rowsExpanded}
+            total={visibleRows.length}
+            cardLabel="تفصيل الطلاب"
+            onToggle={() => {
+              // Shrinking back to the preview is the direction that moves the
+              // page under the reader; growing it does not.
+              if (rowsExpanded) onShrink();
+              setRowsExpanded((v) => !v);
+            }}
+          />
+        )}
+      >
         <SearchInput
           compact
           class="mb-3"
@@ -722,6 +1014,7 @@ export function StatsScreen() {
           {SORT_TABS.map((tab) => (
             <button
               key={tab.key}
+              type="button"
               class={
                 'flex-1 py-1.5 rounded-full text-xs font-bold border ' +
                 (sortKey === tab.key
@@ -737,11 +1030,13 @@ export function StatsScreen() {
 
         {visibleRows.length === 0 ? (
           <div class="text-center text-sm text-taupe py-6">
-            {search ? `لا يوجد نتائج لـ "${esc(search)}"` : 'لا يوجد بيانات مطابقة'}
+            {/* No esc() here: JSX escapes text content already, so escaping
+                first would print &amp; back at the user. */}
+            {search ? `لا يوجد نتائج لـ "${search}"` : 'لا يوجد بيانات مطابقة'}
           </div>
         ) : (
           <div class="divide-y divide-[#F5F1E5]">
-            {visibleRows.map((row) => (
+            {visibleStudentRows.map((row) => (
               <div key={row.id} class="py-3">
                 <div class="flex items-center justify-between mb-1.5">
                   <div class="text-sm font-bold text-ink-dark">{row.name}</div>
@@ -762,14 +1057,14 @@ export function StatsScreen() {
                   />
                 </div>
                 <div class="text-[11px] text-taupe">
-                  {toArabicDigits(row.sessionsCount)} جلسة · {toArabicDigits(row.ayat)} آية ·{' '}
+                  {sessionsLabel(row.sessionsCount)} · {arabicPlural(row.ayat, AYAT_FORMS)} ·{' '}
                   {row.avg === null ? 'لم يُقيَّم' : `متوسط ${toArabicDigits(row.avg)}٪`}
                 </div>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </StatsCard>
 
       {pagesCardOpen && (
         <div
