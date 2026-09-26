@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/preact';
 import userEvent from '@testing-library/user-event';
 import { ToastProvider } from '../../ui/ToastProvider';
+import { DraftGuardProvider } from '../tenant/DraftGuard';
 import { RecordScreen } from './RecordScreen';
 import type { SessionRecord, Student } from '../../types';
 
@@ -45,7 +46,9 @@ async function selectStudent(name: string) {
 function renderScreen() {
   return render(
     <ToastProvider>
-      <RecordScreen editRecord={null} />
+      <DraftGuardProvider>
+        <RecordScreen editRecord={null} />
+      </DraftGuardProvider>
     </ToastProvider>,
   );
 }
