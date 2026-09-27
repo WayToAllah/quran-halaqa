@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [rebuild-v2, main]
+    branches: [rebuild-v2, v3, main]
   pull_request:
-    branches: [rebuild-v2, main]
+    branches: [rebuild-v2, v3, main]
 
 jobs:
   domain:
