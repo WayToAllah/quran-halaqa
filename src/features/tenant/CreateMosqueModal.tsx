@@ -45,7 +45,7 @@ export function CreateMosqueModal({ ownerUid, onClose, onCreated }: Props) {
 
   return (
     <div class="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center">
-      <div class="bg-cream w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl p-5 space-y-4 text-right max-h-[90vh] overflow-y-auto">
+      <div class="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl p-5 space-y-4 text-right max-h-[90vh] overflow-y-auto">
         <h2 class="text-base font-bold text-ink-dark">مسجد جديد</h2>
 
         <div class="space-y-1">
