@@ -124,6 +124,9 @@ export interface Halaqa {
    * them from inside the app with no redeploy. Empty/absent → the header shows a
    * default verse instead. */
   niyyat?: string[];
+  /** Seasons (مواسم) — see domain/seasons.ts. Each is only a start date; it
+   * ends where the next begins. Absent → no seasons, stats show all history. */
+  seasons?: { id: string; name: string; from: string }[];
 }
 
 export interface Badge {
@@ -200,4 +203,10 @@ export interface PublicStats {
       avgMadi?: number | null;
     }
   >;
+  /** The halaqa's seasons (oldest first), copied in so the parent page can
+   * label its chips without reading the halaqa doc. Absent until the halaqa
+   * has seasons. */
+  seasons?: { id: string; name: string; from: string }[];
+  /** Same shape as monthlyStats, keyed by season id. */
+  seasonStats?: Record<string, PublicStats['monthlyStats'][string]>;
 }

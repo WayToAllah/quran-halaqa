@@ -556,3 +556,33 @@ describe('buildStudentPublicStats — إعادة does not count as recited', () 
     expect(result.totalAyat).toBe(0);
   });
 });
+
+describe('buildStudentPublicStats — seasons', () => {
+  const recs: SessionRecord[] = [
+    { id: 'a', studentId: 's_1', date: '2026-09-20', loh: { score: 70 } },
+    { id: 'b', studentId: 's_1', date: '2026-09-27', loh: { score: 90 } },
+  ];
+  const halaqaDays = ['2026-10-04', '2026-09-27', '2026-09-20'];
+  const seasons = [
+    { id: 'old', name: 'صيف 2026', from: '2026-06-01' },
+    { id: 'new', name: 'دراسة 2027', from: '2026-09-27' },
+  ];
+
+  it('publishes the season list and figures per season, each starting from zero', () => {
+    const out = buildStudentPublicStats(zaid, recs, 3, 1, halaqaDays, seasons);
+    expect(out.seasons).toEqual(seasons);
+    expect(out.seasonStats?.new).toMatchObject({
+      attendedDays: 1,
+      halaqaDays: 2,
+      attendPct: 50,
+      avgLoh: 90,
+    });
+    expect(out.seasonStats?.old).toMatchObject({ attendedDays: 1, halaqaDays: 1, avgLoh: 70 });
+  });
+
+  it('writes no season fields while the halaqa has no seasons', () => {
+    const out = buildStudentPublicStats(zaid, recs, 3, 1, halaqaDays);
+    expect('seasons' in out).toBe(false);
+    expect('seasonStats' in out).toBe(false);
+  });
+});

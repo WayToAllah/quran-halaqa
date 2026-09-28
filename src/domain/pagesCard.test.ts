@@ -69,7 +69,7 @@ describe('buildPagesCardData', () => {
   });
 
   it('respects the month filter the stats screen is showing', () => {
-    const data = buildPagesCardData(students, records, { monthFilter: '2026-01' });
+    const data = buildPagesCardData(students, records, { period: '2026-01' });
     expect(data.entries).toHaveLength(0);
   });
 

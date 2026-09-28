@@ -1,4 +1,5 @@
 import type { SessionRecord, Student, SuraAssignment } from '../types';
+import { filterByPeriod, inPeriod, type PeriodFilter } from './seasons';
 import {
   assignmentAyahSpan,
   ayahAtLohPosition,
@@ -334,16 +335,14 @@ export function computeTopPages(
   allRecords: SessionRecord[],
   /** Pass `Infinity` for the whole ranked list (the screen's عرض الكل view). */
   limit = 3,
-  /** 'all', or a 'YYYY-MM' month whose newly-completed pages to count. */
-  monthFilter = 'all',
+  /** 'all', a 'YYYY-MM' month, or a season's date range whose progress to count. */
+  period: PeriodFilter = 'all',
 ): TopPagesEntry[] {
   const per = students
     .map((s) => {
-      const span = computeLohSpan(s, allRecords, monthFilter);
+      const span = computeLohSpan(s, allRecords, period);
       if (!span || !span.pages) return null;
-      const recs = recordsForStudent(s, allRecords).filter(
-        (r) => monthFilter === 'all' || r.date?.slice(0, 7) === monthFilter,
-      );
+      const recs = filterByPeriod(recordsForStudent(s, allRecords), period);
       return {
         id: s.id,
         name: getStudentName(s),
@@ -617,14 +616,14 @@ export function gradedAssignmentIds(studentRecords: SessionRecord[]): Set<string
 export function computeLohSpan(
   student: Student,
   allRecords: SessionRecord[],
-  /** 'all', or a 'YYYY-MM' month to measure the progress made within. */
-  monthFilter = 'all',
+  /** 'all', a 'YYYY-MM' month, or a season's date range to measure within. */
+  period: PeriodFilter = 'all',
 ): LohSpan | null {
   const studentRecords = recordsForStudent(student, allRecords);
   const graded = gradedAssignmentIds(studentRecords);
 
   const recs = studentRecords
-    .filter((r) => !!r.date && (monthFilter === 'all' || r.date.slice(0, 7) === monthFilter))
+    .filter((r) => inPeriod(r.date, period))
     .filter((r) => lohAssignmentsOf(r).length > 0)
     .sort((a, b) => (a.date! < b.date! ? -1 : a.date! > b.date! ? 1 : 0));
   if (!recs.length) return null;

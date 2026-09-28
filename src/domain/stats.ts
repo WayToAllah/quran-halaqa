@@ -1,4 +1,5 @@
 import type { Badge, PublicStats, SessionRecord, Student } from '../types';
+import { inPeriod, seasonRange, sortSeasons, type Season } from './seasons';
 import { byNewest } from './dates';
 import { hasScore } from './scoring';
 import { itemAyat } from './suras';
@@ -100,6 +101,8 @@ export function buildStudentPublicStats(
   totalHalaqaDays: number,
   rank: number | null,
   halaqaDatesDesc: string[],
+  /** The halaqa's seasons; empty → no season fields are published. */
+  seasons: Season[] = [],
 ): PublicStats {
   const name = getStudentName(student);
   const allRecs = recordsForStudent(student, allRecords);
@@ -204,10 +207,13 @@ export function buildStudentPublicStats(
     ...allRecs.map((r) => r.date?.slice(0, 7)).filter((m): m is string => !!m),
     ...enrolledDates.map((d) => d.slice(0, 7)),
   ]);
-  allMonths.forEach((month) => {
-    const monthEnrolledDates = enrolledDates.filter((d) => d.slice(0, 7) === month);
+  /** One period's figures — a month or a season — measured exactly like the
+   * all-time ones above, inside the window only. */
+  type PeriodEntry = PublicStats['monthlyStats'][string];
+  const statsFor = (inWindow: (date: string) => boolean): PeriodEntry => {
+    const monthEnrolledDates = enrolledDates.filter(inWindow);
     const monthHalaqaDays = monthEnrolledDates.length;
-    const monthRealRecs = realRecs.filter((r) => r.date?.slice(0, 7) === month);
+    const monthRealRecs = realRecs.filter((r) => !!r.date && inWindow(r.date));
     // Same intersection rule as the all-time figure above.
     const monthAttendedDays = monthEnrolledDates.filter((d) => studentDates.has(d)).length;
     const monthAttendPct =
@@ -216,7 +222,7 @@ export function buildStudentPublicStats(
     const monthAvgLoh = monthScoredLoh.length
       ? Math.round(monthScoredLoh.reduce((a, r) => a + r.loh!.score!, 0) / monthScoredLoh.length)
       : null;
-    // Same shape as the loh average above, and the same null rule: a month
+    // Same shape as the loh average above, and the same null rule: a period
     // with nothing scored is null, not 0 — 0 is a real grade (إعادة).
     const monthScoredMadi = monthRealRecs.filter((r) => hasScore(r.madi));
     const monthAvgMadi = monthScoredMadi.length
@@ -225,7 +231,7 @@ export function buildStudentPublicStats(
     let monthAyat = 0;
     monthRealRecs.forEach((r) => {
       // repeatMap comes from the full history on purpose: an assignment given
-      // on the last day of a month is graded in the next one.
+      // on the last day of a period is graded in the next one.
       const failed = repeatMap.get(r.id);
       if (!failed?.loh) {
         (r.newLoh ?? []).forEach((l) => {
@@ -239,7 +245,7 @@ export function buildStudentPublicStats(
       }
       if (r.tajweed?.sura && !isRepeatGrade(r.tajweed)) monthAyat += itemAyat(r.tajweed);
     });
-    monthlyStats[month] = {
+    return {
       attendPct: monthAttendPct,
       attendedDays: monthAttendedDays,
       halaqaDays: monthHalaqaDays,
@@ -247,7 +253,28 @@ export function buildStudentPublicStats(
       avgLoh: monthAvgLoh,
       avgMadi: monthAvgMadi,
     };
+  };
+  allMonths.forEach((month) => {
+    monthlyStats[month] = statsFor((d) => d.slice(0, 7) === month);
   });
+
+  // Per-season figures for the parent page's season chips. Only written once
+  // the halaqa has seasons, so documents of halaqat without any keep their
+  // exact old shape. A season the student was not enrolled in (joined later)
+  // is left out, like the months before he joined.
+  const seasonFields: Pick<PublicStats, 'seasons' | 'seasonStats'> = {};
+  if (seasons.length) {
+    const sorted = sortSeasons(seasons);
+    const seasonStats: NonNullable<PublicStats['seasonStats']> = {};
+    sorted.forEach((season) => {
+      const range = seasonRange(sorted, season.id);
+      const entry = statsFor((d) => inPeriod(d, range));
+      const hasAny = entry.halaqaDays! > 0 || allRecs.some((r) => inPeriod(r.date, range));
+      if (hasAny) seasonStats[season.id] = entry;
+    });
+    seasonFields.seasons = sorted.map(({ id, name, from }) => ({ id, name, from }));
+    seasonFields.seasonStats = seasonStats;
+  }
 
   const badges = buildStudentBadges({
     attendPct,
@@ -277,5 +304,6 @@ export function buildStudentPublicStats(
     recentSessions,
     scoreHistory,
     monthlyStats,
+    ...seasonFields,
   };
 }

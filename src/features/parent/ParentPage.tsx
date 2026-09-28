@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { PublicStats } from '../../types';
 import { fetchPublicStatsRest } from '../../data/firestoreRest';
+import { localDateStr } from '../../domain/dates';
 import { visibleBadges } from '../../domain/badges';
 import {
   getParentTheme,
@@ -8,7 +9,7 @@ import {
   buildStats,
   buildCurrentTask,
   buildSessions,
-  buildMonthOptions,
+  buildPeriodOptions,
   rankBadgeText,
   ALL_MONTHS,
   type ParentTheme,
@@ -77,7 +78,8 @@ function formatUpdatedAt(ms: number): string {
 
 export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }: Props) {
   const [dark, setDark] = useState(false);
-  const [month, setMonth] = useState(ALL_MONTHS);
+  /** null = the default chip (the current season, or الكل without seasons). */
+  const [month, setMonth] = useState<string | null>(null);
   const [state, setState] = useState<LoadState>(
     previewStats ? { status: 'ready', stats: previewStats } : { status: 'loading' },
   );
@@ -141,10 +143,10 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
 
   const stats = state.stats;
   const chart = buildChart(stats.scoreHistory);
-  const monthOptions = buildMonthOptions(stats);
-  // A month that vanished between renders (a fresh document dropping an old
-  // month) must not leave the grid stuck on a key nothing answers to.
-  const activeMonth = monthOptions.some((o) => o.key === month) ? month : ALL_MONTHS;
+  const { options: monthOptions, defaultKey } = buildPeriodOptions(stats, localDateStr());
+  // A chip that vanished between renders (a fresh document dropping an old
+  // month or season) must not leave the grid stuck on a key nothing answers to.
+  const activeMonth = month && monthOptions.some((o) => o.key === month) ? month : defaultKey;
   const statCells = buildStats(stats, activeMonth);
   const task = buildCurrentTask(stats);
   const sessions = buildSessions(stats);
@@ -245,7 +247,7 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
         {monthOptions.length > 0 && (
           <div
             role="group"
-            aria-label="تصفية الأرقام حسب الشهر"
+            aria-label="تصفية الأرقام حسب الفترة"
             style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:11px;scrollbar-width:none"
           >
             {monthOptions.map((o) => {

@@ -35,6 +35,21 @@ import { buildPagesCardData, buildPagesCardSvg, pagesCardSize } from '../../doma
 import { svgToPngBlob, sharePng, type ShareResult } from './shareCard';
 import { pagesLabel } from '../../domain/pages';
 import { SearchInput } from '../../ui/SearchInput';
+import { useSeasons } from '../../hooks/useSeasons';
+import { SeasonsModal } from '../seasons/SeasonsModal';
+import { republishPublicStatsFor } from '../../data/publishStats';
+import { localDateStr } from '../../domain/dates';
+import {
+  ALL_SEASONS,
+  currentSeasonId,
+  filterByPeriod,
+  inPeriod,
+  intersectRanges,
+  rangeKey,
+  seasonRange,
+  toRange,
+  type Season,
+} from '../../domain/seasons';
 
 /** Tier badge colors ported from the mockup — same lookup reused across the
  * Record/Log/Stats screens so a score tier always looks the same everywhere. */
@@ -236,11 +251,67 @@ function ShowAllToggle({
   );
 }
 
+/** الكل + one chip per season (newest first), and a manage chip. With no
+ * seasons yet the row is just «موسم جديد», which opens the editor. */
+function SeasonChips({
+  seasons,
+  activeId,
+  onSelect,
+  onManage,
+}: {
+  seasons: Season[];
+  activeId: string;
+  onSelect: (id: string) => void;
+  onManage: () => void;
+}) {
+  const chip = (on: boolean) =>
+    'shrink-0 px-3 py-1.5 rounded-full text-[12.5px] font-semibold border ' +
+    (on ? 'bg-forest text-parchment border-forest' : 'bg-white text-[#5B5646] border-hairline');
+  const options = [...seasons].reverse();
+  return (
+    <div class="flex gap-1.5 overflow-x-auto" role="tablist" aria-label="المواسم">
+      {options.length > 0 &&
+        [...options, { id: ALL_SEASONS, name: 'الكل' }].map((x) => (
+          <button
+            key={x.id}
+            role="tab"
+            aria-selected={x.id === activeId}
+            class={chip(x.id === activeId)}
+            onClick={() => onSelect(x.id)}
+          >
+            {x.name}
+          </button>
+        ))}
+      <button
+        type="button"
+        class="shrink-0 px-3 py-1.5 rounded-full text-[12.5px] font-semibold border border-dashed border-hairline text-forest bg-white"
+        onClick={onManage}
+      >
+        {options.length ? '⚙︎ المواسم' : '+ موسم جديد'}
+      </button>
+    </div>
+  );
+}
+
 export function StatsScreen() {
   const { mosqueId, halaqaId } = useTenant();
   const { students, loaded: studentsLoaded } = useStudents(mosqueId, halaqaId);
   const { records, loaded: recordsLoaded } = useAllRecords(mosqueId, halaqaId);
 
+  const { seasons, save: saveSeasons } = useSeasons(mosqueId, halaqaId);
+  const today = localDateStr();
+  /** null = follow the current season (the default view). */
+  const [seasonChoice, setSeasonChoice] = useState<string | null>(null);
+  const [seasonsOpen, setSeasonsOpen] = useState(false);
+  const activeSeasonId =
+    seasonChoice && (seasonChoice === ALL_SEASONS || seasons.some((x) => x.id === seasonChoice))
+      ? seasonChoice
+      : currentSeasonId(seasons, today);
+  const activeSeason = seasons.find((x) => x.id === activeSeasonId) ?? null;
+  const seasonWindow = useMemo(
+    () => seasonRange(seasons, activeSeasonId),
+    [activeSeasonId, seasons.map((x) => `${x.id}:${x.from}`).join('|')],
+  );
   const [monthFilter, setMonthFilter] = useState('all');
   const [sortKey, setSortKey] = useState<StatsSortKey>('attend');
   const [search, setSearch] = useState('');
@@ -260,15 +331,31 @@ export function StatsScreen() {
   const [juzNamesOpen, setJuzNamesOpen] = useState(false);
   const [rowsExpanded, setRowsExpanded] = useState(false);
 
+  // Months offered by the picker are the ones inside the selected season.
   const availableMonths = useMemo(() => {
-    const months = new Set(records.map((r) => r.date?.slice(0, 7)).filter(Boolean) as string[]);
+    const months = new Set(
+      records
+        .filter((r) => inPeriod(r.date, seasonWindow))
+        .map((r) => r.date?.slice(0, 7))
+        .filter(Boolean) as string[],
+    );
     return Array.from(months).sort((a, b) => (a < b ? 1 : -1));
-  }, [records]);
+  }, [records, seasonWindow]);
 
-  const filteredRecords = useMemo(() => {
-    if (monthFilter === 'all') return records;
-    return records.filter((r) => r.date?.slice(0, 7) === monthFilter);
-  }, [records, monthFilter]);
+  // A month picked under another season may not exist in this one.
+  const activeMonth =
+    monthFilter === 'all' || availableMonths.includes(monthFilter) ? monthFilter : 'all';
+
+  /** The season, narrowed further by the month picker. A month that straddles
+   * the season's start only counts its days inside the season. */
+  const period = useMemo(
+    () =>
+      activeMonth === 'all' ? seasonWindow : intersectRanges(seasonWindow, toRange(activeMonth)),
+    [rangeKey(seasonWindow), activeMonth],
+  );
+  const periodKey = rangeKey(period);
+
+  const filteredRecords = useMemo(() => filterByPeriod(records, period), [records, periodKey]);
 
   // Second argument is the UNFILTERED set: an assignment given at the end of
   // the selected month is graded in the next one, and that verdict still has
@@ -296,8 +383,8 @@ export function StatsScreen() {
   // by default and expand in place — with ~50 students, showing everything up
   // front would bury تفصيل الطلاب under four long lists.
   const topPages = useMemo(
-    () => computeTopPages(students, records, Infinity, monthFilter),
-    [students, records, monthFilter],
+    () => computeTopPages(students, records, Infinity, period),
+    [students, records, periodKey],
   );
   // Headline for the pages leaderboard below it. Derived from the same rows so
   // the total and the ranking are always the same computation.
@@ -342,11 +429,13 @@ export function StatsScreen() {
       ofDays: summary.totalHalaqaDays,
     }));
   }, [attendBasis, topAttend, topAttendPersonal, topAttendDays, summary.totalHalaqaDays]);
-  // Deliberately reads `records`, never `filteredRecords`: the overall ranking
-  // is cumulative by design (see computeOverallRanking), so the month chips do
-  // not narrow it. The card says so on its face — a leaderboard that silently
-  // ignores the filter sitting above it would just read as a bug.
-  const overall = useMemo(() => computeOverallRanking(students, records), [students, records]);
+  // Narrowed by the SEASON only, never by the month picker: it sits above the
+  // picker and says so on its face. Passes the full `records` plus the window,
+  // since a recitation's verdict is settled by the session after it.
+  const overall = useMemo(
+    () => computeOverallRanking(students, records, seasonWindow),
+    [students, records, rangeKey(seasonWindow)],
+  );
   const visibleOverall = overallExpanded ? overall : overall.slice(0, PREVIEW_COUNT);
 
   const studentRows = useMemo(
@@ -400,10 +489,10 @@ export function StatsScreen() {
     0,
   );
   /** How the selected period reads on a card: a month name, or كل الفترة. */
-  const periodLabel = useMemo(
-    () => (monthFilter === 'all' ? 'كل الفترة' : monthLabel(monthFilter)),
-    [monthFilter],
-  );
+  const periodLabel = useMemo(() => {
+    if (activeMonth !== 'all') return monthLabel(activeMonth);
+    return activeSeason ? activeSeason.name : 'كل الفترة';
+  }, [activeMonth, activeSeason]);
 
   const cardData = useMemo(
     () => buildAttendanceCardData(students, filteredRecords, { periodLabel }),
@@ -412,8 +501,8 @@ export function StatsScreen() {
   const cardSvg = useMemo(() => buildAttendanceCardSvg(cardData), [cardData]);
 
   const pagesCardData = useMemo(
-    () => buildPagesCardData(students, filteredRecords, { monthFilter, periodLabel }),
-    [students, filteredRecords, monthFilter, periodLabel],
+    () => buildPagesCardData(students, records, { period, periodLabel }),
+    [students, records, periodKey, periodLabel],
   );
   const pagesCardSvg = useMemo(() => buildPagesCardSvg(pagesCardData), [pagesCardData]);
 
@@ -488,8 +577,37 @@ export function StatsScreen() {
     <div class="p-[18px] pb-[100px] space-y-3.5" dir="rtl">
       <div class="text-[19px] font-extrabold text-ink-dark mb-1">إحصائيات</div>
 
-      {/* Sits ABOVE the month picker on purpose: it is the one card the picker
-          has no say over, and putting it underneath would imply otherwise. */}
+      <SeasonChips
+        seasons={seasons}
+        activeId={activeSeasonId}
+        onSelect={(id) => {
+          setSeasonChoice(id);
+          setMonthFilter('all');
+        }}
+        onManage={() => setSeasonsOpen(true)}
+      />
+      {seasonsOpen && (
+        <SeasonsModal
+          seasons={seasons}
+          recordDates={records.map((r) => r.date ?? '')}
+          today={today}
+          onClose={() => setSeasonsOpen(false)}
+          onSave={async (list) => {
+            await saveSeasons(list);
+            setSeasonChoice(null);
+            // Every parent page carries the season list and per-season
+            // figures, so all of them are refreshed, not just one student.
+            void republishPublicStatsFor(
+              { mosqueId, halaqaId },
+              students.map((x) => x.id),
+            );
+          }}
+        />
+      )}
+
+      {/* Sits ABOVE the month picker on purpose: the picker has no say over
+          it (only the season chips do), and putting it underneath would imply
+          otherwise. */}
       <StatsCard
         title="🥇 الترتيب العام"
         action={(onShrink) => (
@@ -507,7 +625,8 @@ export function StatsScreen() {
         )}
       >
         <div class="text-[10.5px] text-taupe font-semibold mt-0.5 mb-3.5">
-          حضور ٤٠٪ · تسميع ٣٠٪ · سطور ٣٠٪ — من بداية التسجيل
+          حضور ٤٠٪ · تسميع ٣٠٪ · سطور ٣٠٪ —{' '}
+          {activeSeason ? `من بداية ${activeSeason.name}` : 'من بداية التسجيل'}
           <br />
           السطور: ٥ سطور في الجلسة (ثلث صفحة) = ١٠٠
         </div>
@@ -550,10 +669,10 @@ export function StatsScreen() {
       <div class="relative">
         <select
           class="w-full appearance-none border border-hairline rounded-xl px-4 py-3 pl-10 text-sm font-semibold bg-white text-ink-dark"
-          value={monthFilter}
+          value={activeMonth}
           onChange={(e) => setMonthFilter((e.target as HTMLSelectElement).value)}
         >
-          <option value="all">كل الفترة</option>
+          <option value="all">{activeSeason ? `كل ${activeSeason.name}` : 'كل الفترة'}</option>
           {availableMonths.map((m) => (
             <option key={m} value={m}>
               {monthLabel(m)}

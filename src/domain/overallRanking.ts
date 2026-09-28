@@ -5,6 +5,7 @@ import { LINES_PER_FULL_PAGE } from './lineTable';
 import { hasScore } from './scoring';
 import { computeLohSpan } from './statsScreen';
 import { recordsForStudent } from './students';
+import { filterByPeriod, type PeriodFilter } from './seasons';
 
 /**
  * How the three measured things trade off against each other. They sum to 1,
@@ -120,18 +121,26 @@ function evalScore(o: ScoreEval | null | undefined): number | null {
 export function computeOverallRanking(
   students: Student[],
   allRecords: SessionRecord[],
+  /** A season's window (default: the whole history). Everything is measured
+   * inside it; `allRecords` still has to be the full history, because whether
+   * an assignment was recited is settled by the session AFTER it. */
+  period: PeriodFilter = 'all',
 ): OverallRankEntry[] {
   // Population and attendance both come from the personal-window ranking, so
   // "who appears here" matches the attendance leaderboard exactly: a student
   // with no record at all is left out rather than shown at zero.
-  const attendance = getPersonalAttendanceRanking(students, allRecords, allRecords).list;
+  const attendance = getPersonalAttendanceRanking(
+    students,
+    filterByPeriod(allRecords, period),
+    allRecords,
+  ).list;
   if (!attendance.length) return [];
 
   const studentsById = new Map(students.map((s) => [s.id, s]));
 
   const partial = attendance.map((a) => {
     const student = studentsById.get(a.id)!;
-    const recs = recordsForStudent(student, allRecords);
+    const recs = filterByPeriod(recordsForStudent(student, allRecords), period);
 
     let evalTotal = 0;
     let evalCount = 0;
@@ -148,7 +157,7 @@ export function computeOverallRanking(
     // The SAME span the pages leaderboard measures, counted in lines instead
     // of pages. Both cards now answer "how far has he travelled" identically;
     // only the unit differs, so they can never disagree about a student.
-    const span = computeLohSpan(student, allRecords, 'all');
+    const span = computeLohSpan(student, allRecords, period);
     const lines = span ? linesInPathSpan(span.startPos, span.endPos, span.direction) : 0;
 
     // Attended days, not record count: two records on one day is one session's

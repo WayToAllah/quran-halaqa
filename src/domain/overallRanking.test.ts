@@ -254,3 +254,24 @@ describe('computeOverallRanking — points and ranking', () => {
     );
   });
 });
+
+describe('computeOverallRanking — narrowed to a season', () => {
+  it('scores only what happened inside the period', () => {
+    const records = [
+      ...attended('s_1', DAYS.slice(0, 3), 60),
+      ...attended('s_2', DAYS.slice(0, 3), 100).map((r) => ({ ...r, id: r.id + 'x' })),
+      ...attended('s_1', DAYS.slice(3), 100).map((r) => ({ ...r, id: r.id + 'n' })),
+    ];
+    const season = { from: DAYS[3] };
+    const list = computeOverallRanking(students, records, season);
+    // s_2 never came in the new season: he is not on its board at all.
+    expect(list.map((e) => e.id)).toEqual(['s_1']);
+    expect(list[0].attendPct).toBe(100);
+    // The whole-history board is unchanged by the new parameter.
+    expect(
+      computeOverallRanking(students, records)
+        .map((e) => e.id)
+        .sort(),
+    ).toEqual(['s_1', 's_2']);
+  });
+});

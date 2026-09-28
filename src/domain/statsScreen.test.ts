@@ -416,6 +416,17 @@ describe('computeTopPages', () => {
     expect(computeTopPages(students, records, 3, 'all')[0].pages).toBe(1);
   });
 
+  it('accepts a season date range, not only a month', () => {
+    const records: SessionRecord[] = [
+      { id: 'r1', studentId: 's_1', date: '2026-09-20', newLoh: [{ sura: 'الفاتحة' }] },
+      { id: 'r2', studentId: 's_1', date: '2026-09-27', loh: { score: 90 } },
+    ];
+    // The assignment was given in the old season: it belongs there, even
+    // though it was recited on the new season's first day.
+    expect(computeTopPages(students, records, 3, { to: '2026-09-27' })[0].pages).toBe(1);
+    expect(computeTopPages(students, records, 3, { from: '2026-09-27' })).toHaveLength(0);
+  });
+
   it('excludes students with no completed pages instead of listing zeros', () => {
     const records: SessionRecord[] = [
       { id: 'r1', studentId: 's_1', date: '2026-07-01', newLoh: [{ sura: 'الفاتحة' }] },

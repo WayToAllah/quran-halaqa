@@ -1,4 +1,5 @@
 import type { Student, SessionRecord } from '../types';
+import type { PeriodFilter } from './seasons';
 import { computeTopPages } from './statsScreen';
 import { pagesLabel } from './pages';
 import { CARD_FOOTER } from './attendanceCard';
@@ -32,7 +33,8 @@ export interface PagesCardOptions {
    * rather than a ranking. */
   limit?: number;
   /** 'all', or the 'YYYY-MM' the stats screen is filtered to. */
-  monthFilter?: string;
+  /** 'all', a 'YYYY-MM' month, or a season's date range. */
+  period?: PeriodFilter;
   periodLabel?: string;
 }
 
@@ -44,7 +46,7 @@ export function buildPagesCardData(
   opts: PagesCardOptions = {},
 ): PagesCardData {
   const limit = opts.limit ?? DEFAULT_ROWS;
-  const top = computeTopPages(students, records, limit, opts.monthFilter ?? 'all');
+  const top = computeTopPages(students, records, limit, opts.period ?? 'all');
   const entries: PagesCardEntry[] = top.map((e) => ({
     rank: e.rank,
     name: e.name,

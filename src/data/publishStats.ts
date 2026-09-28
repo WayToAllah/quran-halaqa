@@ -9,6 +9,8 @@ import { setPublicStats } from './publicStats.repo';
 import { getAllRecords } from './records.repo';
 import { getAllStudents } from './students.repo';
 import { getCachedHalaqaSnapshot } from './halaqaCache';
+import { getSeasons } from './seasons.repo';
+import type { Season } from '../domain/seasons';
 import type { Tenant } from '../domain/tenant';
 
 /**
@@ -46,6 +48,7 @@ export async function publishStudentPublicStats(
   student: Student,
   allStudents: Student[],
   allRecords: SessionRecord[],
+  seasons: Season[] = [],
 ): Promise<void> {
   if (!student.parentToken) return;
   try {
@@ -60,6 +63,7 @@ export async function publishStudentPublicStats(
       totalHalaqaDays,
       rank,
       halaqaDatesDesc,
+      seasons,
     );
     await setPublicStats(student.parentToken, stats);
   } catch (err) {
@@ -96,6 +100,11 @@ export async function republishPublicStatsFor(tenant: Tenant, studentIds: string
       records: await getAllRecords(mosqueId, halaqaId),
     };
     const inputs = computeSharedStatsInputs(allStudents, allRecords);
+    // Seasons failing to load must not block the rest of the projection.
+    const seasons = await getSeasons(mosqueId, halaqaId).catch((err) => {
+      console.warn('republishPublicStatsFor: seasons read failed', err);
+      return [] as Season[];
+    });
     await Promise.all(
       studentIds.map(async (id) => {
         const student = allStudents.find((s) => s.id === id);
@@ -108,6 +117,7 @@ export async function republishPublicStatsFor(tenant: Tenant, studentIds: string
             inputs.totalHalaqaDays,
             rank,
             inputs.halaqaDatesDesc,
+            seasons,
           );
           await setPublicStats(student.parentToken, stats);
         } catch (err) {

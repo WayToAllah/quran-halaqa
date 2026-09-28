@@ -18,6 +18,7 @@ import {
   formatShortDate,
   SESSIONS_WINDOW,
   buildMonthOptions,
+  buildPeriodOptions,
   ALL_MONTHS,
 } from './parentView';
 import { MOCK_PUBLIC_STATS } from './mockPublicStats';
@@ -819,5 +820,52 @@ describe('buildStats — filtered by month', () => {
     expect(buildStats(stats, '2026-06').map((c) => c.label)).toEqual(
       buildStats(stats).map((c) => c.label),
     );
+  });
+});
+
+describe('buildPeriodOptions — seasons', () => {
+  const entry = (attendPct: number) => ({
+    attendPct,
+    attendedDays: 1,
+    halaqaDays: 2,
+    totalAyat: 10,
+    avgLoh: 90,
+    avgMadi: null,
+  });
+  const withSeasons = baseStats({
+    monthlyStats: { '2026-07': entry(10), '2026-09': entry(20) },
+    seasons: [
+      { id: 'sum', name: 'صيف 2026', from: '2026-06-01' },
+      { id: 'stu', name: 'دراسة 2027', from: '2026-09-27' },
+    ],
+    seasonStats: { sum: entry(60), stu: entry(50) },
+  });
+
+  it('offers seasons newest first then الكل, defaulting to the current season', () => {
+    const { options, defaultKey } = buildPeriodOptions(withSeasons, '2026-09-28');
+    expect(options.map((o) => o.label)).toEqual(['دراسة 2027', 'صيف 2026', 'الكل']);
+    expect(defaultKey).toBe(options[0].key);
+    expect(buildStats(withSeasons, defaultKey)[0].value).toBe('٥٠٪');
+    expect(buildStats(withSeasons, options[1].key)[0].value).toBe('٦٠٪');
+  });
+
+  it('before the new season starts, the default is still the old one', () => {
+    const { options, defaultKey } = buildPeriodOptions(withSeasons, '2026-09-20');
+    expect(defaultKey).toBe(options[1].key);
+  });
+
+  it('leaves out a season the student has no figures for', () => {
+    const joinedLate = { ...withSeasons, seasonStats: { stu: entry(50) } };
+    expect(buildPeriodOptions(joinedLate, '2026-09-28').options.map((o) => o.label)).toEqual([
+      'دراسة 2027',
+      'الكل',
+    ]);
+  });
+
+  it('without seasons falls back to the month chips, all-time by default', () => {
+    const noSeasons = baseStats({ monthlyStats: { '2026-07': entry(10), '2026-09': entry(20) } });
+    const { options, defaultKey } = buildPeriodOptions(noSeasons, '2026-09-28');
+    expect(options).toEqual(buildMonthOptions(noSeasons));
+    expect(defaultKey).toBe(ALL_MONTHS);
   });
 });

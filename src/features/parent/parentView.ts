@@ -4,6 +4,7 @@ import { gregorianStr, gregorianLong } from '../../domain/dates';
 import { hijriShort } from '../../domain/hijri';
 import { toArabicDigits, formatArabicNumber, arabicPlural } from '../../domain/text';
 import { scoreName } from '../../domain/scoring';
+import { currentSeasonId } from '../../domain/seasons';
 
 /**
  * Pure transforms for the parent (child) page. Kept DOM-free so the chart
@@ -322,6 +323,32 @@ export function buildMonthOptions(stats: PublicStats): MonthOption[] {
   ];
 }
 
+const SEASON_PREFIX = 'season:';
+
+/**
+ * The chips over the stat grid. Once the halaqa has seasons they replace the
+ * month chips: the seasons the student has figures for, newest first, then
+ * الكل — and the page opens on the CURRENT season, so a new season starts every
+ * parent's numbers from zero. Without seasons this is exactly the old month
+ * row, opening on الكل.
+ */
+export function buildPeriodOptions(
+  stats: PublicStats,
+  today: string,
+): { options: MonthOption[]; defaultKey: string } {
+  const seasons = stats.seasons ?? [];
+  const seasonStats = stats.seasonStats ?? {};
+  const offered = seasons.filter((x) => seasonStats[x.id]);
+  if (!offered.length) return { options: buildMonthOptions(stats), defaultKey: ALL_MONTHS };
+  const options: MonthOption[] = [
+    ...[...offered].reverse().map((x) => ({ key: SEASON_PREFIX + x.id, label: x.name })),
+    { key: ALL_MONTHS, label: 'الكل' },
+  ];
+  const current = SEASON_PREFIX + currentSeasonId(seasons, today);
+  const defaultKey = options.some((o) => o.key === current) ? current : options[0].key;
+  return { options, defaultKey };
+}
+
 /**
  * The four headline numbers, either all-time or for one month.
  *
@@ -332,7 +359,12 @@ export function buildMonthOptions(stats: PublicStats): MonthOption[] {
  * all-time figures rather than showing zeros.
  */
 export function buildStats(stats: PublicStats, month: string = ALL_MONTHS): StatCell[] {
-  const m = month !== ALL_MONTHS ? stats.monthlyStats?.[month] : undefined;
+  const m =
+    month === ALL_MONTHS
+      ? undefined
+      : month.startsWith(SEASON_PREFIX)
+        ? stats.seasonStats?.[month.slice(SEASON_PREFIX.length)]
+        : stats.monthlyStats?.[month];
   const attended = m ? m.attendedDays : (stats.attendedDays ?? stats.uniqueDays);
   const enrolled = m ? m.halaqaDays : stats.enrolledHalaqaDays;
   const avgLoh = m ? m.avgLoh : stats.avgLoh;
