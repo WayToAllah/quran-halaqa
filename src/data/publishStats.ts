@@ -11,6 +11,7 @@ import { getAllStudents } from './students.repo';
 import { getCachedHalaqaSnapshot } from './halaqaCache';
 import { getSeasons } from './seasons.repo';
 import type { Season } from '../domain/seasons';
+import { policyFromSeasons } from '../domain/attendancePolicy';
 import type { Tenant } from '../domain/tenant';
 
 /**
@@ -19,11 +20,18 @@ import type { Tenant } from '../domain/tenant';
  * once, from the full students+records set. Returned so a caller pushing many
  * students at once (bulk attendance) computes them a single time.
  */
-export function computeSharedStatsInputs(students: Student[], records: SessionRecord[]) {
+export function computeSharedStatsInputs(
+  students: Student[],
+  records: SessionRecord[],
+  seasons: Season[] = [],
+) {
+  // The rank on the parent page follows the same weekly quota as everything
+  // else once a season sets one.
   const { totalHalaqaDays, list } = getAttendanceRanking(
     students,
     records,
     ATTENDANCE_BADGE_THRESHOLD,
+    policyFromSeasons(seasons),
   );
   // Keyed by stable student id, NOT display name — two students with the same
   // name must never share/steal a rank (same principle as studentMatch()).
@@ -55,6 +63,7 @@ export async function publishStudentPublicStats(
     const { totalHalaqaDays, rankById, halaqaDatesDesc } = computeSharedStatsInputs(
       allStudents,
       allRecords,
+      seasons,
     );
     const rank = rankById[student.id] ?? null;
     const stats = buildStudentPublicStats(
@@ -99,12 +108,12 @@ export async function republishPublicStatsFor(tenant: Tenant, studentIds: string
       students: await getAllStudents(mosqueId, halaqaId),
       records: await getAllRecords(mosqueId, halaqaId),
     };
-    const inputs = computeSharedStatsInputs(allStudents, allRecords);
     // Seasons failing to load must not block the rest of the projection.
     const seasons = await getSeasons(mosqueId, halaqaId).catch((err) => {
       console.warn('republishPublicStatsFor: seasons read failed', err);
       return [] as Season[];
     });
+    const inputs = computeSharedStatsInputs(allStudents, allRecords, seasons);
     await Promise.all(
       studentIds.map(async (id) => {
         const student = allStudents.find((s) => s.id === id);

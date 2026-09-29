@@ -869,3 +869,14 @@ describe('buildPeriodOptions — seasons', () => {
     expect(defaultKey).toBe(ALL_MONTHS);
   });
 });
+
+describe('buildStats — extra days under a weekly quota', () => {
+  it('shows the days beyond the quota beside the fraction', () => {
+    const s = baseStats({ attendedDays: 8, enrolledHalaqaDays: 8, attendPct: 100, extraDays: 2 });
+    expect(buildStats(s)[0].sub).toBe('٨ من ٨ أيام · \u2066+٢\u2069 زيادة');
+  });
+  it('no extra line when there are none', () => {
+    const s = baseStats({ attendedDays: 8, enrolledHalaqaDays: 8, attendPct: 100, extraDays: 0 });
+    expect(buildStats(s)[0].sub).toBe('٨ من ٨ أيام');
+  });
+});

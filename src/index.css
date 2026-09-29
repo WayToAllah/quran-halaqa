@@ -1,7 +1,7 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
-  --font-sans: "Tajawal", "Segoe UI", Tahoma, Arial, sans-serif;
+  --font-sans: 'Tajawal', 'Segoe UI', Tahoma, Arial, sans-serif;
   /* App-wide brand palette (forest/mustard/parchment) — every admin screen
      (Record, Students, Log, Stats, Login) plus the shared header/nav now
      uses these. Single named colors rather than a full 50-900 scale: tints
@@ -10,13 +10,13 @@
      نجوم الحضور share card (attendanceCard.ts) use their own literal hex
      values instead of these tokens, since both render outside the regular
      Tailwind-in-the-DOM pipeline (raw SVG / SVG→canvas→PNG). */
-  --color-forest: #0F3D2E;
-  --color-forest-deep: #0A2E22;
-  --color-mustard: #C9A227;
-  --color-parchment: #FAF7F0;
-  --color-ink-dark: #1E2A24;
-  --color-taupe: #8A8372;
-  --color-hairline: #ECE6D6;
+  --color-forest: #0f3d2e;
+  --color-forest-deep: #0a2e22;
+  --color-mustard: #c9a227;
+  --color-parchment: #faf7f0;
+  --color-ink-dark: #1e2a24;
+  --color-taupe: #8a8372;
+  --color-hairline: #ece6d6;
 }
 
 html {

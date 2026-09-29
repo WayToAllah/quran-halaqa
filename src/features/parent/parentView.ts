@@ -374,7 +374,7 @@ export function buildStats(stats: PublicStats, month: string = ALL_MONTHS): Stat
       label: 'نسبة الحضور',
       value: toArabicDigits(m ? m.attendPct : stats.attendPct) + '٪',
       color: 'ink',
-      ...subFor(attendanceFraction(attended, enrolled)),
+      ...subFor(attendanceFraction(attended, enrolled, m ? m.extraDays : stats.extraDays)),
     },
     {
       label: 'آية مُسمّعة',
@@ -407,14 +407,22 @@ function subFor(sub: string | undefined): { sub?: string } {
  * middle dot between Arabic-Indic digits reorders under bidi and reads as one
  * long numeral.
  */
-function attendanceFraction(attended: number, enrolled: number | undefined): string | undefined {
+function attendanceFraction(
+  attended: number,
+  enrolled: number | undefined,
+  /** Days beyond the weekly quota: they never raise the percentage, but the
+   * parent should still see that his son came more than he had to. */
+  extra = 0,
+): string | undefined {
   if (!enrolled || enrolled <= 0) return undefined;
-  return `${toArabicDigits(attended)} من ${arabicPlural(enrolled, {
+  const base = `${toArabicDigits(attended)} من ${arabicPlural(enrolled, {
     one: 'يوم واحد',
     two: 'يومين',
     few: 'أيام',
     many: 'يوم',
   })}`;
+  // The "+" is isolated left-to-right: bare, bidi flips it after the digit (٢+).
+  return extra > 0 ? `${base} · \u2066+${toArabicDigits(extra)}\u2069 زيادة` : base;
 }
 
 /**

@@ -1,5 +1,6 @@
 import type { Student, SessionRecord } from '../types';
 import { getAttendanceRanking, ATTENDANCE_BADGE_THRESHOLD } from './attendance';
+import type { AttendancePolicy } from './attendancePolicy';
 import { toArabicDigits } from './text';
 import { buildStarsCardSvg, starsCardSize, starsRankBadge, type StarsCardModel } from './starsCard';
 
@@ -33,6 +34,8 @@ export interface CardOptions {
   limit?: number;
   /** Label for the period shown, e.g. 'يوليو ٢٠٢٦' or 'كل الفترة'. */
   periodLabel?: string;
+  /** Weekly quota from the seasons (default: every day owed). */
+  policy?: AttendancePolicy;
 }
 
 export const CARD_FOOTER = 'جزاكم الله خيراً 🤲';
@@ -44,7 +47,7 @@ export function buildAttendanceCardData(
 ): AttendanceCardData {
   const minPct = opts.minPct ?? ATTENDANCE_BADGE_THRESHOLD;
   const limit = opts.limit ?? 10;
-  const { totalHalaqaDays, list } = getAttendanceRanking(students, records, minPct);
+  const { totalHalaqaDays, list } = getAttendanceRanking(students, records, minPct, opts.policy);
   const stars: AttendanceCardStar[] = list.slice(0, limit).map((e) => ({
     rank: e.rank,
     name: e.name,

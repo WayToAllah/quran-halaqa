@@ -1,5 +1,7 @@
 import type { SessionRecord, Student } from '../types';
 import { getStudentName, recordsForStudent } from './students';
+import { PER_DAY, tallyAttendance, type AttendancePolicy } from './attendancePolicy';
+import { localDateStr } from './dates';
 
 /**
  * Bonus/makeup halaqa days that shouldn't count against attendance
@@ -115,8 +117,11 @@ export interface PersonalAttendanceRankEntry {
   name: string;
   /** Enrolled halaqa days the student actually turned up for. */
   attendedDays: number;
-  /** Halaqa days inside the window from the student's join date onward. */
+  /** Days owed inside the window from the student's join date onward — every
+   * halaqa day, or the weekly quota under a season that sets one. */
   enrolledDays: number;
+  /** Days beyond the weekly quota (always 0 without one). */
+  extraDays: number;
   attendPct: number;
   rank: number;
 }
@@ -141,6 +146,8 @@ export function getPersonalAttendanceRanking(
   students: Student[],
   windowRecords: SessionRecord[],
   allRecords: SessionRecord[],
+  policy: AttendancePolicy = PER_DAY,
+  today: string = localDateStr(),
 ): { list: PersonalAttendanceRankEntry[] } {
   const windowDates = sortedHalaqaDatesDesc(windowRecords);
 
@@ -149,12 +156,16 @@ export function getPersonalAttendanceRanking(
       const recs = recordsForStudent(s, windowRecords);
       if (!recs.length) return null;
       const enrolled = enrolledHalaqaDates(recordsForStudent(s, allRecords), windowDates);
-      const enrolledDays = enrolled.length;
-      const studentDates = new Set(recs.map((r) => r.date));
-      const attendedDays = enrolled.filter((d) => studentDates.has(d)).length;
-      const attendPct =
-        enrolledDays > 0 ? Math.min(100, Math.round((attendedDays / enrolledDays) * 100)) : 0;
-      return { id: s.id, name: getStudentName(s), attendedDays, enrolledDays, attendPct };
+      const studentDates = new Set(recs.map((r) => r.date).filter((d): d is string => !!d));
+      const t = tallyAttendance(studentDates, enrolled, policy, today);
+      return {
+        id: s.id,
+        name: getStudentName(s),
+        attendedDays: t.attended,
+        enrolledDays: t.required,
+        extraDays: t.extra,
+        attendPct: Math.min(100, t.pct),
+      };
     })
     .filter((x): x is Omit<PersonalAttendanceRankEntry, 'rank'> => x !== null);
 
@@ -184,6 +195,12 @@ export interface AttendanceRankEntry {
   uniqueDays: number;
   attendPct: number;
   rank: number;
+  /** Days owed (the percentage's denominator for this student). */
+  requiredDays?: number;
+  /** Days that counted toward what was owed. */
+  creditedDays?: number;
+  /** Days beyond the weekly quota. */
+  extraDays?: number;
 }
 
 /** Top-3 ranks get a medal emoji; everyone else just shows their number. */
@@ -202,7 +219,12 @@ export function getAttendanceRanking(
   students: Student[],
   recordsFilter: SessionRecord[],
   minPct?: number,
+  /** Per-day by default. Under a weekly quota every student is measured on
+   * the same halaqa-wide calendar, just counted in weeks. */
+  policy: AttendancePolicy = PER_DAY,
+  today: string = localDateStr(),
 ): { totalHalaqaDays: number; list: AttendanceRankEntry[] } {
+  const halaqaDates = sortedHalaqaDatesDesc(recordsFilter);
   const totalHalaqaDays = new Set(
     recordsFilter
       .map((r) => r.date)
@@ -210,18 +232,31 @@ export function getAttendanceRanking(
   ).size;
 
   const per = students
-    .map((s) => {
+    .map((s): Omit<AttendanceRankEntry, 'rank'> | null => {
       const name = getStudentName(s);
       const recs = recordsForStudent(s, recordsFilter);
       if (!recs.length) return null;
       const uniqueDays = new Set(recs.map((r) => r.date)).size;
-      const attendPct =
-        totalHalaqaDays > 0 ? Math.min(100, Math.round((uniqueDays / totalHalaqaDays) * 100)) : 0;
-      return { id: s.id, name, uniqueDays, attendPct };
+      if (policy === PER_DAY) {
+        // The original rule, kept byte-for-byte: a bonus-day attendance still
+        // counts in the numerator here (capped at 100).
+        const attendPct =
+          totalHalaqaDays > 0 ? Math.min(100, Math.round((uniqueDays / totalHalaqaDays) * 100)) : 0;
+        return { id: s.id, name, uniqueDays, attendPct };
+      }
+      const dates = new Set(recs.map((r) => r.date).filter((d): d is string => !!d));
+      const t = tallyAttendance(dates, halaqaDates, policy, today);
+      return {
+        id: s.id,
+        name,
+        uniqueDays,
+        attendPct: Math.min(100, t.pct),
+        requiredDays: t.required,
+        creditedDays: t.credited,
+        extraDays: t.extra,
+      };
     })
-    .filter(
-      (x): x is { id: string; name: string; uniqueDays: number; attendPct: number } => x !== null,
-    );
+    .filter((x): x is Omit<AttendanceRankEntry, 'rank'> => x !== null);
 
   // ترتيب تنازلي؛ الأيام الفريدة والاسم معيار ثانوي للترتيب البصري فقط (مش للمركز)
   per.sort(
@@ -259,8 +294,16 @@ export function getAttendanceRanking(
 export function getDaysAttendedRanking(
   students: Student[],
   recordsFilter: SessionRecord[],
+  policy: AttendancePolicy = PER_DAY,
+  today: string = localDateStr(),
 ): { totalHalaqaDays: number; list: AttendanceRankEntry[] } {
-  const { totalHalaqaDays, list } = getAttendanceRanking(students, recordsFilter);
+  const { totalHalaqaDays, list } = getAttendanceRanking(
+    students,
+    recordsFilter,
+    undefined,
+    policy,
+    today,
+  );
 
   // النسبة معيار تانوي للعرض بس — لما اتنين يتساووا في عدد الأيام، اللي نسبته
   // أعلى يظهر فوق، من غير ما يفرق في رقم المركز.

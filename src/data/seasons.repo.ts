@@ -49,6 +49,8 @@ export async function getSeasons(mosqueId: string, halaqaId: string): Promise<Se
 
 /** Persists the whole list. merge → only the `seasons` field is touched. */
 export function saveSeasons(mosqueId: string, halaqaId: string, seasons: Season[]): Promise<void> {
-  const clean = seasons.map(({ id, name, from }) => ({ id, name: name.trim(), from }));
+  const clean = seasons.map(({ id, name, from, daysPerWeek }) =>
+    daysPerWeek ? { id, name: name.trim(), from, daysPerWeek } : { id, name: name.trim(), from },
+  );
   return setDoc(halaqaDocRef(mosqueId, halaqaId), { seasons: clean }, { merge: true });
 }

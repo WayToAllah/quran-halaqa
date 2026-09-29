@@ -26,6 +26,16 @@ interface Props {
  * far as one named season, and a new one starting today — so starting a new
  * season is a single tap on حفظ.
  */
+const QUOTA_LABELS: Record<number, string> = {
+  1: 'يوم واحد',
+  2: 'يومين',
+  3: '٣ أيام',
+  4: '٤ أيام',
+  5: '٥ أيام',
+  6: '٦ أيام',
+  7: '٧ أيام',
+};
+
 export function SeasonsModal({ seasons, recordDates, today, onSave, onClose }: Props) {
   const { showToast } = useToast();
   const [rows, setRows] = useState<Season[]>(() =>
@@ -78,41 +88,62 @@ export function SeasonsModal({ seasons, recordDates, today, onSave, onClose }: P
 
         <div class="p-5 space-y-2.5">
           {rows.map((row, i) => (
-            <div class="flex items-center gap-2" key={row.id}>
-              <input
-                type="text"
-                dir="rtl"
-                placeholder="اسم الموسم"
-                aria-label="اسم الموسم"
-                class="flex-1 min-w-0 border border-hairline rounded-xl px-3 py-2.5 text-sm text-ink-dark"
-                value={row.name}
-                onInput={(e) => setRow(i, { name: (e.target as HTMLInputElement).value })}
-              />
-              <input
-                type="date"
-                aria-label="بداية الموسم"
-                class="w-[9.5rem] shrink-0 border border-hairline rounded-xl px-2 py-2.5 text-[13px] text-ink-dark"
-                value={row.from}
-                onInput={(e) => setRow(i, { from: (e.target as HTMLInputElement).value })}
-              />
-              <button
-                type="button"
-                class="w-9 h-9 shrink-0 border border-hairline bg-white rounded-[10px] flex items-center justify-center"
-                onClick={() => setRows((r) => r.filter((_, idx) => idx !== i))}
-                aria-label="حذف الموسم"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  width="15"
-                  height="15"
-                  fill="none"
-                  stroke="#B24A3A"
-                  stroke-width="1.8"
-                  stroke-linecap="round"
+            <div class="space-y-2 pb-2.5 border-b border-hairline last:border-0" key={row.id}>
+              <div class="flex items-center gap-2">
+                <input
+                  type="text"
+                  dir="rtl"
+                  placeholder="اسم الموسم"
+                  aria-label="اسم الموسم"
+                  class="flex-1 min-w-0 border border-hairline rounded-xl px-3 py-2.5 text-sm text-ink-dark"
+                  value={row.name}
+                  onInput={(e) => setRow(i, { name: (e.target as HTMLInputElement).value })}
+                />
+                <input
+                  type="date"
+                  aria-label="بداية الموسم"
+                  class="w-[9.5rem] shrink-0 border border-hairline rounded-xl px-2 py-2.5 text-[13px] text-ink-dark"
+                  value={row.from}
+                  onInput={(e) => setRow(i, { from: (e.target as HTMLInputElement).value })}
+                />
+                <button
+                  type="button"
+                  class="w-9 h-9 shrink-0 border border-hairline bg-white rounded-[10px] flex items-center justify-center"
+                  onClick={() => setRows((r) => r.filter((_, idx) => idx !== i))}
+                  aria-label="حذف الموسم"
                 >
-                  <path d="M5 6.5h14M9.5 6.5V4.8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1.7M7 6.5l.8 12.7a1.5 1.5 0 0 0 1.5 1.4h5.4a1.5 1.5 0 0 0 1.5-1.4l.8-12.7" />
-                </svg>
-              </button>
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="15"
+                    height="15"
+                    fill="none"
+                    stroke="#B24A3A"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                  >
+                    <path d="M5 6.5h14M9.5 6.5V4.8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1.7M7 6.5l.8 12.7a1.5 1.5 0 0 0 1.5 1.4h5.4a1.5 1.5 0 0 0 1.5-1.4l.8-12.7" />
+                  </svg>
+                </button>
+              </div>
+              <label class="flex items-center gap-2 text-[12.5px] text-[#5B5646] font-semibold">
+                <span class="shrink-0">الحضور المطلوب:</span>
+                <select
+                  aria-label="أيام الحضور في الأسبوع"
+                  class="flex-1 min-w-0 border border-hairline rounded-xl px-2.5 py-2 text-[13px] text-ink-dark bg-white"
+                  value={row.daysPerWeek ? String(row.daysPerWeek) : ''}
+                  onChange={(e) => {
+                    const v = (e.target as HTMLSelectElement).value;
+                    setRow(i, { daysPerWeek: v ? Number(v) : undefined });
+                  }}
+                >
+                  <option value="">كل أيام الحلقة</option>
+                  {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                    <option key={n} value={String(n)}>
+                      {QUOTA_LABELS[n]} في الأسبوع
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
           ))}
 
@@ -127,6 +158,9 @@ export function SeasonsModal({ seasons, recordDates, today, onSave, onClose }: P
           {rows.length > 0 && (
             <div class="text-[11px] text-taupe bg-parchment rounded-xl px-3 py-2.5 leading-relaxed">
               أول موسم بيشمل كمان أي تسجيل قبل تاريخه.
+              <br />
+              «يوم في الأسبوع» يعني أي يوم يحضره يحسب، والأيام الزيادة بتظهر جنب النسبة من غير ما
+              تعلّيها.
             </div>
           )}
           {error && rows.length > 0 && (

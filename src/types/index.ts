@@ -126,7 +126,7 @@ export interface Halaqa {
   niyyat?: string[];
   /** Seasons (مواسم) — see domain/seasons.ts. Each is only a start date; it
    * ends where the next begins. Absent → no seasons, stats show all history. */
-  seasons?: { id: string; name: string; from: string }[];
+  seasons?: { id: string; name: string; from: string; daysPerWeek?: number }[];
 }
 
 export interface Badge {
@@ -201,12 +201,16 @@ export interface PublicStats {
       /** Optional for the same reason. `undefined` (never published) and
        * `null` (published, nothing scored) both render as a dash. */
       avgMadi?: number | null;
+      /** Days beyond the weekly quota; only under a season that sets one. */
+      extraDays?: number;
     }
   >;
+  /** Days beyond the weekly quota, all-time; only once a season sets one. */
+  extraDays?: number;
   /** The halaqa's seasons (oldest first), copied in so the parent page can
    * label its chips without reading the halaqa doc. Absent until the halaqa
    * has seasons. */
-  seasons?: { id: string; name: string; from: string }[];
+  seasons?: { id: string; name: string; from: string; daysPerWeek?: number }[];
   /** Same shape as monthlyStats, keyed by season id. */
   seasonStats?: Record<string, PublicStats['monthlyStats'][string]>;
 }

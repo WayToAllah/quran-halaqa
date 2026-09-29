@@ -17,6 +17,7 @@ import {
   computeTopPages,
   sumMemorizedPages,
   computeFollowUpList,
+  averageWeeklyAttendance,
   computeStudentStatsRows,
   sortStudentStatsRows,
   countRecentlyActiveStudents,
@@ -39,6 +40,7 @@ import { useSeasons } from '../../hooks/useSeasons';
 import { SeasonsModal } from '../seasons/SeasonsModal';
 import { republishPublicStatsFor } from '../../data/publishStats';
 import { localDateStr } from '../../domain/dates';
+import { policyFromSeasons } from '../../domain/attendancePolicy';
 import {
   ALL_SEASONS,
   currentSeasonId,
@@ -84,6 +86,8 @@ interface AttendRow {
   attendPct: number;
   days: number;
   ofDays: number;
+  /** Days beyond the weekly quota (0 without one). */
+  extra: number;
 }
 
 const ATTEND_BASIS_TABS: { key: AttendBasis; label: string }[] = [
@@ -204,6 +208,8 @@ const AYAT_FORMS = {
 } as const;
 
 /** حلقة واحدة / حلقتين / ٣ حلقات / ١٢ حلقة */
+const WEEK_FORMS = { one: 'أسبوع واحد', two: 'أسبوعين', few: 'أسابيع', many: 'أسبوع' };
+
 const HALAQA_FORMS = {
   one: 'حلقة واحدة',
   two: 'حلقتين',
@@ -312,6 +318,13 @@ export function StatsScreen() {
     () => seasonRange(seasons, activeSeasonId),
     [activeSeasonId, seasons.map((x) => `${x.id}:${x.from}`).join('|')],
   );
+  // Weekly attendance quotas come from the seasons; without any, every
+  // halaqa day is owed (the original rule).
+  const policy = useMemo(
+    () => policyFromSeasons(seasons),
+    [seasons.map((x) => `${x.id}:${x.from}:${x.daysPerWeek ?? ''}`).join('|')],
+  );
+  const weeklyView = !!activeSeason?.daysPerWeek;
   const [monthFilter, setMonthFilter] = useState('all');
   const [sortKey, setSortKey] = useState<StatsSortKey>('attend');
   const [search, setSearch] = useState('');
@@ -393,19 +406,19 @@ export function StatsScreen() {
   // teacher most needs to see. The threshold survives as a visual marker in
   // the expanded list instead of as a filter that hides them.
   const topAttend = useMemo(
-    () => getAttendanceRanking(students, filteredRecords).list,
-    [students, filteredRecords],
+    () => getAttendanceRanking(students, filteredRecords, undefined, policy, today).list,
+    [students, filteredRecords, policy, today],
   );
   // Second argument is the window, third is the FULL history — the join date
   // has to come from outside the selected month or every veteran restarts at
   // his first day in it and scores a free 100%.
   const topAttendPersonal = useMemo(
-    () => getPersonalAttendanceRanking(students, filteredRecords, records).list,
-    [students, filteredRecords, records],
+    () => getPersonalAttendanceRanking(students, filteredRecords, records, policy, today).list,
+    [students, filteredRecords, records, policy, today],
   );
   const topAttendDays = useMemo(
-    () => getDaysAttendedRanking(students, filteredRecords).list,
-    [students, filteredRecords],
+    () => getDaysAttendedRanking(students, filteredRecords, policy, today).list,
+    [students, filteredRecords, policy, today],
   );
   /** All three rankings flattened to one row shape so the card renders once. */
   const attendRows = useMemo<AttendRow[]>(() => {
@@ -415,8 +428,9 @@ export function StatsScreen() {
         name: x.name,
         rank: x.rank,
         attendPct: x.attendPct,
-        days: x.attendedDays,
+        days: x.attendedDays - x.extraDays,
         ofDays: x.enrolledDays,
+        extra: x.extraDays,
       }));
     }
     const source = attendBasis === 'days' ? topAttendDays : topAttend;
@@ -425,21 +439,28 @@ export function StatsScreen() {
       name: x.name,
       rank: x.rank,
       attendPct: x.attendPct,
-      days: x.uniqueDays,
-      ofDays: summary.totalHalaqaDays,
+      // Under a weekly quota the percentage divides credited days by days
+      // owed, so the row shows those two, and the surplus beside them.
+      days: attendBasis !== 'days' && x.creditedDays !== undefined ? x.creditedDays : x.uniqueDays,
+      ofDays:
+        attendBasis !== 'days' && x.requiredDays !== undefined
+          ? x.requiredDays
+          : summary.totalHalaqaDays,
+      extra: x.extraDays ?? 0,
     }));
   }, [attendBasis, topAttend, topAttendPersonal, topAttendDays, summary.totalHalaqaDays]);
   // Narrowed by the SEASON only, never by the month picker: it sits above the
   // picker and says so on its face. Passes the full `records` plus the window,
   // since a recitation's verdict is settled by the session after it.
   const overall = useMemo(
-    () => computeOverallRanking(students, records, seasonWindow),
-    [students, records, rangeKey(seasonWindow)],
+    () => computeOverallRanking(students, records, seasonWindow, policy, today),
+    [students, records, rangeKey(seasonWindow), policy, today],
   );
   const visibleOverall = overallExpanded ? overall : overall.slice(0, PREVIEW_COUNT);
 
   const studentRows = useMemo(
-    () => computeStudentStatsRows(students, filteredRecords, summary.totalHalaqaDays),
+    () =>
+      computeStudentStatsRows(students, filteredRecords, summary.totalHalaqaDays, policy, today),
     [students, filteredRecords, summary.totalHalaqaDays],
   );
   const visibleRows = useMemo(() => {
@@ -454,7 +475,7 @@ export function StatsScreen() {
   const visibleStudentRows = rowsExpanded ? visibleRows : visibleRows.slice(0, PREVIEW_COUNT);
 
   const followUp = useMemo(
-    () => computeFollowUpList(students, filteredRecords, ABSENCE_ALERT_STREAK),
+    () => computeFollowUpList(students, filteredRecords, ABSENCE_ALERT_STREAK, policy, today),
     [students, filteredRecords],
   );
   const visibleFollowUp = followUpExpanded ? followUp : followUp.slice(0, PREVIEW_COUNT);
@@ -475,10 +496,14 @@ export function StatsScreen() {
   // student, so students who stopped coming months ago don't permanently
   // depress the figure. `null` when nobody is active — a percentage of zero
   // students says nothing, so the card shows the raw average alone.
+  // Under a weekly quota the boys are spread across the week on purpose, so
+  // the per-day average would read a third of the roster on a perfect week.
+  const avgAttendance = useMemo(
+    () => (weeklyView ? averageWeeklyAttendance(filteredRecords) : summary.avgDailyAttendance),
+    [weeklyView, filteredRecords, summary.avgDailyAttendance],
+  );
   const dailyAttendancePct =
-    recentlyActive > 0
-      ? Math.min(100, Math.round((summary.avgDailyAttendance / recentlyActive) * 100))
-      : null;
+    recentlyActive > 0 ? Math.min(100, Math.round((avgAttendance / recentlyActive) * 100)) : null;
 
   const weeklyScale = useMemo(
     () => computeWeeklyScale(weeklyBuckets.map((w) => w.count)),
@@ -495,7 +520,7 @@ export function StatsScreen() {
   }, [activeMonth, activeSeason]);
 
   const cardData = useMemo(
-    () => buildAttendanceCardData(students, filteredRecords, { periodLabel }),
+    () => buildAttendanceCardData(students, filteredRecords, { periodLabel, policy }),
     [students, filteredRecords, periodLabel],
   );
   const cardSvg = useMemo(() => buildAttendanceCardSvg(cardData), [cardData]);
@@ -694,8 +719,8 @@ export function StatsScreen() {
             color: '#0F3D2E',
           },
           {
-            num: toArabicDigits(Math.round(summary.avgDailyAttendance)),
-            lbl: 'متوسط الحضور اليومي',
+            num: toArabicDigits(Math.round(avgAttendance)),
+            lbl: weeklyView ? 'متوسط الحضور الأسبوعي' : 'متوسط الحضور اليومي',
             color: '#C9A227',
             sub:
               dailyAttendancePct === null
@@ -963,11 +988,13 @@ export function StatsScreen() {
           ))}
         </div>
         <div class="text-[11px] text-taupe mb-2.5">
-          {attendBasis === 'halaqa'
-            ? 'النسبة من كل أيام الحلقة — مقياس واحد للجميع'
-            : attendBasis === 'personal'
-              ? 'النسبة من أيام الحلقة بعد انضمام الطالب — زي صفحة ولي الأمر'
-              : 'الترتيب بعدد أيام الحضور نفسه — الأكثر التزاماً بالعدد'}
+          {weeklyView && attendBasis !== 'days'
+            ? `المطلوب ${activeSeason!.daysPerWeek === 1 ? 'يوم واحد' : `${toArabicDigits(activeSeason!.daysPerWeek!)} أيام`} في الأسبوع، أي يوم — الزيادة ما بتعلّيش النسبة`
+            : attendBasis === 'halaqa'
+              ? 'النسبة من كل أيام الحلقة — مقياس واحد للجميع'
+              : attendBasis === 'personal'
+                ? 'النسبة من أيام الحلقة بعد انضمام الطالب — زي صفحة ولي الأمر'
+                : 'الترتيب بعدد أيام الحضور نفسه — الأكثر التزاماً بالعدد'}
         </div>
         {attendRows.length === 0 ? (
           <div class="text-center text-sm text-taupe py-6">لا يوجد بيانات</div>
@@ -1014,6 +1041,12 @@ export function StatsScreen() {
                           <>
                             المركز {toArabicOrdinal(x.rank)} · {toArabicDigits(x.days)} يوم حضور من{' '}
                             {toArabicDigits(x.ofDays)}
+                            {x.extra > 0 && (
+                              <span class="text-forest font-bold">
+                                {' '}
+                                · <bdi dir="ltr">+{toArabicDigits(x.extra)}</bdi> زيادة
+                              </span>
+                            )}
                           </>
                         )}
                       </div>
@@ -1075,13 +1108,13 @@ export function StatsScreen() {
                   <div class="text-xs text-taupe">
                     {x.neverAttended
                       ? 'لم يحضر ولا مرة'
-                      : `غاب آخر ${arabicPlural(x.absenceStreak, HALAQA_FORMS)} · آخر حضور ${x.lastAttended}`}
+                      : `غاب آخر ${arabicPlural(x.absenceStreak, x.unit === 'week' ? WEEK_FORMS : HALAQA_FORMS)} · آخر حضور ${x.lastAttended}`}
                   </div>
                 </div>
                 <div
                   class="w-[26px] h-[26px] rounded-full flex items-center justify-center text-xs font-extrabold shrink-0"
                   style={{ background: '#FBEAEA', color: '#B3261E' }}
-                  title={`${toArabicDigits(x.absenceStreak)} حلقة متتالية`}
+                  title={`${toArabicDigits(x.absenceStreak)} ${x.unit === 'week' ? 'أسبوع' : 'حلقة'} متتالية`}
                 >
                   {toArabicDigits(x.absenceStreak)}
                 </div>

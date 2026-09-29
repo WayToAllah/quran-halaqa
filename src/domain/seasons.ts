@@ -24,6 +24,9 @@ export interface Season {
   name: string;
   /** 'YYYY-MM-DD', inclusive. */
   from: string;
+  /** Attendance owed per week (1–7), any days of the week. Absent → every
+   * halaqa day is owed. See domain/attendancePolicy.ts. */
+  daysPerWeek?: number;
 }
 
 export interface DateRange {
@@ -41,6 +44,10 @@ export const ALL_SEASONS = 'all';
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
+function isValidQuota(n: unknown): n is number {
+  return typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 7;
+}
+
 export function sortSeasons(seasons: Season[]): Season[] {
   return [...seasons].sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
 }
@@ -52,11 +59,13 @@ export function normalizeSeasons(raw: unknown): Season[] {
   const out: Season[] = [];
   for (const x of raw) {
     if (!x || typeof x !== 'object') continue;
-    const { id, name, from } = x as Record<string, unknown>;
+    const { id, name, from, daysPerWeek } = x as Record<string, unknown>;
     if (typeof id !== 'string' || !id) continue;
     if (typeof name !== 'string' || !name.trim()) continue;
     if (typeof from !== 'string' || !DATE_RE.test(from)) continue;
-    out.push({ id, name: name.trim(), from });
+    const season: Season = { id, name: name.trim(), from };
+    if (isValidQuota(daysPerWeek)) season.daysPerWeek = daysPerWeek;
+    out.push(season);
   }
   return sortSeasons(out);
 }
@@ -155,6 +164,8 @@ export function validateSeasons(seasons: Season[]): string | null {
   for (const s of seasons) {
     if (!s.name.trim()) return 'كل موسم لازم يكون له اسم';
     if (!DATE_RE.test(s.from)) return 'تاريخ بداية الموسم غير صحيح';
+    if (s.daysPerWeek !== undefined && !isValidQuota(s.daysPerWeek))
+      return 'أيام الحضور في الأسبوع لازم تكون من ١ لـ ٧';
   }
   const starts = seasons.map((s) => s.from);
   if (new Set(starts).size !== starts.length) return 'موسمين مايبدأوش في نفس اليوم';

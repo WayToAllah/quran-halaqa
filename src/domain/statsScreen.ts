@@ -1,5 +1,6 @@
 import type { SessionRecord, Student, SuraAssignment } from '../types';
 import { filterByPeriod, inPeriod, type PeriodFilter } from './seasons';
+import { PER_DAY, saturdayOf, tallyAttendance, type AttendancePolicy } from './attendancePolicy';
 import {
   assignmentAyahSpan,
   ayahAtLohPosition,
@@ -410,7 +411,10 @@ export function computeStudentStatsRows(
   students: Student[],
   records: SessionRecord[],
   totalHalaqaDays: number,
+  policy: AttendancePolicy = PER_DAY,
+  today: string = localDateStr(),
 ): StudentStatsRow[] {
+  const halaqaDates = policy === PER_DAY ? [] : sortedHalaqaDatesDesc(records);
   return students.map((s) => {
     const recs = recordsForStudent(s, records);
     const scoredLoh = recs.filter((r) => hasScore(r.loh));
@@ -427,7 +431,16 @@ export function computeStudentStatsRows(
     const ayat = recs.reduce((sum, r) => sum + ayatInRecord(r), 0);
     const uniqueDays = new Set(recs.map((r) => r.date)).size;
     const attendPct =
-      totalHalaqaDays > 0 ? Math.min(100, Math.round((uniqueDays / totalHalaqaDays) * 100)) : 0;
+      policy === PER_DAY
+        ? totalHalaqaDays > 0
+          ? Math.min(100, Math.round((uniqueDays / totalHalaqaDays) * 100))
+          : 0
+        : tallyAttendance(
+            new Set(recs.map((r) => r.date).filter((d): d is string => !!d)),
+            halaqaDates,
+            policy,
+            today,
+          ).pct;
     return {
       id: s.id,
       name: getStudentName(s),
@@ -458,8 +471,10 @@ export function sortStudentStatsRows(
 export interface FollowUpEntry {
   id: string;
   name: string;
-  /** Consecutive most-recent halaqa days missed. */
+  /** Consecutive most-recent halaqa days missed — or WEEKS short of the
+   * quota, under a season with a weekly quota (see `unit`). */
   absenceStreak: number;
+  unit: 'day' | 'week';
   /** Last halaqa day attended, or null if they never have. */
   lastAttended: string | null;
   neverAttended: boolean;
@@ -476,6 +491,8 @@ export function computeFollowUpList(
   students: Student[],
   records: SessionRecord[],
   minStreak = 2,
+  policy: AttendancePolicy = PER_DAY,
+  today: string = localDateStr(),
 ): FollowUpEntry[] {
   const halaqaDatesDesc = sortedHalaqaDatesDesc(records);
   if (!halaqaDatesDesc.length) return [];
@@ -488,11 +505,16 @@ export function computeFollowUpList(
           .filter((d): d is string => !!d),
       );
       const attendedHalaqaDays = halaqaDatesDesc.filter((d) => dates.has(d));
-      const absenceStreak = computeAbsenceStreak(dates, halaqaDatesDesc);
+      const weekly =
+        policy !== PER_DAY ? tallyAttendance(dates, halaqaDatesDesc, policy, today) : null;
+      const absenceStreak = weekly
+        ? weekly.missedStreak
+        : computeAbsenceStreak(dates, halaqaDatesDesc);
       return {
         id: s.id,
         name: getStudentName(s),
         absenceStreak,
+        unit: weekly?.unit ?? ('day' as const),
         lastAttended: attendedHalaqaDays[0] ?? null,
         neverAttended: attendedHalaqaDays.length === 0,
       };
@@ -718,4 +740,28 @@ export function computeWeeklyScale(counts: number[]): WeeklyScale {
   const pad = Math.max(1, Math.ceil((max - floor) * CROP_MARGIN));
   const baseline = Math.max(0, floor - pad);
   return { baseline, top: max, truncated: baseline > 0 };
+}
+
+/**
+ * Under a weekly quota the teacher splits the boys across days, so "average
+ * attendance per halaqa DAY" reads a third of the roster on a perfect week.
+ * The meaningful figure is per WEEK: how many distinct students came at least
+ * once, averaged over the weeks the halaqa met.
+ */
+export function averageWeeklyAttendance(records: SessionRecord[]): number {
+  const byWeek = new Map<string, Set<string>>();
+  for (const r of records) {
+    const d = r.date;
+    if (!d || EXCLUDED_HALAQA_DATES.includes(d)) continue;
+    const key = r.studentId || r.student;
+    if (!key) continue;
+    const w = saturdayOf(d);
+    let set = byWeek.get(w);
+    if (!set) byWeek.set(w, (set = new Set()));
+    set.add(key);
+  }
+  if (!byWeek.size) return 0;
+  let total = 0;
+  byWeek.forEach((set) => (total += set.size));
+  return total / byWeek.size;
 }

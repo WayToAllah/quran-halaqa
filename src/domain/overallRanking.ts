@@ -6,6 +6,8 @@ import { hasScore } from './scoring';
 import { computeLohSpan } from './statsScreen';
 import { recordsForStudent } from './students';
 import { filterByPeriod, type PeriodFilter } from './seasons';
+import { PER_DAY, type AttendancePolicy } from './attendancePolicy';
+import { localDateStr } from './dates';
 
 /**
  * How the three measured things trade off against each other. They sum to 1,
@@ -125,6 +127,8 @@ export function computeOverallRanking(
    * inside it; `allRecords` still has to be the full history, because whether
    * an assignment was recited is settled by the session AFTER it. */
   period: PeriodFilter = 'all',
+  policy: AttendancePolicy = PER_DAY,
+  today: string = localDateStr(),
 ): OverallRankEntry[] {
   // Population and attendance both come from the personal-window ranking, so
   // "who appears here" matches the attendance leaderboard exactly: a student
@@ -133,6 +137,8 @@ export function computeOverallRanking(
     students,
     filterByPeriod(allRecords, period),
     allRecords,
+    policy,
+    today,
   ).list;
   if (!attendance.length) return [];
 

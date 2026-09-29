@@ -1,5 +1,7 @@
 import type { Badge, PublicStats, SessionRecord, Student } from '../types';
 import { inPeriod, seasonRange, sortSeasons, type Season } from './seasons';
+import { localDateStr } from './dates';
+import { PER_DAY, policyFromSeasons, tallyAttendance } from './attendancePolicy';
 import { byNewest } from './dates';
 import { hasScore } from './scoring';
 import { itemAyat } from './suras';
@@ -103,7 +105,11 @@ export function buildStudentPublicStats(
   halaqaDatesDesc: string[],
   /** The halaqa's seasons; empty → no season fields are published. */
   seasons: Season[] = [],
+  today: string = localDateStr(),
 ): PublicStats {
+  // Weekly quotas come from the seasons; without them every day is owed.
+  const policy = policyFromSeasons(seasons);
+  const weekly = policy !== PER_DAY;
   const name = getStudentName(student);
   const allRecs = recordsForStudent(student, allRecords);
   const realRecs = allRecs.filter((r) => !r.attendance_only).sort(byNewest);
@@ -148,15 +154,21 @@ export function buildStudentPublicStats(
   // published (halaqa-wide, and the basis of `rank`) so the two numbers stay
   // distinguishable — see enrolledHalaqaDates() for why they differ.
   const enrolledDates = enrolledHalaqaDates(allRecs, halaqaDatesDesc);
-  const enrolledDays = enrolledDates.length;
+
   // The numerator is the INTERSECTION with that same window, not the student's
   // raw date count. Anything the denominator drops — a bonus day in
   // EXCLUDED_HALAQA_DATES, an undated legacy row — must be dropped here too,
   // or the fraction compares two different calendars and reads too high (the
   // old Math.min(100, …) cap existed only to hide exactly that). Attendance
   // marks and full sessions both count, and a day carrying both counts once.
-  const attendedDays = enrolledDates.filter((d) => studentDates.has(d)).length;
-  const attendPct = enrolledDays > 0 ? Math.round((attendedDays / enrolledDays) * 100) : 0;
+  // Under a weekly quota the same window is counted in weeks (see
+  // attendancePolicy.ts): the denominator becomes the days OWED, the numerator
+  // the days that counted toward them, and anything beyond is `extraDays`.
+  // Per day, this is exactly the intersection described above.
+  const tally = tallyAttendance(studentDates, enrolledDates, policy, today);
+  const enrolledDays = tally.required;
+  const attendedDays = tally.credited;
+  const attendPct = tally.pct;
 
   const latest = realRecs[0];
   const currentTask = latest
@@ -212,12 +224,12 @@ export function buildStudentPublicStats(
   type PeriodEntry = PublicStats['monthlyStats'][string];
   const statsFor = (inWindow: (date: string) => boolean): PeriodEntry => {
     const monthEnrolledDates = enrolledDates.filter(inWindow);
-    const monthHalaqaDays = monthEnrolledDates.length;
     const monthRealRecs = realRecs.filter((r) => !!r.date && inWindow(r.date));
-    // Same intersection rule as the all-time figure above.
-    const monthAttendedDays = monthEnrolledDates.filter((d) => studentDates.has(d)).length;
-    const monthAttendPct =
-      monthHalaqaDays > 0 ? Math.round((monthAttendedDays / monthHalaqaDays) * 100) : 0;
+    // Same rule as the all-time figure above, inside the window.
+    const t = tallyAttendance(studentDates, monthEnrolledDates, policy, today);
+    const monthHalaqaDays = t.required;
+    const monthAttendedDays = t.credited;
+    const monthAttendPct = t.pct;
     const monthScoredLoh = monthRealRecs.filter((r) => hasScore(r.loh));
     const monthAvgLoh = monthScoredLoh.length
       ? Math.round(monthScoredLoh.reduce((a, r) => a + r.loh!.score!, 0) / monthScoredLoh.length)
@@ -249,6 +261,7 @@ export function buildStudentPublicStats(
       attendPct: monthAttendPct,
       attendedDays: monthAttendedDays,
       halaqaDays: monthHalaqaDays,
+      ...(weekly ? { extraDays: t.extra } : {}),
       totalAyat: monthAyat,
       avgLoh: monthAvgLoh,
       avgMadi: monthAvgMadi,
@@ -272,7 +285,9 @@ export function buildStudentPublicStats(
       const hasAny = entry.halaqaDays! > 0 || allRecs.some((r) => inPeriod(r.date, range));
       if (hasAny) seasonStats[season.id] = entry;
     });
-    seasonFields.seasons = sorted.map(({ id, name, from }) => ({ id, name, from }));
+    seasonFields.seasons = sorted.map(({ id, name, from, daysPerWeek }) =>
+      daysPerWeek ? { id, name, from, daysPerWeek } : { id, name, from },
+    );
     seasonFields.seasonStats = seasonStats;
   }
 
@@ -293,6 +308,7 @@ export function buildStudentPublicStats(
     enrolledHalaqaDays: enrolledDays,
     uniqueDays,
     attendedDays,
+    ...(weekly ? { extraDays: tally.extra } : {}),
     attendPct,
     rank,
     sessionsCount: realRecs.length,
