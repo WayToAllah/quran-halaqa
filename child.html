@@ -2,6 +2,15 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
+<script>
+  // Parent pages moved to the Firestore-backed page (seasons, weekly
+  // attendance). Old links forward there with the same token, normalised the
+  // way this page always read it (trim + fbKey).
+  (function () {
+    var t = (new URLSearchParams(location.search).get('t') || '').trim();
+    if (t) location.replace('v2/child.html?t=' + encodeURIComponent(String(t).replace(/[.#$\[\]\/]/g, '_')));
+  })();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#15613a">
