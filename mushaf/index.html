@@ -51,6 +51,12 @@ select,input{width:100%;height:42px;font-size:16px;font-family:inherit;padding:0
 .add:active{transform:scale(.94)}
 .foot{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff9f1;border-top:1px solid #efe3d3}
 .hintbar{padding:0 12px 8px;font-size:12px;color:#8a7256;background:#fff9f1;text-align:center;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+.w{cursor:pointer}
+.w.m{color:#d32f2f}
+#viewer.ro .w{cursor:default}
+#viewer.ro .foot{display:none}
+.share{width:40px;height:40px;border-radius:50%;background:#fffdf9;border:1px solid #e6d6c1;font-size:17px;color:#0f6e56;flex:0 0 auto;display:none}
+.share.on{display:block}
 .foot #done{height:40px;padding:0 20px;font-size:15px;font-family:inherit;font-weight:600;color:#fff;background:#0f6e56;border:0;border-radius:8px}
 </style>
 </head>
@@ -84,6 +90,7 @@ select,input{width:100%;height:42px;font-size:16px;font-family:inherit;padding:0
   <div class="foot">
     <button class="undo" id="undo" aria-label="تراجع">&#8630;</button>
     <button class="add" id="add"><b id="cnt">٠</b><span>خطأ</span></button>
+    <button class="share" id="share" aria-label="ابعت الأخطاء لولي الأمر">&#10148;</button>
     <button id="done">تم</button>
   </div>
   <div class="hintbar" id="hint"></div>
@@ -256,7 +263,7 @@ function fit(sheet) {
   if (!lines.length) return;
   const segs = [...sheet.querySelectorAll('.seg')];
   const BASE = 40;
-  segs.forEach(s => { s.style.transform = 'none'; s.style.width = 'auto'; s.style.textAlign = 'right'; s.style.textAlignLast = 'auto'; s.textContent = decodeURIComponent(s.dataset.tight); s.style.fontSize = BASE + 'px'; });
+  segs.forEach(s => { s.style.transform = 'none'; s.style.width = 'auto'; s.style.textAlign = 'right'; s.style.textAlignLast = 'auto'; setWords(s, false); s.style.fontSize = BASE + 'px'; });
   const natural = el => { const r = document.createRange(); r.selectNodeContents(el); return r.getBoundingClientRect().width; };
   const boxOf = s => (s.dataset.x1 - s.dataset.x0) / SRC_W * W;
   const placed = segs.filter(s => s.dataset.x0 !== 'null');
@@ -277,11 +284,11 @@ function fit(sheet) {
       const box = boxOf(s);
       let k = box / w;
       if (k <= MAXK) {                       // the glyphs alone can fill this line
-        s.textContent = decodeURIComponent(s.dataset.tight);
+        setWords(s, false);
         s.style.width = 'auto'; s.style.textAlign = 'right'; s.style.textAlignLast = 'auto';
         k = Math.max(0.9, Math.min(MAXK, k));
       } else {                               // it cannot: put the spaces back and justify
-        s.textContent = decodeURIComponent(s.dataset.loose);
+        setWords(s, true);
         const r2 = document.createRange(); r2.selectNodeContents(s);
         const wl = r2.getBoundingClientRect().width;
         k = Math.max(0.9, Math.min(MAXK, box / wl));
@@ -308,6 +315,115 @@ function fit(sheet) {
     if (sheet.scrollHeight > avail) lines.forEach(l => { l.style.height = (size * 2.0) + 'px'; });
   }
 }
+// ---- تعليم الكلمات الغلط ----
+// كل كلمة في خط المصحف (QCF V4) حرف واحد في الخط، فبنلفّ كل كلمة في span
+// من غير ما نغيّر النص نفسه — السطر بيفضل نفس العرض بالظبط.
+// معرّف الكلمة "سورة:آية:ترتيبها" — ثابت في كل نسخ المصحف، فاللينك ميتغيرش.
+const marks = new Map();          // رقم الصفحة → Set من معرّفات الكلمات
+const actions = [];               // سجل عشان زرار التراجع
+const EMPTY = new Set();
+function setWords(s, loose) {
+  const m = marksOn(s._p);
+  s.innerHTML = s._w.map(w => {
+    const id = w.k + ':' + w.p;
+    if (s._last[w.k] === w.p) return '<span class="n">' + w.c + '</span>';
+    return '<span class="w' + (m.has(id) ? ' m' : '') + '" data-id="' + id + '">' + w.c + '</span>';
+  }).join(loose ? ' ' : '');
+}
+function paintMarks() {
+  const m = marksOn(pages[idx]);
+  document.querySelectorAll('#stage .w').forEach(w => w.classList.toggle('m', m.has(w.dataset.id)));
+}
+function allMarks() {
+  const out = [];
+  [...marks.keys()].sort((a, b) => a - b).forEach(p => out.push(...[...marks.get(p)].sort(cmpId)));
+  return out;
+}
+function cmpId(a, b) {
+  const x = a.split(':').map(Number), y = b.split(':').map(Number);
+  return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
+}
+// "3:2:4,3:2:5,3:3:1" → "3:2:4.5,3:3:1" (الكلمات في نفس الآية مع بعض)
+function encodeMarks(ids) {
+  const g = new Map();
+  ids.forEach(id => { const [s, a, w] = id.split(':'); const k = s + ':' + a; if (!g.has(k)) g.set(k, []); g.get(k).push(w); });
+  return [...g].map(([k, ws]) => k + ':' + ws.join('.')).join(',');
+}
+function decodeMarks(str) {
+  const out = [];
+  (str || '').split(',').forEach(part => {
+    const [s, a, ws] = part.split(':');
+    if (!/^\d+$/.test(s) || !/^\d+$/.test(a) || !ws) return;
+    ws.split('.').forEach(w => { if (/^\d+$/.test(w)) out.push(+s + ':' + +a + ':' + +w); });
+  });
+  return out;
+}
+function shareLink() {
+  const q = new URLSearchParams();
+  q.set('m', encodeMarks(allMarks()));
+  const extra = counts.reduce((a, b) => a + b, 0);
+  if (extra) q.set('x', extra);
+  const name = document.querySelector('.bar .t b').textContent;
+  if (name && name !== 'التسميع') q.set('n', name);
+  const wardTxt = document.getElementById('ward').textContent;
+  if (wardTxt) q.set('w', wardTxt);
+  if (EMBED) q.set('a', EMBED.items.map(a => [a.sura, a.from, a.to].join(':')).join(','));
+  else if (ward.length) q.set('pg', ward.join('.'));
+  return location.origin + location.pathname + '?' + q.toString();
+}
+async function shareMarks() {
+  const n = markedTotal();
+  if (!n) return;
+  const link = shareLink();
+  const name = document.querySelector('.bar .t b').textContent;
+  const text = 'أخطاء تسميع ' + (name && name !== 'التسميع' ? name + ' ' : '') + 'اليوم معلّمة بالأحمر في المصحف:\n' + link;
+  try { if (navigator.share) { await navigator.share({ text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+  const wa = 'https://wa.me/?text=' + encodeURIComponent(text);
+  if (!window.open(wa, '_blank')) {
+    try { await navigator.clipboard.writeText(link); flash('اتنسخ اللينك'); } catch (e) { prompt('انسخ اللينك:', link); }
+  }
+}
+// ---- صفحة ولي الأمر: نفس المصحف، للقراءة بس ----
+const VIEW = (() => {
+  const q = new URLSearchParams(location.search);
+  if (!q.has('m')) return null;
+  const ids = decodeMarks(q.get('m'));
+  const items = (q.get('a') || '').split(',').map(s => s.split(':')).filter(x => x[0])
+    .map(x => ({ sura: decodeURIComponent(x[0]), from: x[1] || '', to: x[2] || '' }));
+  const pg = (q.get('pg') || '').split('.').map(Number).filter(n => n >= 1 && n <= 604);
+  return { ids, items, pg, extra: Math.max(0, +q.get('x') || 0), name: q.get('n') || '', ward: q.get('w') || '' };
+})();
+function viewHint() {
+  const n = markedTotal(), x = VIEW.extra;
+  const plural = (k, one, two, few, many) => k === 1 ? one : k === 2 ? two : AR(k) + ' ' + (k <= 10 ? few : many);
+  let t = n ? 'الكلمات اللي بالأحمر فيها خطأ — ' + plural(n, 'كلمة واحدة', 'كلمتين', 'كلمات', 'كلمة') : 'مفيش كلمات معلّمة';
+  if (x) t += '، و' + plural(x, 'خطأ تاني', 'خطأين تانيين', 'أخطاء تانية', 'خطأ تاني') + ' (تردد أو وقف)';
+  document.getElementById('hint').textContent = t;
+}
+function startView() {
+  if (!VIEW) return;
+  VIEW.ids.forEach(id => {
+    const [s, a] = id.split(':').map(Number);
+    const p = pageOfAyah(s, a);
+    if (!p) return;
+    if (!marks.has(p)) marks.set(p, new Set());
+    marks.get(p).add(id);
+  });
+  let ps = VIEW.items.length ? pagesForWard(VIEW.items, suraIdx, ayahCount) : VIEW.pg;
+  if (!ps.length) ps = [...marks.keys()];
+  ps = [...new Set([...ps, ...marks.keys()])].sort((a, b) => a - b);
+  if (!ps.length) return;
+  pages = ps; ward = ps.slice(); counts = pages.map(() => 0);
+  idx = Math.max(0, pages.findIndex(p => marks.has(p)));
+  pages.forEach(pp => ensureFontsFor(pp));
+  document.querySelector('.wrap').style.display = 'none';
+  document.querySelector('.bar .t b').textContent = VIEW.name ? 'أخطاء ' + VIEW.name : 'أخطاء التسميع';
+  document.getElementById('ward').textContent = VIEW.ward;
+  document.getElementById('close').style.visibility = 'hidden';
+  const v = document.getElementById('viewer');
+  v.classList.add('on', 'ro');
+  render();
+}
 async function render() {
   const st = document.getElementById('stage');
   const p = pages[idx];
@@ -319,11 +435,16 @@ async function render() {
     await ensureFontsFor(p);
     if (pages[idx] !== p) return;
     const sheet = st.querySelector('.sheet');
+    const lineRows = rows.filter(l => l.t !== 'h' && l.t !== 'b');
     sheet.innerHTML = rows.map(l =>
       l.t === 'h' ? '<div class="hdr"><span style="font-family:' + l.f + '">' + l.c + '</span></div>'
       : l.t === 'b' ? '<div class="bsm" style="font-family:' + l.f + '">' + l.c + '</div>'
       : '<div class="ln"><span class="seg" style="font-family:' + l.f + '" data-x0="' + l.x0 + '" data-x1="' + l.x1
-        + '" data-tight="' + encodeURIComponent(l.g) + '" data-loose="' + encodeURIComponent(l.gs) + '">' + l.g + '</span></div>').join('');
+        + '">' + l.g + '</span></div>').join('');
+    // آخر "كلمة" في كل آية هي علامة رقم الآية — مش بتتعلّم
+    const last = {};
+    lineRows.forEach(l => (l.w || []).forEach(w => { if (!(last[w.k] >= w.p)) last[w.k] = w.p; }));
+    sheet.querySelectorAll('.seg').forEach((s, i) => { s._w = lineRows[i].w || []; s._p = p; s._last = last; });
     await document.fonts.ready;
     fit(sheet);
     sheet.style.opacity = '1';
@@ -350,16 +471,22 @@ function label(p) {
   document.getElementById('msura').textContent = surasOnPage(p).join(' · ');
   document.getElementById('mpage').textContent = AR(p);
 }
+function marksOn(p) { return marks.get(p) || EMPTY; }
+function markedTotal() { let n = 0; marks.forEach(m => { n += m.size; }); return n; }
+function grandTotal() { return counts.reduce((a, b) => a + b, 0) + markedTotal(); }
 function total() {
-  const t = counts.reduce((a, b) => a + b, 0);
+  const t = grandTotal();
+  const here = (counts[idx] || 0) + marksOn(pages[idx]).size;
   document.getElementById('cnt').textContent = AR(t);
-  document.getElementById('hint').textContent = t === 0 ? 'دوس على زرار الخطأ مع كل غلطة' : 'إجمالي الأخطاء ' + AR(t) + (pages.length > 1 ? '، وفي الصفحة دي ' + AR(counts[idx]) : '');
+  document.getElementById('share').classList.toggle('on', markedTotal() > 0);
+  if (VIEW) { viewHint(); return; }
+  document.getElementById('hint').textContent = t === 0 ? 'دوس على الكلمة الغلط تتعلّم بالأحمر، أو على زرار الخطأ' : 'إجمالي الأخطاء ' + AR(t) + (pages.length > 1 ? '، وفي الصفحة دي ' + AR(here) : '');
 }
 // ---- خارجي: يفتح الورد مباشرةً من رابط، ويرجّع العدد للتطبيق ----
 const EMBED = (() => {
   const q = new URLSearchParams(location.search);
   const raw = q.get('a');            // sura:from:to,sura:from:to
-  if (!raw) return null;
+  if (!raw || q.has('m')) return null;
   const items = raw.split(',').map(s => s.split(':')).filter(x => x[0])
     .map(x => ({ sura: decodeURIComponent(x[0]), from: x[1] || '', to: x[2] || '' }));
   if (!items.length) return null;
@@ -375,7 +502,7 @@ function announceReady() {
 }
 function reportCount(total) {
   if (!EMBED) return false;
-  const msg = { type: 'mushaf-count', id: EMBED.token, count: total };
+  const msg = { type: 'mushaf-count', id: EMBED.token, count: total, marks: allMarks(), link: markedTotal() ? shareLink() : '' };
   if (window.parent && window.parent !== window) { window.parent.postMessage(msg, '*'); return true; }
   if (window.opener) { window.opener.postMessage(msg, '*'); return true; }
   return false;
@@ -395,7 +522,7 @@ function startEmbedded() {
     return;
   }
   document.querySelector('.wrap').style.display = 'none';
-  counts = pages.map(() => 0); idx = 0; ward = pages.slice();
+  counts = pages.map(() => 0); idx = 0; ward = pages.slice(); marks.clear(); actions.length = 0;
   pages.forEach((pp) => ensureFontsFor(pp));
   document.querySelector('.bar .t b').textContent = EMBED.name || 'التسميع';
   const wardText = EMBED.items
@@ -409,7 +536,7 @@ function startEmbedded() {
 document.getElementById('go').onclick = () => {
   calc();
   if (!pages.length) return;
-  counts = pages.map(() => 0); idx = 0; ward = pages.slice();
+  counts = pages.map(() => 0); idx = 0; ward = pages.slice(); marks.clear(); actions.length = 0;
   pages.forEach((pp) => ensureFontsFor(pp));
   document.getElementById('ward').textContent = 'اللوح، ' + sEl.value + ' ' + AR(fEl.value) + '-' + AR(tEl.value);
   document.getElementById('viewer').classList.add('on');
@@ -477,16 +604,43 @@ function goTo(n, dir) {
     if (e.key === 'ArrowRight') goTo(idx - 1, -1);
   });
 })();
-document.getElementById('add').onclick = () => { counts[idx]++; total(); };
-document.getElementById('undo').onclick = () => { if (counts[idx] > 0) counts[idx]--; total(); };
-document.getElementById('close').onclick = () => { if (EMBED) { reportCount(counts.reduce((a,b)=>a+b,0)); return; } document.getElementById('viewer').classList.remove('on'); };
+document.getElementById('add').onclick = () => { counts[idx]++; actions.push({ p: pages[idx] }); total(); };
+document.getElementById('undo').onclick = () => {
+  // آخر حاجة اتعملت في الصفحة دي: كلمة اتعلّمت أو ضغطة على زرار الخطأ
+  const p = pages[idx];
+  for (let i = actions.length - 1; i >= 0; i--) {
+    if (actions[i].p !== p) continue;
+    const a = actions.splice(i, 1)[0];
+    if (a.id) { marksOn(p).delete(a.id); paintMarks(); } else if (counts[idx] > 0) counts[idx]--;
+    break;
+  }
+  total();
+};
+document.getElementById('stage').addEventListener('click', e => {
+  if (VIEW) return;
+  const w = e.target.closest('.w');
+  if (!w) return;
+  const p = pages[idx], id = w.dataset.id;
+  if (!marks.has(p)) marks.set(p, new Set());
+  const m = marks.get(p);
+  if (m.has(id)) {
+    m.delete(id);
+    const i = actions.findIndex(a => a.p === p && a.id === id);
+    if (i >= 0) actions.splice(i, 1);
+  } else { m.add(id); actions.push({ p, id }); }
+  w.classList.toggle('m', m.has(id));
+  total();
+});
+document.getElementById('share').onclick = shareMarks;
+document.getElementById('close').onclick = () => { if (EMBED) { reportCount(grandTotal()); return; } document.getElementById('viewer').classList.remove('on'); };
 document.getElementById('done').onclick = () => {
-  const t = counts.reduce((a, b) => a + b, 0);
+  const t = grandTotal();
   if (reportCount(t)) return;                 // opened from the app: hand the number back
   document.getElementById('viewer').classList.remove('on');
   alert('اتسجّل ' + AR(t) + ' خطأ. في النسخة النهائية الرقم ده هيتحفظ مع الجلسة.');
 };
 startEmbedded();
+startView();
 </script>
 </body>
 </html>
