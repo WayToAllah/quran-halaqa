@@ -343,12 +343,6 @@ function cmpId(a, b) {
   const x = a.split(':').map(Number), y = b.split(':').map(Number);
   return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
 }
-// "3:2:4,3:2:5,3:3:1" → "3:2:4.5,3:3:1" (الكلمات في نفس الآية مع بعض)
-function encodeMarks(ids) {
-  const g = new Map();
-  ids.forEach(id => { const [s, a, w] = id.split(':'); const k = s + ':' + a; if (!g.has(k)) g.set(k, []); g.get(k).push(w); });
-  return [...g].map(([k, ws]) => k + ':' + ws.join('.')).join(',');
-}
 function decodeMarks(str) {
   const out = [];
   (str || '').split(',').forEach(part => {
@@ -358,18 +352,51 @@ function decodeMarks(str) {
   });
   return out;
 }
+// اللينك القصير: أرقام وعلامات آمنة بس (. _ -) — مفيش عربي ولا حروف بتتحوّل
+// لـ %XX، فاللينك بيطلع حوالي ٨٠ حرف بدل ٢٣٠.
+//   e=3.2.3.4_3.3.3  → سورة.آية.كلمة.كلمة  (مجموعة لكل آية)
+//   p=50-51          → صفحات الورد (مدى أو أرقام مفصولة بـ _)
+//   x=1              → أخطاء من غير كلمة محددة (تردد/وقف)
+function encodeShort(ids) {
+  const g = new Map();
+  ids.forEach(id => { const [s, a, w] = id.split(':'); const k = s + '.' + a; if (!g.has(k)) g.set(k, []); g.get(k).push(w); });
+  return [...g].map(([k, ws]) => k + '.' + ws.join('.')).join('_');
+}
+function decodeShort(str) {
+  const out = [];
+  (str || '').split('_').forEach(part => {
+    const n = part.split('.');
+    if (n.length < 3 || !n.every(x => /^\d+$/.test(x))) return;
+    n.slice(2).forEach(w => out.push(+n[0] + ':' + +n[1] + ':' + +w));
+  });
+  return out;
+}
+function encodePages(ps) {
+  const sorted = [...new Set(ps)].sort((a, b) => a - b), out = [];
+  for (let i = 0; i < sorted.length; i++) {
+    let j = i;
+    while (j + 1 < sorted.length && sorted[j + 1] === sorted[j] + 1) j++;
+    out.push(j > i ? sorted[i] + '-' + sorted[j] : String(sorted[i]));
+    i = j;
+  }
+  return out.join('_');
+}
+function decodePages(str) {
+  const out = [];
+  (str || '').split('_').forEach(part => {
+    const m = /^(\d+)(?:-(\d+))?$/.exec(part);
+    if (!m) return;
+    const a = +m[1], b = m[2] ? +m[2] : a;
+    for (let p = a; p <= b && p <= 604 && out.length < 604; p++) if (p >= 1) out.push(p);
+  });
+  return out;
+}
 function shareLink() {
-  const q = new URLSearchParams();
-  q.set('m', encodeMarks(allMarks()));
+  let q = 'e=' + encodeShort(allMarks());
+  if (ward.length) q += '&p=' + encodePages(ward);
   const extra = counts.reduce((a, b) => a + b, 0);
-  if (extra) q.set('x', extra);
-  const name = document.querySelector('.bar .t b').textContent;
-  if (name && name !== 'التسميع') q.set('n', name);
-  const wardTxt = document.getElementById('ward').textContent;
-  if (wardTxt) q.set('w', wardTxt);
-  if (EMBED) q.set('a', EMBED.items.map(a => [a.sura, a.from, a.to].join(':')).join(','));
-  else if (ward.length) q.set('pg', ward.join('.'));
-  return location.origin + location.pathname + '?' + q.toString();
+  if (extra) q += '&x=' + extra;
+  return location.origin + location.pathname.replace(/index\.html$/, '') + '?' + q;
 }
 async function shareMarks() {
   const n = markedTotal();
@@ -377,8 +404,9 @@ async function shareMarks() {
   const link = shareLink();
   const name = document.querySelector('.bar .t b').textContent;
   const text = 'أخطاء تسميع ' + (name && name !== 'التسميع' ? name + ' ' : '') + 'اليوم معلّمة بالأحمر في المصحف:\n' + link;
-  try { if (navigator.share) { await navigator.share({ text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
-  const wa = 'https://wa.me/?text=' + encodeURIComponent(text);
+  try { if (navigator.share && !(EMBED && EMBED.phone)) { await navigator.share({ text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+  // لو التطبيق باعت رقم ولي الأمر، الرسالة تروح على الشات بتاعه على طول
+  const wa = 'https://wa.me/' + (EMBED && EMBED.phone ? EMBED.phone : '') + '?text=' + encodeURIComponent(text);
   if (!window.open(wa, '_blank')) {
     try { await navigator.clipboard.writeText(link); flash('اتنسخ اللينك'); } catch (e) { prompt('انسخ اللينك:', link); }
   }
@@ -386,11 +414,13 @@ async function shareMarks() {
 // ---- صفحة ولي الأمر: نفس المصحف، للقراءة بس ----
 const VIEW = (() => {
   const q = new URLSearchParams(location.search);
-  if (!q.has('m')) return null;
-  const ids = decodeMarks(q.get('m'));
+  // e= اللينك القصير الجديد، m= الشكل القديم (لينكات اتبعتت قبل كده لازم تفضل شغالة)
+  if (!q.has('e') && !q.has('m')) return null;
+  const ids = q.has('e') ? decodeShort(q.get('e')) : decodeMarks(q.get('m'));
   const items = (q.get('a') || '').split(',').map(s => s.split(':')).filter(x => x[0])
     .map(x => ({ sura: decodeURIComponent(x[0]), from: x[1] || '', to: x[2] || '' }));
-  const pg = (q.get('pg') || '').split('.').map(Number).filter(n => n >= 1 && n <= 604);
+  const pg = q.has('p') ? decodePages(q.get('p'))
+    : (q.get('pg') || '').split('.').map(Number).filter(n => n >= 1 && n <= 604);
   return { ids, items, pg, extra: Math.max(0, +q.get('x') || 0), name: q.get('n') || '', ward: q.get('w') || '' };
 })();
 function viewHint() {
@@ -486,11 +516,11 @@ function total() {
 const EMBED = (() => {
   const q = new URLSearchParams(location.search);
   const raw = q.get('a');            // sura:from:to,sura:from:to
-  if (!raw || q.has('m')) return null;
+  if (!raw || q.has('m') || q.has('e')) return null;
   const items = raw.split(',').map(s => s.split(':')).filter(x => x[0])
     .map(x => ({ sura: decodeURIComponent(x[0]), from: x[1] || '', to: x[2] || '' }));
   if (!items.length) return null;
-  return { items, name: q.get('n') || '', ward: q.get('w') || '', token: q.get('id') || '' };
+  return { items, name: q.get('n') || '', ward: q.get('w') || '', token: q.get('id') || '', phone: (q.get('ph') || '').replace(/[^0-9]/g, '') };
 })();
 /** Told to the app once the ward is actually on screen. Separate from the
  * iframe loading: the viewer can come up and still fail to place the ward. */
