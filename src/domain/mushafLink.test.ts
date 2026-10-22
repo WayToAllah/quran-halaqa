@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { mushafWardParam, mushafLink, readMushafCount, isMushafReady } from './mushafLink';
+import {
+  mushafWardParam,
+  mushafLink,
+  readMushafCount,
+  readMushafMarksLink,
+  isMushafReady,
+} from './mushafLink';
 
 describe('mushafWardParam', () => {
   it('encodes a single assignment as sura:from:to', () => {
@@ -100,5 +106,42 @@ describe('isMushafReady', () => {
     expect(isMushafReady({ type: 'mushaf-count', id: 'r_9', count: 1 }, 'r_9')).toBe(false);
     expect(isMushafReady('hello', 'r_9')).toBe(false);
     expect(isMushafReady(null, 'r_9')).toBe(false);
+  });
+});
+
+describe('mushafLink phone', () => {
+  it('passes the parent number so the viewer opens that chat', () => {
+    const url = mushafLink([{ sura: 'الناس' }], { token: 't', phone: '201001234567' })!;
+    expect(url).toContain('ph=201001234567');
+  });
+  it('leaves ph out when there is no number', () => {
+    expect(mushafLink([{ sura: 'الناس' }])).not.toContain('ph=');
+  });
+});
+
+describe('readMushafMarksLink', () => {
+  const origin = 'https://waytoallah.github.io';
+  const link = origin + '/quran-halaqa/mushaf/?e=3.2.3.4_3.3.3&p=50&x=1';
+  const msg = { type: 'mushaf-count', id: 'r_9', count: 3, link };
+  it('returns the marks link from the viewer', () => {
+    expect(readMushafMarksLink(msg, 'r_9', origin)).toBe(link);
+  });
+  it('ignores a message for another open', () => {
+    expect(readMushafMarksLink(msg, 'r_10', origin)).toBeNull();
+  });
+  it('is null when nothing was marked', () => {
+    expect(readMushafMarksLink({ ...msg, link: '' }, 'r_9', origin)).toBeNull();
+    expect(
+      readMushafMarksLink({ type: 'mushaf-count', id: 'r_9', count: 2 }, 'r_9', origin),
+    ).toBeNull();
+  });
+  it('never accepts a link to another site or another page', () => {
+    expect(
+      readMushafMarksLink({ ...msg, link: 'https://evil.example/mushaf/?e=1.1.1' }, 'r_9', origin),
+    ).toBeNull();
+    expect(
+      readMushafMarksLink({ ...msg, link: origin + '/quran-halaqa/v3/?e=1' }, 'r_9', origin),
+    ).toBeNull();
+    expect(readMushafMarksLink({ ...msg, link: 'javascript:alert(1)' }, 'r_9', origin)).toBeNull();
   });
 });

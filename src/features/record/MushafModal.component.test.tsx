@@ -70,7 +70,7 @@ describe('MushafModal', () => {
   it('hands the count back and closes when the viewer reports it', async () => {
     const { onCount, onClose } = renderModal();
     postFromViewer({ type: 'mushaf-count', id: 'r_9', count: 6 });
-    await waitFor(() => expect(onCount).toHaveBeenCalledWith(6));
+    await waitFor(() => expect(onCount).toHaveBeenCalledWith(6, null));
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -93,7 +93,25 @@ describe('MushafModal', () => {
     postFromViewer({ type: 'mushaf-count', id: 'r_9', count: 2 });
     postFromViewer({ type: 'mushaf-count', id: 'r_9', count: 5 });
     await waitFor(() => expect(onCount).toHaveBeenCalledTimes(1));
-    expect(onCount).toHaveBeenCalledWith(2);
+    expect(onCount).toHaveBeenCalledWith(2, null);
+  });
+
+  it('hands back the red-marked link from the viewer', async () => {
+    const { onCount } = renderModal();
+    const link = window.location.origin + '/quran-halaqa/mushaf/?e=3.2.3&p=50';
+    postFromViewer({ type: 'mushaf-count', id: 'r_9', count: 1, link });
+    await waitFor(() => expect(onCount).toHaveBeenCalledWith(1, link));
+  });
+
+  it('drops a marks link that points anywhere else', async () => {
+    const { onCount } = renderModal();
+    postFromViewer({
+      type: 'mushaf-count',
+      id: 'r_9',
+      count: 1,
+      link: 'https://evil.example/mushaf/',
+    });
+    await waitFor(() => expect(onCount).toHaveBeenCalledWith(1, null));
   });
 
   it('still offers a way out while the viewer has not loaded yet', async () => {

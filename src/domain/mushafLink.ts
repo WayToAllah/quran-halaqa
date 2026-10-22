@@ -35,12 +35,15 @@ export interface MushafLinkOptions {
   token?: string;
   /** Defaults to the sibling folder of the app. */
   base?: string;
+  /** Parent's WhatsApp number (already normalized), so the viewer's send
+   *  button opens that chat directly instead of WhatsApp's contact picker. */
+  phone?: string;
 }
 
 /** Full URL for the viewer, or null when there is nothing to show. */
 export function mushafLink(
   list: readonly SuraAssignment[],
-  { name = '', ward = '', token = '', base = '../mushaf/' }: MushafLinkOptions = {},
+  { name = '', ward = '', token = '', base = '../mushaf/', phone = '' }: MushafLinkOptions = {},
 ): string | null {
   const a = mushafWardParam(list);
   if (!a) return null;
@@ -48,6 +51,7 @@ export function mushafLink(
   if (name) params.push(`n=${encodeURIComponent(name)}`);
   if (ward) params.push(`w=${encodeURIComponent(ward)}`);
   if (token) params.push(`id=${encodeURIComponent(token)}`);
+  if (phone) params.push(`ph=${encodeURIComponent(phone)}`);
   return `${base}?${params.join('&')}`;
 }
 
@@ -63,6 +67,26 @@ export function readMushafCount(data: unknown, token: string): number | null {
   const n = Number(msg.count);
   if (!Number.isFinite(n) || n < 0) return null;
   return Math.floor(n);
+}
+
+/**
+ * The parent-facing link to the words the teacher marked red, carried on the
+ * same count message. Only a link back to the mushaf viewer on this site is
+ * accepted — anything else on the message is dropped, so the WhatsApp text can
+ * never pick up an arbitrary URL.
+ */
+export function readMushafMarksLink(data: unknown, token: string, origin: string): string | null {
+  if (readMushafCount(data, token) === null) return null;
+  const link = (data as { link?: unknown }).link;
+  if (typeof link !== 'string' || !link) return null;
+  let url: URL;
+  try {
+    url = new URL(link);
+  } catch {
+    return null;
+  }
+  if (url.origin !== origin || !/\/mushaf\/(index\.html)?$/.test(url.pathname)) return null;
+  return url.href;
 }
 
 /**

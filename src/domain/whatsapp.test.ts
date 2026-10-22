@@ -304,3 +304,26 @@ describe('normalizeWhatsAppPhone', () => {
     expect(normalizeWhatsAppPhone(undefined)).toBe('');
   });
 });
+
+describe('buildWhatsAppMessage — mushaf mistake links', () => {
+  const rec: SessionRecord = {
+    id: 'r1',
+    studentId: 's_1',
+    student: 'زيد احمد',
+    date: '2026-07-03',
+    loh: { score: 8 },
+  };
+  const L = 'https://waytoallah.github.io/quran-halaqa/mushaf/?e=3.2.3&p=50';
+  const M = 'https://waytoallah.github.io/quran-halaqa/mushaf/?e=2.5.1&p=2';
+  it('adds the red-marked link under each side', () => {
+    const msg = buildWhatsAppMessage(rec, null, undefined, { loh: [L], madi: [M] });
+    expect(msg).toContain('معلّمة بالأحمر');
+    expect(msg).toContain('• اللوح: ' + L);
+    expect(msg).toContain('• الماضي: ' + M);
+  });
+  it('says nothing about the mushaf when no word was marked', () => {
+    const msg = buildWhatsAppMessage(rec, null, undefined, { loh: [], madi: [] });
+    expect(msg).not.toContain('معلّمة بالأحمر');
+    expect(buildWhatsAppMessage(rec, null)).toBe(msg);
+  });
+});

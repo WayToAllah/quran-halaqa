@@ -183,6 +183,10 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   // shows the same taps; committed to the record's loh/madi.mistakes on save.
   const [lohMistakes, setLohMistakes] = useState<MistakeKind[]>([]);
   const [madiMistakes, setMadiMistakes] = useState<MistakeKind[]>([]);
+  // Links to the words marked red in the mushaf, one per open that marked any.
+  // Not stored on the record — they ride along in today's WhatsApp message only.
+  const [lohMarkLinks, setLohMarkLinks] = useState<string[]>([]);
+  const [madiMarkLinks, setMadiMarkLinks] = useState<string[]>([]);
   const [mistakeModal, setMistakeModal] = useState<'loh' | 'madi' | null>(null);
   // 'loh'/'madi' open the ward being GRADED today (mistakes feed the score);
   // 'newLoh'/'newMadi' open the ward being ASSIGNED today, read-only — there is
@@ -214,7 +218,12 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
 
   /** The mushaf counter records plain mistakes; they join the same history the
    *  counter modal builds, so the score comes out of one place either way. */
-  function applyMushafCount(which: 'loh' | 'madi', count: number) {
+  function applyMushafCount(which: 'loh' | 'madi', count: number, marksLink: string | null) {
+    if (marksLink) {
+      const keep = (prev: string[]) => (prev.includes(marksLink) ? prev : [...prev, marksLink]);
+      if (which === 'loh') setLohMarkLinks(keep);
+      else setMadiMarkLinks(keep);
+    }
     const add: MistakeKind[] = Array.from({ length: count }, () => 'full');
     if (which === 'loh') {
       const next = [...lohMistakes, ...add];
@@ -396,6 +405,8 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     setPrevEdits(null);
     setLohMistakes([]);
     setMadiMistakes([]);
+    setLohMarkLinks([]);
+    setMadiMarkLinks([]);
     setLohRows([emptyRow()]);
     setMadiRows([emptyRow()]);
     setTajweedEnabled(false);
@@ -454,6 +465,8 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
       setPrevMadiScore('');
       setLohMistakes([]);
       setMadiMistakes([]);
+      setLohMarkLinks([]);
+      setMadiMarkLinks([]);
       formOwnerRef.current = s;
       return;
     }
@@ -540,6 +553,8 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     // counter; pre-feature records have no tally, so the counter starts empty.
     setLohMistakes(rebuildMistakeHistory(r.loh?.mistakes));
     setMadiMistakes(rebuildMistakeHistory(r.madi?.mistakes));
+    setLohMarkLinks([]);
+    setMadiMarkLinks([]);
 
     const lohArr = (r.newLoh ?? []).filter((l) => l?.sura);
     const lohLoaded = lohArr.length ? lohArr.map((l) => ({ ...l })) : [emptyRow()];
@@ -791,7 +806,10 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     // originally-stored one, so what the teacher reviews matches what's
     // about to be saved.
     const messageSource = prevUpdate ?? prevSession;
-    const message = buildWhatsAppMessage(rec, messageSource, selectedStudent.parentToken);
+    const message = buildWhatsAppMessage(rec, messageSource, selectedStudent.parentToken, {
+      loh: lohMarkLinks,
+      madi: madiMarkLinks,
+    });
     const phone = normalizeWhatsAppPhone(selectedStudent.phonePrimary);
     setPendingSave({ rec, message, phone, isEditing, studentId: selectedStudent.id, prevUpdate });
   }
@@ -1398,11 +1416,12 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
           list={mushafListFor(mushafFor)}
           studentName={selectedStudent ? getStudentName(selectedStudent) : ''}
           token={mushafToken}
+          phone={selectedStudent ? normalizeWhatsAppPhone(selectedStudent.phonePrimary) : ''}
           // Read-only targets pass no handler at all, so a count arriving from
           // the viewer's close button closes the frame and changes nothing.
           onCount={
             mushafFor === 'loh' || mushafFor === 'madi'
-              ? (count) => applyMushafCount(mushafFor, count)
+              ? (count, marksLink) => applyMushafCount(mushafFor, count, marksLink)
               : undefined
           }
           onClose={() => setMushafFor(null)}

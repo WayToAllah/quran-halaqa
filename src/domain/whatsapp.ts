@@ -78,10 +78,17 @@ function gradeLine(row: string): string {
  * entirely (see firestore.rules), so that has to happen server-side
  * (Phase 5). If `parentToken` is omitted, the link line is simply left out.
  */
+/** Links to today's ward with the mistaken words marked red in the mushaf. */
+export interface MistakeLinks {
+  loh?: readonly string[];
+  madi?: readonly string[];
+}
+
 export function buildWhatsAppMessage(
   rec: SessionRecord,
   prevSession: SessionRecord | null,
   parentToken?: string,
+  mistakeLinks?: MistakeLinks,
 ): string {
   const nl = '\n';
   const firstName = (rec.student || '').split(' ')[0] || 'الطالب';
@@ -122,6 +129,15 @@ export function buildWhatsAppMessage(
       msg += '• الماضي: ' + scoreText(rec.madi!.score!) + nl;
       msg += gradeLine(gradeRowFromScore(rec.madi!.score!));
     }
+    msg += nl;
+  }
+
+  const lohLinks = mistakeLinks?.loh ?? [];
+  const madiLinks = mistakeLinks?.madi ?? [];
+  if (lohLinks.length || madiLinks.length) {
+    msg += '🔴 *الكلمات اللي غلط فيها معلّمة بالأحمر في المصحف*' + nl;
+    lohLinks.forEach((l) => (msg += '• اللوح: ' + l + nl));
+    madiLinks.forEach((l) => (msg += '• الماضي: ' + l + nl));
     msg += nl;
   }
 

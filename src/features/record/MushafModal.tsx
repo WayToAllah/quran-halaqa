@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { mushafLink, readMushafCount, isMushafReady } from '../../domain/mushafLink';
+import {
+  mushafLink,
+  readMushafCount,
+  readMushafMarksLink,
+  isMushafReady,
+} from '../../domain/mushafLink';
 import type { SuraAssignment } from '../../types';
 
 interface Props {
@@ -10,12 +15,14 @@ interface Props {
   studentName: string;
   /** Distinguishes this open from any earlier one, so a stale message is dropped. */
   token: string;
+  /** Parent's WhatsApp number (normalized); the viewer's send button opens that chat. */
+  phone?: string;
   /** Number of mistakes the teacher tapped while the viewer was open. Omitted
    *  when the viewer is opened just to READ a ward (the new assignment has no
    *  score to feed), in which case the count is dropped — but the message is
    *  still what closes the frame, because the viewer's own close button is
    *  what sends it. */
-  onCount?: (count: number) => void;
+  onCount?: (count: number, marksLink: string | null) => void;
   onClose: () => void;
 }
 
@@ -26,8 +33,8 @@ interface Props {
  * tab so the teacher stays inside the session being recorded, and it hands the
  * count back over postMessage.
  */
-export function MushafModal({ label, list, studentName, token, onCount, onClose }: Props) {
-  const src = mushafLink(list, { name: studentName, ward: label, token });
+export function MushafModal({ label, list, studentName, token, phone, onCount, onClose }: Props) {
+  const src = mushafLink(list, { name: studentName, ward: label, token, phone });
   const closedRef = useRef(false);
   // The viewer draws its own header with the name and the ward, so this frame
   // adds none of its own. Until the viewer reports that it is showing the ward
@@ -45,7 +52,7 @@ export function MushafModal({ label, list, studentName, token, onCount, onClose 
       const count = readMushafCount(e.data, token);
       if (count === null || closedRef.current) return;
       closedRef.current = true;
-      onCount?.(count);
+      onCount?.(count, readMushafMarksLink(e.data, token, window.location.origin));
       onClose();
     }
     window.addEventListener('message', onMessage);
