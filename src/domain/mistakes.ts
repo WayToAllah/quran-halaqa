@@ -75,3 +75,22 @@ export function mistakeScoreColor(s: number): string {
   if (s >= 60) return '#c98a1f';
   return '#c0392b';
 }
+
+/**
+ * The mushaf viewer reports its whole tally every time it closes (it reopens
+ * with the earlier red words), so the app moves its plain mistakes by the
+ * difference instead of adding the full count again. Tajweed taps come from the
+ * counter modal, never from the viewer, so they are left alone.
+ */
+export function adjustFullMistakes(history: readonly MistakeKind[], delta: number): MistakeKind[] {
+  if (delta > 0) return [...history, ...Array.from({ length: delta }, () => 'full' as const)];
+  const next = [...history];
+  let left = -delta;
+  for (let i = next.length - 1; i >= 0 && left > 0; i--) {
+    if (next[i] === 'full') {
+      next.splice(i, 1);
+      left--;
+    }
+  }
+  return next;
+}

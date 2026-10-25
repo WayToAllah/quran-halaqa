@@ -38,12 +38,28 @@ export interface MushafLinkOptions {
   /** Parent's WhatsApp number (already normalized), so the viewer's send
    *  button opens that chat directly instead of WhatsApp's contact picker. */
   phone?: string;
+  /** What the viewer was closed with last time for this student, so reopening
+   *  shows the same red words and the same count instead of a blank page. `rk`
+   *  is the viewer's own short marks format; `rx` the taps on the error button. */
+  restore?: MushafRestore;
+}
+
+export interface MushafRestore {
+  rk: string;
+  rx: number;
 }
 
 /** Full URL for the viewer, or null when there is nothing to show. */
 export function mushafLink(
   list: readonly SuraAssignment[],
-  { name = '', ward = '', token = '', base = '../mushaf/', phone = '' }: MushafLinkOptions = {},
+  {
+    name = '',
+    ward = '',
+    token = '',
+    base = '../mushaf/',
+    phone = '',
+    restore,
+  }: MushafLinkOptions = {},
 ): string | null {
   const a = mushafWardParam(list);
   if (!a) return null;
@@ -52,6 +68,8 @@ export function mushafLink(
   if (ward) params.push(`w=${encodeURIComponent(ward)}`);
   if (token) params.push(`id=${encodeURIComponent(token)}`);
   if (phone) params.push(`ph=${encodeURIComponent(phone)}`);
+  if (restore?.rk) params.push(`rk=${encodeURIComponent(restore.rk)}`);
+  if (restore && restore.rx > 0) params.push(`rx=${Math.floor(restore.rx)}`);
   return `${base}?${params.join('&')}`;
 }
 
@@ -67,6 +85,28 @@ export function readMushafCount(data: unknown, token: string): number | null {
   const n = Number(msg.count);
   if (!Number.isFinite(n) || n < 0) return null;
   return Math.floor(n);
+}
+
+/** The viewer's short marks format: groups of `sura.ayah.word.word…` joined by `_`. */
+const SHORT_MARKS = /^\d+(\.\d+){2,}(_\d+(\.\d+){2,})*$/;
+
+/**
+ * Everything the viewer needs back to reopen exactly as it was closed, plus the
+ * total it reported. The total is what the app compares against its last one:
+ * the viewer restores earlier marks, so what it reports on close is the whole
+ * tally, not just what was added this time.
+ */
+export function readMushafState(
+  data: unknown,
+  token: string,
+): { rk: string; rx: number; total: number } | null {
+  const total = readMushafCount(data, token);
+  if (total === null) return null;
+  const msg = data as { rk?: unknown; rx?: unknown };
+  const rk = typeof msg.rk === 'string' && SHORT_MARKS.test(msg.rk) ? msg.rk : '';
+  const rxNum = Number(msg.rx);
+  const rx = Number.isFinite(rxNum) && rxNum > 0 ? Math.floor(rxNum) : 0;
+  return { rk, rx, total };
 }
 
 /**

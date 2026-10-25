@@ -3,7 +3,9 @@ import {
   mushafLink,
   readMushafCount,
   readMushafMarksLink,
+  readMushafState,
   isMushafReady,
+  type MushafRestore,
 } from '../../domain/mushafLink';
 import type { SuraAssignment } from '../../types';
 
@@ -23,6 +25,11 @@ interface Props {
    *  still what closes the frame, because the viewer's own close button is
    *  what sends it. */
   onCount?: (count: number, marksLink: string | null) => void;
+  /** What to reopen with: the red words and taps the viewer was last closed with. */
+  restore?: MushafRestore | null;
+  /** The viewer's state on close, to hand back as `restore` next time. Called
+   *  just before `onCount`, and only when `onCount` is. */
+  onState?: (state: MushafRestore & { total: number }) => void;
   onClose: () => void;
 }
 
@@ -33,8 +40,24 @@ interface Props {
  * tab so the teacher stays inside the session being recorded, and it hands the
  * count back over postMessage.
  */
-export function MushafModal({ label, list, studentName, token, phone, onCount, onClose }: Props) {
-  const src = mushafLink(list, { name: studentName, ward: label, token, phone });
+export function MushafModal({
+  label,
+  list,
+  studentName,
+  token,
+  phone,
+  onCount,
+  restore,
+  onState,
+  onClose,
+}: Props) {
+  const src = mushafLink(list, {
+    name: studentName,
+    ward: label,
+    token,
+    phone,
+    restore: restore ?? undefined,
+  });
   const closedRef = useRef(false);
   // The viewer draws its own header with the name and the ward, so this frame
   // adds none of its own. Until the viewer reports that it is showing the ward
@@ -52,12 +75,14 @@ export function MushafModal({ label, list, studentName, token, phone, onCount, o
       const count = readMushafCount(e.data, token);
       if (count === null || closedRef.current) return;
       closedRef.current = true;
+      const state = readMushafState(e.data, token);
+      if (onCount && state) onState?.(state);
       onCount?.(count, readMushafMarksLink(e.data, token, window.location.origin));
       onClose();
     }
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [token, onCount, onClose]);
+  }, [token, onCount, onState, onClose]);
 
   if (!src) return null;
 

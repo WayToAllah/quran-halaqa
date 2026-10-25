@@ -4,6 +4,7 @@ import {
   mushafLink,
   readMushafCount,
   readMushafMarksLink,
+  readMushafState,
   isMushafReady,
 } from './mushafLink';
 
@@ -143,5 +144,46 @@ describe('readMushafMarksLink', () => {
       readMushafMarksLink({ ...msg, link: origin + '/quran-halaqa/v3/?e=1' }, 'r_9', origin),
     ).toBeNull();
     expect(readMushafMarksLink({ ...msg, link: 'javascript:alert(1)' }, 'r_9', origin)).toBeNull();
+  });
+});
+
+describe('mushafLink restore', () => {
+  it('hands back the marks and the extra taps so the viewer reopens as it was left', () => {
+    const url = mushafLink([{ sura: 'الناس' }], {
+      token: 't',
+      restore: { rk: '114.2.1.3', rx: 2 },
+    })!;
+    expect(url).toContain('rk=114.2.1.3');
+    expect(url).toContain('rx=2');
+  });
+  it('adds nothing when there is nothing to restore', () => {
+    const url = mushafLink([{ sura: 'الناس' }], { token: 't', restore: { rk: '', rx: 0 } })!;
+    expect(url).not.toContain('rk=');
+    expect(url).not.toContain('rx=');
+  });
+});
+
+describe('readMushafState', () => {
+  const base = { type: 'mushaf-count', id: 'r_9', count: 5, rk: '114.2.1.3', rx: 3 };
+  it('reads what the viewer needs back on the next open', () => {
+    expect(readMushafState(base, 'r_9')).toEqual({ rk: '114.2.1.3', rx: 3, total: 5 });
+  });
+  it('is null for another open or a non-count message', () => {
+    expect(readMushafState(base, 'r_10')).toBeNull();
+    expect(readMushafState({ ...base, type: 'x' }, 'r_9')).toBeNull();
+  });
+  it('treats a missing or empty state as nothing marked', () => {
+    expect(readMushafState({ type: 'mushaf-count', id: 'r_9', count: 0 }, 'r_9')).toEqual({
+      rk: '',
+      rx: 0,
+      total: 0,
+    });
+  });
+  it('drops marks that are not the viewer short-format', () => {
+    expect(readMushafState({ ...base, rk: '<script>' }, 'r_9')?.rk).toBe('');
+  });
+  it('clamps a bad extra to zero', () => {
+    expect(readMushafState({ ...base, rx: -4 }, 'r_9')?.rx).toBe(0);
+    expect(readMushafState({ ...base, rx: 'x' }, 'r_9')?.rx).toBe(0);
   });
 });

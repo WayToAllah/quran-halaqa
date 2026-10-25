@@ -33,12 +33,13 @@ import { useGroupAttendance } from '../../hooks/useGroupAttendance';
 import { GroupAttendanceModal } from './GroupAttendanceModal';
 import { MistakeCounterModal } from './MistakeCounterModal';
 import { MushafModal } from './MushafModal';
-import { mushafWardParam } from '../../domain/mushafLink';
+import { mushafWardParam, type MushafRestore } from '../../domain/mushafLink';
 import { WhatsAppModal } from './WhatsAppModal';
 import {
   summarizeMistakes,
   rebuildMistakeHistory,
   committedMistakeScore,
+  adjustFullMistakes,
   type MistakeKind,
 } from '../../domain/mistakes';
 import { StarPicker } from '../../ui/StarPicker';
@@ -187,6 +188,15 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   // Not stored on the record — they ride along in today's WhatsApp message only.
   const [lohMarkLinks, setLohMarkLinks] = useState<string[]>([]);
   const [madiMarkLinks, setMadiMarkLinks] = useState<string[]>([]);
+  // What the viewer was last closed with (red words, extra taps, its total), per
+  // evaluation. Reopening hands it back so the teacher continues instead of
+  // starting blank; it lasts until the next student or the save, like the tally.
+  const [lohMushaf, setLohMushaf] = useState<{ restore: MushafRestore; total: number } | null>(
+    null,
+  );
+  const [madiMushaf, setMadiMushaf] = useState<{ restore: MushafRestore; total: number } | null>(
+    null,
+  );
   const [mistakeModal, setMistakeModal] = useState<'loh' | 'madi' | null>(null);
   // 'loh'/'madi' open the ward being GRADED today (mistakes feed the score);
   // 'newLoh'/'newMadi' open the ward being ASSIGNED today, read-only — there is
@@ -217,23 +227,33 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   }
 
   /** The mushaf counter records plain mistakes; they join the same history the
-   *  counter modal builds, so the score comes out of one place either way. */
+   *  counter modal builds, so the score comes out of one place either way. The
+   *  viewer reopens with its earlier red words, so what it reports on close is
+   *  the whole tally: the history moves by the difference from last time. */
   function applyMushafCount(which: 'loh' | 'madi', count: number, marksLink: string | null) {
-    if (marksLink) {
-      const keep = (prev: string[]) => (prev.includes(marksLink) ? prev : [...prev, marksLink]);
-      if (which === 'loh') setLohMarkLinks(keep);
-      else setMadiMarkLinks(keep);
-    }
-    const add: MistakeKind[] = Array.from({ length: count }, () => 'full');
+    const prev = which === 'loh' ? lohMushaf : madiMushaf;
+    const delta = count - (prev?.total ?? 0);
+    // One link per evaluation, always the latest: it already holds every red word.
+    const links = marksLink ? [marksLink] : [];
     if (which === 'loh') {
-      const next = [...lohMistakes, ...add];
+      const next = adjustFullMistakes(lohMistakes, delta);
       setLohMistakes(next);
       setPrevLohScore(String(committedMistakeScore(next)));
+      setLohMarkLinks(links);
     } else {
-      const next = [...madiMistakes, ...add];
+      const next = adjustFullMistakes(madiMistakes, delta);
       setMadiMistakes(next);
       setPrevMadiScore(String(committedMistakeScore(next)));
+      setMadiMarkLinks(links);
     }
+  }
+
+  /** Remember how the viewer was left, for the next open. */
+  function rememberMushaf(which: 'loh' | 'madi', state: MushafRestore & { total: number }) {
+    const { total, ...restore } = state;
+    const entry = restore.rk || restore.rx > 0 || total > 0 ? { restore, total } : null;
+    if (which === 'loh') setLohMushaf(entry);
+    else setMadiMushaf(entry);
   }
 
   const [lohRows, setLohRows] = useState<SuraAssignment[]>([emptyRow()]);
@@ -407,6 +427,8 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     setMadiMistakes([]);
     setLohMarkLinks([]);
     setMadiMarkLinks([]);
+    setLohMushaf(null);
+    setMadiMushaf(null);
     setLohRows([emptyRow()]);
     setMadiRows([emptyRow()]);
     setTajweedEnabled(false);
@@ -467,6 +489,8 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
       setMadiMistakes([]);
       setLohMarkLinks([]);
       setMadiMarkLinks([]);
+      setLohMushaf(null);
+      setMadiMushaf(null);
       formOwnerRef.current = s;
       return;
     }
@@ -555,6 +579,8 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     setMadiMistakes(rebuildMistakeHistory(r.madi?.mistakes));
     setLohMarkLinks([]);
     setMadiMarkLinks([]);
+    setLohMushaf(null);
+    setMadiMushaf(null);
 
     const lohArr = (r.newLoh ?? []).filter((l) => l?.sura);
     const lohLoaded = lohArr.length ? lohArr.map((l) => ({ ...l })) : [emptyRow()];
@@ -1422,6 +1448,18 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
           onCount={
             mushafFor === 'loh' || mushafFor === 'madi'
               ? (count, marksLink) => applyMushafCount(mushafFor, count, marksLink)
+              : undefined
+          }
+          restore={
+            mushafFor === 'loh'
+              ? (lohMushaf?.restore ?? null)
+              : mushafFor === 'madi'
+                ? (madiMushaf?.restore ?? null)
+                : null
+          }
+          onState={
+            mushafFor === 'loh' || mushafFor === 'madi'
+              ? (state) => rememberMushaf(mushafFor, state)
               : undefined
           }
           onClose={() => setMushafFor(null)}

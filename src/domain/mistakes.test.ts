@@ -4,6 +4,7 @@ import {
   committedMistakeScore,
   summarizeMistakes,
   rebuildMistakeHistory,
+  adjustFullMistakes,
   mistakeScoreColor,
   type MistakeKind,
 } from './mistakes';
@@ -120,5 +121,24 @@ describe('mistakeScoreColor', () => {
       const colourChanged = mistakeScoreColor(n) !== mistakeScoreColor(n - 1);
       expect(colourChanged).toBe(labelChanged);
     }
+  });
+});
+
+describe('adjustFullMistakes', () => {
+  it('adds plain mistakes when the viewer total went up', () => {
+    expect(adjustFullMistakes(['full'], 2)).toEqual(['full', 'full', 'full']);
+  });
+  it('takes the latest plain mistakes back when the total went down', () => {
+    expect(adjustFullMistakes(['full', 'tajweed', 'full', 'full'], -2)).toEqual([
+      'full',
+      'tajweed',
+    ]);
+  });
+  it('never removes tajweed taps and never goes below what is there', () => {
+    expect(adjustFullMistakes(['tajweed', 'full'], -5)).toEqual(['tajweed']);
+  });
+  it('leaves the history alone for no change', () => {
+    const h: MistakeKind[] = ['full', 'tajweed'];
+    expect(adjustFullMistakes(h, 0)).toEqual(h);
   });
 });
