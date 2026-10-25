@@ -528,7 +528,9 @@ const EMBED = (() => {
   const items = raw.split(',').map(s => s.split(':')).filter(x => x[0])
     .map(x => ({ sura: decodeURIComponent(x[0]), from: x[1] || '', to: x[2] || '' }));
   if (!items.length) return null;
-  return { items, name: q.get('n') || '', ward: q.get('w') || '', token: q.get('id') || '', phone: (q.get('ph') || '').replace(/[^0-9]/g, '') };
+  return { items, name: q.get('n') || '', ward: q.get('w') || '', token: q.get('id') || '', phone: (q.get('ph') || '').replace(/[^0-9]/g, ''),
+    // ما كان عليه المصحف لما اتقفل آخر مرة لنفس الطالب (الكلمات الحمرا وضغطات زرار الخطأ)
+    rk: q.get('rk') || '', rx: Math.max(0, Math.floor(+q.get('rx')) || 0) };
 })();
 /** Told to the app once the ward is actually on screen. Separate from the
  * iframe loading: the viewer can come up and still fail to place the ward. */
@@ -540,7 +542,8 @@ function announceReady() {
 }
 function reportCount(total) {
   if (!EMBED) return false;
-  const msg = { type: 'mushaf-count', id: EMBED.token, count: total, marks: allMarks(), link: markedTotal() ? shareLink() : '' };
+  const msg = { type: 'mushaf-count', id: EMBED.token, count: total, marks: allMarks(), link: markedTotal() ? shareLink() : '',
+    rk: encodeShort(allMarks()), rx: counts.reduce((a, b) => a + b, 0) };
   if (window.parent && window.parent !== window) { window.parent.postMessage(msg, '*'); return true; }
   if (window.opener) { window.opener.postMessage(msg, '*'); return true; }
   return false;
@@ -561,7 +564,18 @@ function startEmbedded() {
     return;
   }
   document.querySelector('.wrap').style.display = 'none';
-  counts = pages.map(() => 0); idx = 0; ward = pages.slice(); marks.clear(); actions.length = 0;
+  ward = pages.slice(); marks.clear(); actions.length = 0;
+  // لو الطالب كان معلَّم له أخطاء قبل كده، نرجّعها زي ما كانت بدل صفحة بيضا
+  decodeShort(EMBED.rk).forEach(id => {
+    const [s, a] = id.split(':').map(Number);
+    const p = pageOfAyah(s, a);
+    if (!p) return;
+    if (!marks.has(p)) marks.set(p, new Set());
+    marks.get(p).add(id);
+  });
+  pages = [...new Set([...pages, ...marks.keys()])].sort((a, b) => a - b);
+  counts = pages.map(() => 0); idx = Math.max(0, pages.indexOf(ward[0]));
+  counts[idx] = EMBED.rx;
   pages.forEach((pp) => ensureFontsFor(pp));
   document.querySelector('.bar .t b').textContent = EMBED.name || 'التسميع';
   const wardText = EMBED.items
