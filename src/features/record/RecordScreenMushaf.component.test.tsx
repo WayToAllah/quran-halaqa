@@ -21,8 +21,9 @@ vi.mock('../../hooks/usePreviousSession', () => ({
     loading: false,
   }),
 }));
+const saveRecordMock = vi.fn().mockResolvedValue(undefined);
 vi.mock('../../data/records.repo', () => ({
-  saveRecord: vi.fn().mockResolvedValue(undefined),
+  saveRecord: (...args: unknown[]) => saveRecordMock(...args),
   getRecordsByDate: vi.fn().mockResolvedValue([]),
 }));
 vi.mock('../../data/publishStats', () => ({
@@ -37,11 +38,11 @@ async function selectStudent(name: string) {
   await userEvent.click(screen.getByRole('button', { name }));
 }
 
-function renderScreen() {
+function renderScreen(editRecord: SessionRecord | null = null) {
   return render(
     <ToastProvider>
       <DraftGuardProvider>
-        <RecordScreen editRecord={null} />
+        <RecordScreen editRecord={editRecord} onEditConsumed={() => {}} />
       </DraftGuardProvider>
     </ToastProvider>,
   );
@@ -160,5 +161,88 @@ describe('RecordScreen — المصحف', () => {
     const again = await openViewer();
     expect(again.url.searchParams.has('rk')).toBe(false);
     expect(again.url.searchParams.has('rx')).toBe(false);
+  });
+
+  describe('saved without sending, then reopened', () => {
+    const LINK = `${window.location.origin}/mushaf/?a=x&m=78.1.2.3`;
+
+    it('stores the red words, taps, total and parent link on the record', async () => {
+      renderScreen();
+      await selectStudent('زيد احمد');
+      const first = await openViewer();
+      window.postMessage(
+        {
+          type: 'mushaf-count',
+          id: first.token,
+          count: 3,
+          rk: '78.1.2.3',
+          rx: 1,
+          link: LINK,
+        },
+        '*',
+      );
+      await waitFor(() => expect(screen.getByDisplayValue('97')).toBeInTheDocument());
+      await userEvent.click(screen.getByRole('button', { name: /حفظ الجلسة/ }));
+      await userEvent.click(
+        await screen.findByRole('button', { name: /احفظ بدون إرسال|✓ احفظ الجلسة/ }),
+      );
+      await waitFor(() => expect(saveRecordMock).toHaveBeenCalledTimes(1));
+      const saved = saveRecordMock.mock.calls[0][2] as SessionRecord;
+      expect(saved.loh?.mushaf).toEqual({ rk: '78.1.2.3', rx: 1, total: 3, link: LINK });
+    });
+
+    it('reopens an edited session with its red words and the same count', async () => {
+      renderScreen({
+        id: 'r_today',
+        studentId: 's_1',
+        student: 'زيد احمد',
+        date: '2026-07-03',
+        loh: {
+          score: 97,
+          stars: 5,
+          mistakes: { full: 3, tajweed: 0 },
+          mushaf: { rk: '78.1.2.3', rx: 1, total: 3, link: LINK },
+        },
+        madi: { score: null, stars: 0 },
+        newLoh: [{ sura: 'النبأ', from: '1', to: '40' }],
+      });
+      const again = await openViewer();
+      expect(again.url.searchParams.get('rk')).toBe('78.1.2.3');
+      expect(again.url.searchParams.get('rx')).toBe('1');
+      // closing unchanged must not add the three mistakes a second time
+      window.postMessage(
+        { type: 'mushaf-count', id: again.token, count: 3, rk: '78.1.2.3', rx: 1, link: LINK },
+        '*',
+      );
+      await waitFor(() => expect(screen.queryByTestId('mushaf-frame')).not.toBeInTheDocument());
+      expect(screen.getByDisplayValue('97')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: /تحديث الجلسة/ }));
+      await screen.findByText(/مراجعة قبل الحفظ/);
+      await waitFor(() => expect(document.body.textContent).toContain(LINK));
+    });
+
+    it('keeps the link when the edited session is updated without opening the mushaf', async () => {
+      renderScreen({
+        id: 'r_today',
+        studentId: 's_1',
+        student: 'زيد احمد',
+        date: '2026-07-03',
+        loh: {
+          score: 97,
+          stars: 5,
+          mistakes: { full: 3, tajweed: 0 },
+          mushaf: { rk: '78.1.2.3', rx: 1, total: 3, link: LINK },
+        },
+        madi: { score: null, stars: 0 },
+        newLoh: [{ sura: 'النبأ', from: '1', to: '40' }],
+      });
+      await userEvent.click(await screen.findByRole('button', { name: /تحديث الجلسة/ }));
+      await waitFor(() => expect(document.body.textContent).toContain(LINK));
+      await userEvent.click(screen.getByRole('button', { name: /حدّث بدون إرسال|✓ حدّث الجلسة/ }));
+      await waitFor(() => expect(saveRecordMock).toHaveBeenCalledTimes(1));
+      const saved = saveRecordMock.mock.calls[0][2] as SessionRecord;
+      expect(saved.loh?.mushaf).toEqual({ rk: '78.1.2.3', rx: 1, total: 3, link: LINK });
+      expect(saved.loh?.mistakes).toEqual({ full: 3, tajweed: 0 });
+    });
   });
 });

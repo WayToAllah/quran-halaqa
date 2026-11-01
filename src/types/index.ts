@@ -65,10 +65,22 @@ export interface MistakeTally {
   tajweed: number;
 }
 
+/** How the mushaf viewer was left for one evaluation, kept on the record so a
+ * session saved without sending (or reopened for edit) still has its red words
+ * and the parent link. `rk`/`rx` are the viewer's own restore format, `total`
+ * the count it last reported, `link` the red-marked page for the parent. */
+export interface MushafMarks {
+  rk: string;
+  rx: number;
+  total: number;
+  link?: string;
+}
+
 export interface ScoreEval {
   score?: number | null;
   stars?: number;
   mistakes?: MistakeTally;
+  mushaf?: MushafMarks;
 }
 
 export interface TajweedEval {

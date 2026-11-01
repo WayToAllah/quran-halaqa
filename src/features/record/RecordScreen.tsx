@@ -47,7 +47,7 @@ import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useToast } from '../../ui/ToastProvider';
 import { useTenant } from '../tenant/TenantContext';
 import { useReportDraft } from '../tenant/DraftGuard';
-import type { SuraAssignment, SessionRecord, Student } from '../../types';
+import type { MushafMarks, SuraAssignment, SessionRecord, Student } from '../../types';
 
 /**
  * How long to wait for Firestore to acknowledge a session write before letting
@@ -121,6 +121,34 @@ interface Props {
   onEditConsumed?: () => void;
 }
 
+/** Viewer state + parent link for one evaluation, as stored on the record.
+ *  Null when the mushaf was never used for it, so no empty field is written. */
+function toMushafMarks(
+  state: { restore: MushafRestore; total: number } | null,
+  links: readonly string[],
+): MushafMarks | null {
+  if (!state) return null;
+  const marks: MushafMarks = {
+    rk: state.restore.rk ?? '',
+    rx: state.restore.rx ?? 0,
+    total: state.total,
+  };
+  // Firestore rejects undefined, so the link is only added when there is one.
+  if (links[0]) marks.link = links[0];
+  return marks;
+}
+
+function fromMushafMarks(m: MushafMarks | undefined): {
+  state: { restore: MushafRestore; total: number } | null;
+  links: string[];
+} {
+  if (!m) return { state: null, links: [] };
+  return {
+    state: { restore: { rk: m.rk ?? '', rx: m.rx ?? 0 }, total: m.total ?? 0 },
+    links: m.link ? [m.link] : [],
+  };
+}
+
 export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) {
   const tenant = useTenant();
   const { mosqueId, halaqaId } = tenant;
@@ -184,8 +212,9 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   // shows the same taps; committed to the record's loh/madi.mistakes on save.
   const [lohMistakes, setLohMistakes] = useState<MistakeKind[]>([]);
   const [madiMistakes, setMadiMistakes] = useState<MistakeKind[]>([]);
-  // Links to the words marked red in the mushaf, one per open that marked any.
-  // Not stored on the record — they ride along in today's WhatsApp message only.
+  // Link to the words marked red in the mushaf (the latest close holds them all).
+  // Stored on the record with the viewer state, so a session saved without
+  // sending — or reopened for edit — still carries it into the message.
   const [lohMarkLinks, setLohMarkLinks] = useState<string[]>([]);
   const [madiMarkLinks, setMadiMarkLinks] = useState<string[]>([]);
   // What the viewer was last closed with (red words, extra taps, its total), per
@@ -577,10 +606,14 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     // counter; pre-feature records have no tally, so the counter starts empty.
     setLohMistakes(rebuildMistakeHistory(r.loh?.mistakes));
     setMadiMistakes(rebuildMistakeHistory(r.madi?.mistakes));
-    setLohMarkLinks([]);
-    setMadiMarkLinks([]);
-    setLohMushaf(null);
-    setMadiMushaf(null);
+    // Bring back the mushaf as it was saved: same red words, same total (so
+    // closing it unchanged adds nothing), and the parent link for the message.
+    const lohSaved = fromMushafMarks(r.loh?.mushaf);
+    const madiSaved = fromMushafMarks(r.madi?.mushaf);
+    setLohMarkLinks(lohSaved.links);
+    setMadiMarkLinks(madiSaved.links);
+    setLohMushaf(lohSaved.state);
+    setMadiMushaf(madiSaved.state);
 
     const lohArr = (r.newLoh ?? []).filter((l) => l?.sura);
     const lohLoaded = lohArr.length ? lohArr.map((l) => ({ ...l })) : [emptyRow()];
@@ -777,6 +810,12 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     const madiTally = summarizeMistakes(madiMistakes);
     if (lohTally) rec.loh!.mistakes = lohTally;
     if (madiTally) rec.madi!.mistakes = madiTally;
+    // The mushaf's red words and parent link live only in this screen until
+    // now; without them on the record, "احفظ فقط" or a later edit lost both.
+    const lohMarks = toMushafMarks(lohMushaf, lohMarkLinks);
+    const madiMarks = toMushafMarks(madiMushaf, madiMarkLinks);
+    if (lohMarks) rec.loh!.mushaf = lohMarks;
+    if (madiMarks) rec.madi!.mushaf = madiMarks;
     if (tajweedEnabled && tajweed.sura) {
       rec.tajweed = cleanTajweed(tajweed, tajweedStars, tajweedNote);
     }
