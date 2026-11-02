@@ -28,7 +28,8 @@ html.direct #viewer{display:flex}
 .bar .x{font-size:24px;line-height:1;background:0;border:0;color:#8a7256;padding:0 4px}
 .bar .t{flex:1;min-width:0}
 .bar .t b{display:block;font-size:14px;font-weight:600}
-.bar .t span{display:block;font-size:12px;color:#8a7256;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .t span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:12px;line-height:1.45;color:#8a7256;cursor:pointer}
+.bar .t span.all{display:block}
 .bar .p{font-size:12px;color:#a98761;white-space:nowrap}
 .stage{flex:1;position:relative;overflow:auto;display:flex;align-items:flex-start;justify-content:center}
 .stage img{width:100%;max-width:520px;display:block}
@@ -587,14 +588,17 @@ function startEmbedded() {
   counts[idx] = EMBED.rx;
   pages.forEach((pp) => ensureFontsFor(pp));
   document.querySelector('.bar .t b').textContent = EMBED.name || 'التسميع';
+  // كل سورة بآياتها كتلة واحدة (مسافات ثابتة) عشان السطر ينزل بين السور مش جواها
   const wardText = EMBED.items
-    .map(a => a.sura + (a.from && a.to ? ' ' + AR(a.from) + '-' + AR(a.to) : ''))
+    .map(a => (a.sura + (a.from && a.to ? ' ' + AR(a.from) + '-' + AR(a.to) : '')).replace(/ /g, '\u00a0'))
     .join(' + ');
   document.getElementById('ward').textContent = EMBED.ward ? EMBED.ward + '، ' + wardText : wardText;
   document.getElementById('viewer').classList.add('on');
   render();
   announceReady();
 }
+// الورد بيبان في سطرين؛ لو أطول من كده، دوسة عليه تفرده كله ودوسة تانية ترجّعه
+document.getElementById('ward').addEventListener('click', e => e.currentTarget.classList.toggle('all'));
 document.getElementById('go').onclick = () => {
   calc();
   if (!pages.length) return;
