@@ -34,8 +34,6 @@ import { GroupAttendanceModal } from './GroupAttendanceModal';
 import { MistakeCounterModal } from './MistakeCounterModal';
 import { MushafModal } from './MushafModal';
 import { mushafWardParam, type MushafRestore } from '../../domain/mushafLink';
-import { marksQueryOf, shortMarksUrl } from '../../domain/shortMarks';
-import { createShortMarks } from '../../data/marks.repo';
 import { WhatsAppModal } from './WhatsAppModal';
 import {
   summarizeMistakes,
@@ -271,49 +269,12 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
       setLohMistakes(next);
       setPrevLohScore(String(committedMistakeScore(next)));
       setLohMarkLinks(links);
-      shortenMarksLink('loh', marksLink);
     } else {
       const next = adjustFullMistakes(madiMistakes, delta);
       setMadiMistakes(next);
       setPrevMadiScore(String(committedMistakeScore(next)));
       setMadiMarkLinks(links);
-      shortenMarksLink('madi', marksLink);
     }
-  }
-
-  // Full marks query → its short link, so reopening the viewer and closing it
-  // with the same red words reuses one code instead of minting a new one.
-  const shortLinksRef = useRef(new Map<string, string>());
-  // The full link each side is currently waiting to shorten; a late answer for
-  // an older link (the teacher reopened and changed the marks) is dropped.
-  const pendingShortRef = useRef<{ loh: string | null; madi: string | null }>({
-    loh: null,
-    madi: null,
-  });
-
-  /** Swap the side's full marks link for a short one once Firestore has it.
-   *  Until then — or for good if the save is refused — the full link stays, so
-   *  the parent always gets a working link either way. */
-  function shortenMarksLink(which: 'loh' | 'madi', link: string | null) {
-    pendingShortRef.current[which] = link;
-    if (!link) return;
-    const q = marksQueryOf(link);
-    if (!q) return;
-    const setLinks = which === 'loh' ? setLohMarkLinks : setMadiMarkLinks;
-    const known = shortLinksRef.current.get(q);
-    if (known) {
-      setLinks([known]);
-      return;
-    }
-    createShortMarks(mosqueId, q).then(
-      (code) => {
-        const short = shortMarksUrl(link, code);
-        if (!short) return;
-        shortLinksRef.current.set(q, short);
-        if (pendingShortRef.current[which] === link) setLinks([short]);
-      },
-      (err) => console.warn('short marks link not saved, keeping the full one:', err),
-    );
   }
 
   /** Remember how the viewer was left, for the next open. */
@@ -495,7 +456,6 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     setMadiMistakes([]);
     setLohMarkLinks([]);
     setMadiMarkLinks([]);
-    pendingShortRef.current = { loh: null, madi: null };
     setLohMushaf(null);
     setMadiMushaf(null);
     setLohRows([emptyRow()]);
@@ -558,7 +518,6 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
       setMadiMistakes([]);
       setLohMarkLinks([]);
       setMadiMarkLinks([]);
-      pendingShortRef.current = { loh: null, madi: null };
       setLohMushaf(null);
       setMadiMushaf(null);
       formOwnerRef.current = s;
@@ -653,7 +612,6 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     const madiSaved = fromMushafMarks(r.madi?.mushaf);
     setLohMarkLinks(lohSaved.links);
     setMadiMarkLinks(madiSaved.links);
-    pendingShortRef.current = { loh: null, madi: null };
     setLohMushaf(lohSaved.state);
     setMadiMushaf(madiSaved.state);
 
