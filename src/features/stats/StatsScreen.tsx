@@ -41,6 +41,7 @@ import { SeasonsModal } from '../seasons/SeasonsModal';
 import { republishPublicStatsFor } from '../../data/publishStats';
 import { localDateStr } from '../../domain/dates';
 import { policyFromSeasons } from '../../domain/attendancePolicy';
+import { appBarHeight } from '../../ui/appBar';
 import {
   ALL_SEASONS,
   currentSeasonId,
@@ -124,9 +125,6 @@ function monthLabel(month: string): string {
 }
 
 const cardCls = 'bg-white border border-hairline rounded-2xl p-[18px]';
-/** Height of the app bar the card headers pin below. Kept in step with the
- * `top-[69px]` class by hand — Tailwind needs the value as a literal. */
-const STICKY_TOP = 69;
 
 /**
  * A stats card with a pinned header.
@@ -165,7 +163,8 @@ function StatsCard({
     const el = cardRef.current;
     if (!el || typeof window.scrollTo !== 'function') return;
     const { top } = el.getBoundingClientRect();
-    if (top < STICKY_TOP) window.scrollTo({ top: window.scrollY + top - STICKY_TOP });
+    const barH = appBarHeight();
+    if (top < barH) window.scrollTo({ top: window.scrollY + top - barH });
   });
 
   return (
@@ -173,11 +172,11 @@ function StatsCard({
       <div
         data-card-header
         class={
-          // Pinned just under the 69px app bar, and stretched over the card's
+          // Pinned just under the app bar (its measured height, see ui/appBar), and stretched over the card's
           // own padding so rows scroll behind it edge to edge. Without this the
           // header scrolls away and a long leaderboard becomes impossible to
           // shorten from the middle without first scrolling back to the top.
-          'sticky top-[69px] z-[5] bg-white flex items-center gap-2 ' +
+          'sticky top-[var(--app-bar-h,69px)] z-[5] bg-white flex items-center gap-2 ' +
           '-mx-[18px] px-[18px] -mt-[18px] pt-[18px] pb-3.5'
         }
       >

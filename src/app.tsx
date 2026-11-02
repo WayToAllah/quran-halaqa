@@ -1,4 +1,5 @@
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
+import { useAppBarHeight } from './ui/appBar';
 import { ToastProvider } from './ui/ToastProvider';
 import { useAuth } from './features/auth/useAuth';
 import { LoginScreen } from './features/auth/LoginScreen';
@@ -34,6 +35,8 @@ function AppShell() {
   const [editingRecord, setEditingRecord] = useState<SessionRecord | null>(null);
   const { niyyat, save: saveNiyyat } = useNiyyat(mosqueId, halaqaId, auth.status === 'ready');
   const [niyyatOpen, setNiyyatOpen] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
+  useAppBarHeight(headerRef);
   const online = useOnlineStatus();
 
   if (auth.status === 'loading' || auth.status === 'checking-membership') {
@@ -53,7 +56,10 @@ function AppShell() {
 
   return (
     <div class="min-h-screen bg-parchment pb-20" dir="rtl">
-      <header class="bg-white border-b border-hairline px-[18px] py-4 flex items-center gap-3 sticky top-0 z-10">
+      <header
+        ref={headerRef}
+        class="bg-white border-b border-hairline px-[18px] py-3 flex items-center gap-3 sticky top-0 z-10"
+      >
         <div class="w-9 h-9 rounded-[10px] bg-forest flex items-center justify-center shrink-0">
           <svg viewBox="0 0 24 24" width="19" height="19" fill="none">
             <path
@@ -76,11 +82,13 @@ function AppShell() {
           </svg>
         </div>
 
-        {/* Renders nothing while this account has only one halaqa to open,
-            which is everybody today — the header stays exactly as it was. */}
-        <TenantSwitcher uid={auth.user?.uid ?? null} />
-
-        <NiyyahBar niyyat={niyyat} onEdit={() => setNiyyatOpen(true)} />
+        {/* The mosque name sits on its own small line above the niyyah. Side
+            by side they shared one row, and on a phone the niyyah was squeezed
+            to a couple of letters with its ﴿ spilling onto the mosque name. */}
+        <div class="flex-1 min-w-0 flex flex-col items-stretch gap-0.5">
+          <TenantSwitcher uid={auth.user?.uid ?? null} />
+          <NiyyahBar niyyat={niyyat} onEdit={() => setNiyyatOpen(true)} />
+        </div>
 
         <button
           class="w-8 h-8 shrink-0 rounded-full border border-hairline bg-white flex items-center justify-center text-sm"
@@ -97,7 +105,7 @@ function AppShell() {
       {(!online || auth.offlineSession) && (
         <div
           role="status"
-          class="sticky top-[69px] z-10 bg-[#8C2F1E] text-white text-[12px] font-semibold px-[18px] py-2 text-center"
+          class="sticky top-[var(--app-bar-h,69px)] z-10 bg-[#8C2F1E] text-white text-[12px] font-semibold px-[18px] py-2 text-center"
         >
           {online
             ? '📴 شغّال من نسخة الجهاز — البيانات ممكن تكون قديمة'

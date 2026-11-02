@@ -44,7 +44,7 @@ describe('StatsScreen — card headers', () => {
   it('pins the header so it stays reachable from the middle of a long list', () => {
     const cls = (render(<StatsScreen />), cardHeader('🥇 الترتيب العام').className);
     expect(cls).toContain('sticky');
-    expect(cls).toContain('top-[69px]');
+    expect(cls).toContain('top-[var(--app-bar-h,69px)]');
   });
 
   it('carries the list toggle in the header rather than under the list', () => {

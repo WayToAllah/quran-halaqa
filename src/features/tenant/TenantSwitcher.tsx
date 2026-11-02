@@ -73,10 +73,10 @@ export function TenantSwitcher({ uid }: { uid: string | null }) {
     <>
       <button
         type="button"
-        class="shrink-0 max-w-[42%] px-2.5 py-1.5 rounded-full border border-hairline bg-white flex items-center gap-1"
+        class="self-start max-w-full min-w-0 flex items-center gap-1 text-right"
         onClick={() => setOpen((v) => !v)}
       >
-        <span class="text-[11.5px] font-bold text-ink-dark truncate">
+        <span class="min-w-0 text-[11.5px] font-bold text-taupe truncate">
           {current ? current.mosqueName : tenant.mosqueId}
         </span>
         <span class="text-[9px] text-taupe">▾</span>
@@ -85,7 +85,7 @@ export function TenantSwitcher({ uid }: { uid: string | null }) {
       {open && (
         <div class="fixed inset-0 z-40" onClick={() => setOpen(false)}>
           <div
-            class="absolute top-[62px] right-3 left-3 sm:left-auto sm:w-72 bg-white rounded-2xl border border-hairline shadow-lg overflow-hidden"
+            class="absolute top-[calc(var(--app-bar-h,69px)-4px)] right-3 left-3 sm:left-auto sm:w-72 bg-white rounded-2xl border border-hairline shadow-lg overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {options.map((o) => {
