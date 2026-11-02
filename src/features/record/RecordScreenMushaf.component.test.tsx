@@ -30,6 +30,20 @@ vi.mock('../../data/publishStats', () => ({
   republishPublicStatsFor: vi.fn().mockResolvedValue(undefined),
 }));
 
+/** Posts the viewer's count message until the app takes it. The modal starts
+ *  listening in an effect, so a message sent the instant the frame appears
+ *  can land before the listener exists; the real viewer only ever sends on
+ *  close, long after. Accepted means the modal closed. */
+async function sendCount(msg: Record<string, unknown>) {
+  await waitFor(
+    () => {
+      if (screen.queryByTestId('mushaf-frame')) window.postMessage(msg, '*');
+      expect(screen.queryByTestId('mushaf-frame')).not.toBeInTheDocument();
+    },
+    { timeout: 3000, interval: 50 },
+  );
+}
+
 async function selectStudent(name: string) {
   const input = screen.getByPlaceholderText('ابحث أو اختر اسم الطالب…');
   await userEvent.click(input);
@@ -74,7 +88,7 @@ describe('RecordScreen — المصحف', () => {
     const frame = (await screen.findByTestId('mushaf-frame')) as HTMLIFrameElement;
     const token = new URL(frame.src, window.location.href).searchParams.get('id')!;
 
-    window.postMessage({ type: 'mushaf-count', id: token, count: 6 }, '*');
+    await sendCount({ type: 'mushaf-count', id: token, count: 6 });
     await waitFor(() => expect(screen.getByDisplayValue('94')).toBeInTheDocument());
     expect(screen.queryByTestId('mushaf-frame')).not.toBeInTheDocument();
   });
@@ -85,7 +99,7 @@ describe('RecordScreen — المصحف', () => {
     await userEvent.click(screen.getByRole('button', { name: /📖 المصحف/ }));
     const frame = (await screen.findByTestId('mushaf-frame')) as HTMLIFrameElement;
     const token = new URL(frame.src, window.location.href).searchParams.get('id')!;
-    window.postMessage({ type: 'mushaf-count', id: token, count: 2 }, '*');
+    await sendCount({ type: 'mushaf-count', id: token, count: 2 });
     await waitFor(() => expect(screen.getByDisplayValue('98')).toBeInTheDocument());
     // the counter button now reflects the same two mistakes
     expect(screen.getByRole('button', { name: /🧮 عدّاد الأخطاء \(2\)/ })).toBeInTheDocument();
@@ -102,10 +116,7 @@ describe('RecordScreen — المصحف', () => {
     renderScreen();
     await selectStudent('زيد احمد');
     const first = await openViewer();
-    window.postMessage(
-      { type: 'mushaf-count', id: first.token, count: 3, rk: '78.1.2.3', rx: 1 },
-      '*',
-    );
+    await sendCount({ type: 'mushaf-count', id: first.token, count: 3, rk: '78.1.2.3', rx: 1 });
     await waitFor(() => expect(screen.queryByTestId('mushaf-frame')).not.toBeInTheDocument());
     const second = await openViewer();
     expect(second.url.searchParams.get('rk')).toBe('78.1.2.3');
@@ -116,13 +127,10 @@ describe('RecordScreen — المصحف', () => {
     renderScreen();
     await selectStudent('زيد احمد');
     const first = await openViewer();
-    window.postMessage({ type: 'mushaf-count', id: first.token, count: 3, rk: '78.1.2.3' }, '*');
+    await sendCount({ type: 'mushaf-count', id: first.token, count: 3, rk: '78.1.2.3' });
     await waitFor(() => expect(screen.getByDisplayValue('97')).toBeInTheDocument());
     const second = await openViewer();
-    window.postMessage(
-      { type: 'mushaf-count', id: second.token, count: 5, rk: '78.1.2.3.4.5' },
-      '*',
-    );
+    await sendCount({ type: 'mushaf-count', id: second.token, count: 5, rk: '78.1.2.3.4.5' });
     await waitFor(() => expect(screen.getByDisplayValue('95')).toBeInTheDocument());
   });
 
@@ -130,28 +138,18 @@ describe('RecordScreen — المصحف', () => {
     renderScreen();
     await selectStudent('زيد احمد');
     const first = await openViewer();
-    window.postMessage(
-      { type: 'mushaf-count', id: first.token, count: 4, rk: '78.1.2.3.4.5' },
-      '*',
-    );
-    await waitFor(() => expect(screen.getByDisplayValue('96')).toBeInTheDocument(), {
-      timeout: 3000,
-    });
+    await sendCount({ type: 'mushaf-count', id: first.token, count: 4, rk: '78.1.2.3.4.5' });
+    await waitFor(() => expect(screen.getByDisplayValue('96')).toBeInTheDocument());
     const second = await openViewer();
-    window.postMessage({ type: 'mushaf-count', id: second.token, count: 1, rk: '78.1.2' }, '*');
-    await waitFor(() => expect(screen.getByDisplayValue('99')).toBeInTheDocument(), {
-      timeout: 3000,
-    });
+    await sendCount({ type: 'mushaf-count', id: second.token, count: 1, rk: '78.1.2' });
+    await waitFor(() => expect(screen.getByDisplayValue('99')).toBeInTheDocument());
   });
 
   it('starts a different student with a clean viewer', async () => {
     renderScreen();
     await selectStudent('زيد احمد');
     const first = await openViewer();
-    window.postMessage(
-      { type: 'mushaf-count', id: first.token, count: 2, rk: '78.1.2', rx: 0 },
-      '*',
-    );
+    await sendCount({ type: 'mushaf-count', id: first.token, count: 2, rk: '78.1.2', rx: 0 });
     await waitFor(() => expect(screen.queryByTestId('mushaf-frame')).not.toBeInTheDocument());
 
     await selectStudent('عمر خالد');
@@ -174,17 +172,14 @@ describe('RecordScreen — المصحف', () => {
       renderScreen();
       await selectStudent('زيد احمد');
       const first = await openViewer();
-      window.postMessage(
-        {
-          type: 'mushaf-count',
-          id: first.token,
-          count: 3,
-          rk: '78.1.2.3',
-          rx: 1,
-          link: LINK,
-        },
-        '*',
-      );
+      await sendCount({
+        type: 'mushaf-count',
+        id: first.token,
+        count: 3,
+        rk: '78.1.2.3',
+        rx: 1,
+        link: LINK,
+      });
       await waitFor(() => expect(screen.getByDisplayValue('97')).toBeInTheDocument());
       await userEvent.click(screen.getByRole('button', { name: /حفظ الجلسة/ }));
       await userEvent.click(
@@ -214,10 +209,14 @@ describe('RecordScreen — المصحف', () => {
       expect(again.url.searchParams.get('rk')).toBe('78.1.2.3');
       expect(again.url.searchParams.get('rx')).toBe('1');
       // closing unchanged must not add the three mistakes a second time
-      window.postMessage(
-        { type: 'mushaf-count', id: again.token, count: 3, rk: '78.1.2.3', rx: 1, link: LINK },
-        '*',
-      );
+      await sendCount({
+        type: 'mushaf-count',
+        id: again.token,
+        count: 3,
+        rk: '78.1.2.3',
+        rx: 1,
+        link: LINK,
+      });
       await waitFor(() => expect(screen.queryByTestId('mushaf-frame')).not.toBeInTheDocument());
       expect(screen.getByDisplayValue('97')).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: /تحديث الجلسة/ }));
