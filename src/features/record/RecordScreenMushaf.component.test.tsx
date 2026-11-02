@@ -26,6 +26,10 @@ vi.mock('../../data/records.repo', () => ({
   saveRecord: (...args: unknown[]) => saveRecordMock(...args),
   getRecordsByDate: vi.fn().mockResolvedValue([]),
 }));
+const createShortMarksMock = vi.fn<(m: string, q: string) => Promise<string>>();
+vi.mock('../../data/marks.repo', () => ({
+  createShortMarks: (m: string, q: string) => createShortMarksMock(m, q),
+}));
 vi.mock('../../data/publishStats', () => ({
   republishPublicStatsFor: vi.fn().mockResolvedValue(undefined),
 }));
@@ -50,6 +54,8 @@ function renderScreen(editRecord: SessionRecord | null = null) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // By default the short link is never confirmed, so the full one stays.
+  createShortMarksMock.mockReturnValue(new Promise<string>(() => {}));
   previousSessionForS1 = {
     id: 'r_prev',
     studentId: 's_1',
@@ -243,6 +249,61 @@ describe('RecordScreen — المصحف', () => {
       const saved = saveRecordMock.mock.calls[0][2] as SessionRecord;
       expect(saved.loh?.mushaf).toEqual({ rk: '78.1.2.3', rx: 1, total: 3, link: LINK });
       expect(saved.loh?.mistakes).toEqual({ full: 3, tajweed: 0 });
+    });
+  });
+
+  describe('short marks link', () => {
+    const FULL = `${window.location.origin}/mushaf/?e=78.1.2.3&p=582-583`;
+    const SHORT = `${window.location.origin}/m/?Ab3dEf7`;
+
+    async function markAndPreview() {
+      renderScreen();
+      await selectStudent('زيد احمد');
+      const v = await openViewer();
+      window.postMessage(
+        { type: 'mushaf-count', id: v.token, count: 3, rk: '78.1.2.3', link: FULL },
+        '*',
+      );
+      await waitFor(() => expect(screen.getByDisplayValue('97')).toBeInTheDocument());
+    }
+
+    it('sends the short link once it is saved, and stores it on the record', async () => {
+      createShortMarksMock.mockResolvedValue('Ab3dEf7');
+      await markAndPreview();
+      expect(createShortMarksMock).toHaveBeenCalledWith(expect.any(String), 'e=78.1.2.3&p=582-583');
+      await userEvent.click(screen.getByRole('button', { name: /حفظ الجلسة/ }));
+      await waitFor(() => expect(document.body.textContent).toContain(SHORT));
+      expect(document.body.textContent).not.toContain(FULL);
+      await userEvent.click(screen.getByRole('button', { name: /احفظ بدون إرسال|✓ احفظ الجلسة/ }));
+      await waitFor(() => expect(saveRecordMock).toHaveBeenCalledTimes(1));
+      expect((saveRecordMock.mock.calls[0][2] as SessionRecord).loh?.mushaf?.link).toBe(SHORT);
+    });
+
+    it('keeps the full link when the short one cannot be saved', async () => {
+      createShortMarksMock.mockRejectedValue(new Error('permission-denied'));
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await markAndPreview();
+      await userEvent.click(screen.getByRole('button', { name: /حفظ الجلسة/ }));
+      await waitFor(() => expect(document.body.textContent).toContain(FULL));
+    });
+
+    it('does not let a late short link land on the next student', async () => {
+      let resolve!: (c: string) => void;
+      createShortMarksMock.mockReturnValue(new Promise<string>((r) => (resolve = r)));
+      await markAndPreview();
+      await selectStudent('عمر خالد');
+      await userEvent.click(await screen.findByRole('button', { name: /ابدأ من جديد/ }));
+      resolve('Ab3dEf7');
+      await new Promise((r) => setTimeout(r, 0));
+      await userEvent.type(
+        screen.getByPlaceholderText('أي ملاحظة عن أداء الطالب اليوم…'),
+        'ملاحظة',
+      );
+      await userEvent.click(screen.getByRole('button', { name: /حفظ الجلسة/ }));
+      await screen.findByText(/مراجعة قبل الحفظ/);
+      expect(document.body.textContent).toContain('تقييم عمر');
+      expect(document.body.textContent).not.toContain(SHORT);
+      expect(document.body.textContent).not.toContain('الكلمات اللي غلط فيها');
     });
   });
 });

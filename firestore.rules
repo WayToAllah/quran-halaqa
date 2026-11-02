@@ -160,5 +160,27 @@ service cloud.firestore {
       // writes entirely, so this never needs to become multi-tenant.
       allow write: if isMosqueMember('altayseer');
     }
+
+    // marks/{code}: short links for the mushaf's red-marked words. The parent
+    // opens m/?CODE with no sign-in, so `get` is public like publicStats —
+    // and `list` is denied, so codes can never be enumerated. A member of the
+    // mosque named in the doc creates it once; nothing ever edits or deletes
+    // one, so a link sent to a parent keeps showing what was sent. The shape
+    // is pinned and `q` limited to the viewer's own digits-and-dots format
+    // (mirrors src/domain/shortMarks.ts), so it cannot be used as storage.
+    match /marks/{code} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if code.matches('^[A-Za-z0-9]{6,12}$')
+        && request.resource.data.keys().hasOnly(['q', 'mosqueId', 'createdAt'])
+        && request.resource.data.keys().hasAll(['q', 'mosqueId', 'createdAt'])
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.mosqueId is string
+        && isMosqueMember(request.resource.data.mosqueId)
+        && request.resource.data.q is string
+        && request.resource.data.q.size() <= 1500
+        && request.resource.data.q.matches('^[0-9a-z._&=-]+$');
+      allow update, delete: if false;
+    }
   }
 }

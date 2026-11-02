@@ -21,7 +21,15 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import { readFileSync } from 'fs';
-import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import {
+  doc,
+  getDoc,
+  getDocs,
+  collection,
+  setDoc,
+  deleteDoc,
+  serverTimestamp,
+} from 'firebase/firestore';
 
 const PROJECT_ID = 'demo-quran-halaqa-rules-test';
 const MOSQUE_ID = 'altayseer';
@@ -312,5 +320,52 @@ describe('membership is granted by the mosque owner', () => {
     await assertFails(
       setDoc(doc(db, 'mosques', MOSQUE_ID, 'members', OUTSIDER_UID), { role: 'owner' }),
     );
+  });
+});
+
+describe('marks/{code} — public get, no list, member-only create, never edited', () => {
+  const CODE = 'Ab3dEf7';
+  const Q = 'e=78.1.2.3_78.5.4&p=582-583&x=1';
+  const good = () => ({ q: Q, mosqueId: MOSQUE_ID, createdAt: serverTimestamp() });
+
+  it('lets a mosque member create a short link', async () => {
+    const db = testEnv.authenticatedContext(ADMIN_UID).firestore();
+    await assertSucceeds(setDoc(doc(db, 'marks', CODE), good()));
+  });
+
+  it('lets a parent (no sign-in) open one by its code, but never list them', async () => {
+    await testEnv.withSecurityRulesDisabled(async (c) => {
+      await setDoc(doc(c.firestore(), 'marks', CODE), { q: Q, mosqueId: MOSQUE_ID });
+    });
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertSucceeds(getDoc(doc(db, 'marks', CODE)));
+    await assertFails(getDocs(collection(db, 'marks')));
+  });
+
+  it('refuses a non-member, an anonymous visitor and a member naming another mosque', async () => {
+    const outsider = testEnv.authenticatedContext(OUTSIDER_UID).firestore();
+    await assertFails(setDoc(doc(outsider, 'marks', CODE), good()));
+    const anon = testEnv
+      .authenticatedContext('anon_visitor_1', { firebase: { sign_in_provider: 'anonymous' } })
+      .firestore();
+    await assertFails(setDoc(doc(anon, 'marks', CODE), good()));
+    const admin = testEnv.authenticatedContext(ADMIN_UID).firestore();
+    await assertFails(setDoc(doc(admin, 'marks', CODE), { ...good(), mosqueId: 'other' }));
+  });
+
+  it('refuses anything but the viewer short format, extra fields, or a bad code', async () => {
+    const db = testEnv.authenticatedContext(ADMIN_UID).firestore();
+    await assertFails(setDoc(doc(db, 'marks', CODE), { ...good(), q: '<script>' }));
+    await assertFails(setDoc(doc(db, 'marks', CODE), { ...good(), q: 'e=' + '1'.repeat(1600) }));
+    await assertFails(setDoc(doc(db, 'marks', CODE), { ...good(), extra: 1 }));
+    await assertFails(setDoc(doc(db, 'marks', CODE), { q: Q, mosqueId: MOSQUE_ID }));
+    await assertFails(setDoc(doc(db, 'marks', 'bad/code!'.replace('/', '_')), good()));
+  });
+
+  it('never lets a saved link be changed or deleted, even by a member', async () => {
+    const db = testEnv.authenticatedContext(ADMIN_UID).firestore();
+    await assertSucceeds(setDoc(doc(db, 'marks', CODE), good()));
+    await assertFails(setDoc(doc(db, 'marks', CODE), { ...good(), q: 'e=1.1.1' }));
+    await assertFails(deleteDoc(doc(db, 'marks', CODE)));
   });
 });
