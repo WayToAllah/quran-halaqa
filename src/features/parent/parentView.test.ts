@@ -20,6 +20,8 @@ import {
   buildMonthOptions,
   buildPeriodOptions,
   ALL_MONTHS,
+  safeMarksLink,
+  latestMarks,
 } from './parentView';
 import { MOCK_PUBLIC_STATS } from './mockPublicStats';
 import { scoreName } from '../../domain/scoring';
@@ -878,5 +880,50 @@ describe('buildStats — extra days under a weekly quota', () => {
   it('no extra line when there are none', () => {
     const s = baseStats({ attendedDays: 8, enrolledHalaqaDays: 8, attendPct: 100, extraDays: 0 });
     expect(buildStats(s)[0].sub).toBe('٨ من ٨ أيام');
+  });
+});
+
+describe('red-marks links on the parent page', () => {
+  const O = 'https://waytoallah.github.io';
+  const L = O + '/quran-halaqa/mushaf/?e=2.1.3&p=2';
+  const withMarks = (loh?: string, madi?: string): PublicStats => ({
+    ...MOCK_PUBLIC_STATS,
+    recentSessions: [
+      {
+        ...MOCK_PUBLIC_STATS.recentSessions[0],
+        loh: { score: 92, ...(loh ? { marksLink: loh } : {}) },
+        madi: { score: 90, ...(madi ? { marksLink: madi } : {}) },
+      },
+      ...MOCK_PUBLIC_STATS.recentSessions.slice(1),
+    ],
+  });
+
+  it('accepts only our own mushaf page on this site', () => {
+    expect(safeMarksLink(L, O)).toBe(L);
+    expect(safeMarksLink(O + '/quran-halaqa/mushaf/index.html?e=1.1.1', O)).not.toBeNull();
+    expect(safeMarksLink('https://evil.test/quran-halaqa/mushaf/?e=1.1.1', O)).toBeNull();
+    expect(safeMarksLink(O + '/quran-halaqa/v3/child.html?t=x', O)).toBeNull();
+    expect(safeMarksLink('javascript:alert(1)', O)).toBeNull();
+    expect(safeMarksLink(undefined, O)).toBeNull();
+  });
+
+  it('offers the newest session marks at the top, and only the newest', () => {
+    expect(latestMarks(withMarks(L), O)).toMatchObject({ date: '2026-07-09', loh: L, madi: null });
+    expect(latestMarks(MOCK_PUBLIC_STATS, O)).toBeNull();
+    const olderOnly: PublicStats = {
+      ...MOCK_PUBLIC_STATS,
+      recentSessions: [
+        MOCK_PUBLIC_STATS.recentSessions[0],
+        { ...MOCK_PUBLIC_STATS.recentSessions[1], loh: { score: 88, marksLink: L } },
+      ],
+    };
+    expect(latestMarks(olderOnly, O)).toBeNull();
+    expect(buildSessions(olderOnly, O)[1].lohMarksLink).toBe(L);
+  });
+
+  it('puts the link on its session in the timeline', () => {
+    const [first] = buildSessions(withMarks(undefined, L), O);
+    expect(first.lohMarksLink).toBeNull();
+    expect(first.madiMarksLink).toBe(L);
   });
 });

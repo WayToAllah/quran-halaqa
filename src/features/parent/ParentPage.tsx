@@ -9,6 +9,7 @@ import {
   buildStats,
   buildCurrentTask,
   buildSessions,
+  latestMarks,
   buildPeriodOptions,
   rankBadgeText,
   ALL_MONTHS,
@@ -150,6 +151,7 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
   const statCells = buildStats(stats, activeMonth);
   const task = buildCurrentTask(stats);
   const sessions = buildSessions(stats);
+  const marks = latestMarks(stats);
   const rankText = rankBadgeText(stats.rank);
   // publicStats documents written before a badge was hidden still carry it,
   // so filter on read as well as on write (see domain/badges.ts).
@@ -167,6 +169,10 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
     'background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:19px;margin-bottom:13px;box-shadow:var(--shadow-sm)';
   const cardTitle =
     'font-size:12.5px;font-weight:700;color:var(--ink);letter-spacing:0.02em;display:flex;align-items:center;gap:9px;margin-bottom:14px';
+  const marksButton =
+    'flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px 10px;border-radius:var(--radius-sm);background:oklch(55% 0.19 25);color:#fff;font-size:14px;font-weight:700;text-decoration:none';
+  const marksInline =
+    'display:inline-block;padding:6px 0;font-size:12px;font-weight:700;color:oklch(50% 0.19 25);text-decoration:none';
   const titleDot =
     'width:21px;height:21px;border-radius:50%;background:var(--ink-tint);color:var(--ink);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0';
 
@@ -211,6 +217,37 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
       </div>
 
       <div style="padding:18px 18px 40px">
+        {/* Red-marked mistakes of the newest session. The WhatsApp message
+            points here instead of carrying the long mushaf link itself. */}
+        {marks && (
+          <div style={cardStyle} data-testid="latest-marks">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+              <div style="font-size:12.5px;font-weight:700;color:var(--ink);letter-spacing:0.02em;display:flex;align-items:center;gap:9px">
+                <span style={titleDot}>🔴</span>
+                أخطاء آخر جلسة
+              </div>
+              <span style="font-size:11px;color:var(--text-hint);font-weight:500">
+                {marks.dateLabel}
+              </span>
+            </div>
+            <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:12px">
+              الكلمات اللي غلط فيها معلّمة بالأحمر في المصحف
+            </div>
+            <div style="display:flex;gap:8px">
+              {marks.loh && (
+                <a href={marks.loh} style={marksButton}>
+                  📖 أخطاء اللوح
+                </a>
+              )}
+              {marks.madi && (
+                <a href={marks.madi} style={marksButton}>
+                  📖 أخطاء الماضي
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Current task */}
         {task && (
           <div style={cardStyle}>
@@ -554,6 +591,13 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
                             {s.lohMistakes}
                           </div>
                         )}
+                        {s.lohMarksLink && (
+                          <div style="padding-right:54px">
+                            <a href={s.lohMarksLink} style={marksInline}>
+                              🔴 الأخطاء في المصحف
+                            </a>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -589,6 +633,13 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
                             )}
                             {s.madiGrade && s.madiMistakes ? '، ' : ''}
                             {s.madiMistakes}
+                          </div>
+                        )}
+                        {s.madiMarksLink && (
+                          <div style="padding-right:54px">
+                            <a href={s.madiMarksLink} style={marksInline}>
+                              🔴 الأخطاء في المصحف
+                            </a>
                           </div>
                         )}
                       </div>

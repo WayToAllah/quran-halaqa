@@ -184,8 +184,11 @@ export interface PublicStats {
   } | null;
   recentSessions: Array<{
     date: string;
-    loh: { score: number; mistakes?: MistakeTally } | null;
-    madi: { score: number; mistakes?: MistakeTally } | null;
+    /** `marksLink`: the mushaf page with that session's red-marked words, when
+     * the teacher marked any. The parent page shows it as a button, so the
+     * WhatsApp message no longer has to carry the long link itself. */
+    loh: { score: number; mistakes?: MistakeTally; marksLink?: string } | null;
+    madi: { score: number; mistakes?: MistakeTally; marksLink?: string } | null;
     newLoh: SuraAssignment[];
     newMadi: SuraAssignment[];
     /** No `tajweed` here on purpose — see the projection in stats.ts. Documents

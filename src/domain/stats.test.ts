@@ -282,6 +282,32 @@ describe('buildStudentPublicStats', () => {
     const result = buildStudentPublicStats(zaid, withMistakes, 1, 1, ['2026-07-01']);
     expect(result.recentSessions[0].loh).toEqual({ score: 97, mistakes: { full: 2, tajweed: 2 } });
   });
+
+  it('publishes the red-marks link of each evaluation, and nothing when none was marked', () => {
+    const LINK = 'https://waytoallah.github.io/quran-halaqa/mushaf/?e=2.1.3&p=2';
+    const recs: SessionRecord[] = [
+      {
+        id: 'r2',
+        studentId: 's_1',
+        date: '2026-07-02',
+        loh: {
+          score: 97,
+          mistakes: { full: 3, tajweed: 0 },
+          mushaf: { rk: 'x', rx: 0, total: 3, link: LINK },
+        },
+        madi: { score: 100, mushaf: { rk: '', rx: 0, total: 0 } },
+      },
+    ];
+    const out = buildStudentPublicStats(zaid, recs, 1, 1, ['2026-07-02']);
+    expect(out.recentSessions[0].loh).toEqual({
+      score: 97,
+      mistakes: { full: 3, tajweed: 0 },
+      marksLink: LINK,
+    });
+    expect(out.recentSessions[0].madi).toEqual({ score: 100 });
+    // the viewer's own restore state stays private to the admin app
+    expect(JSON.stringify(out)).not.toContain('"rk"');
+  });
 });
 
 describe('buildStudentPublicStats attendance window (parent-facing)', () => {

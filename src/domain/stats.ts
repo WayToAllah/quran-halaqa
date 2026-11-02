@@ -1,4 +1,4 @@
-import type { Badge, PublicStats, SessionRecord, Student } from '../types';
+import type { Badge, PublicStats, ScoreEval, SessionRecord, Student } from '../types';
 import { inPeriod, seasonRange, sortSeasons, type Season } from './seasons';
 import { localDateStr } from './dates';
 import { PER_DAY, policyFromSeasons, tallyAttendance } from './attendancePolicy';
@@ -179,14 +179,21 @@ export function buildStudentPublicStats(
       }
     : null;
 
+  // Score, tally and red-marks link of one evaluation; optional keys are left
+  // out rather than set to undefined (Firestore rejects undefined).
+  const evalView = (e: ScoreEval | null | undefined) =>
+    hasScore(e)
+      ? {
+          score: e!.score!,
+          ...(e!.mistakes ? { mistakes: e!.mistakes } : {}),
+          ...(e!.mushaf?.link ? { marksLink: e!.mushaf.link } : {}),
+        }
+      : null;
+
   const recentSessions = realRecs.slice(0, 10).map((r) => ({
     date: r.date || '',
-    loh: hasScore(r.loh)
-      ? { score: r.loh!.score!, ...(r.loh!.mistakes ? { mistakes: r.loh!.mistakes } : {}) }
-      : null,
-    madi: hasScore(r.madi)
-      ? { score: r.madi!.score!, ...(r.madi!.mistakes ? { mistakes: r.madi!.mistakes } : {}) }
-      : null,
+    loh: evalView(r.loh),
+    madi: evalView(r.madi),
     newLoh: (r.newLoh ?? []).filter((l) => l?.sura),
     newMadi: (r.newMadi ?? []).filter((m) => m?.sura),
     // The tajweed assignment is deliberately NOT published. child.html never

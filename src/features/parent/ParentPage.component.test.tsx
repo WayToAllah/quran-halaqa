@@ -325,3 +325,30 @@ describe('ParentPage — progress chart', () => {
     await waitFor(() => expect(screen.getByText('٨٨٪')).toBeInTheDocument());
   });
 });
+
+describe('ParentPage — red-marked mistakes', () => {
+  it('shows a button to the newest session marks, and a link on that session', () => {
+    const link = window.location.origin + '/quran-halaqa/mushaf/?e=3.2.3&p=50';
+    const stats: PublicStats = {
+      ...MOCK_PUBLIC_STATS,
+      recentSessions: [
+        {
+          ...MOCK_PUBLIC_STATS.recentSessions[0],
+          loh: { score: 92, mistakes: { full: 2, tajweed: 1 }, marksLink: link },
+        },
+        ...MOCK_PUBLIC_STATS.recentSessions.slice(1),
+      ],
+    };
+    render(<ParentPage previewStats={stats} />);
+    expect(screen.getByText('أخطاء آخر جلسة')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /أخطاء اللوح/ })).toHaveAttribute('href', link);
+    expect(screen.queryByRole('link', { name: /أخطاء الماضي/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /الأخطاء في المصحف/ })).toHaveAttribute('href', link);
+  });
+
+  it('shows no marks card when nothing was marked', () => {
+    render(<ParentPage previewStats={MOCK_PUBLIC_STATS} />);
+    expect(screen.queryByText('أخطاء آخر جلسة')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /الأخطاء في المصحف/ })).not.toBeInTheDocument();
+  });
+});

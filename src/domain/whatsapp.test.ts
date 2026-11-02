@@ -321,6 +321,16 @@ describe('buildWhatsAppMessage — mushaf mistake links', () => {
     expect(msg).toContain('• اللوح: ' + L);
     expect(msg).toContain('• الماضي: ' + M);
   });
+  it('points to the parent page instead of printing the links when there is one', () => {
+    const msg = buildWhatsAppMessage(rec, null, 'TOKEN123', { loh: [L], madi: [M] });
+    expect(msg).toContain('معلّمة بالأحمر');
+    expect(msg).toContain('صفحة المتابعة');
+    expect(msg).not.toContain(L);
+    expect(msg).not.toContain(M);
+    expect(msg).toContain('?t=TOKEN123');
+    // the pointer comes before the parent link it points at
+    expect(msg.indexOf('صفحة المتابعة')).toBeLessThan(msg.indexOf('?t=TOKEN123'));
+  });
   it('says nothing about the mushaf when no word was marked', () => {
     const msg = buildWhatsAppMessage(rec, null, undefined, { loh: [], madi: [] });
     expect(msg).not.toContain('معلّمة بالأحمر');

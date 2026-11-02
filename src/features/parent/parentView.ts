@@ -542,6 +542,10 @@ export interface SessionView {
    * tally, which is different from recording a tally of zero. */
   lohMistakes: string | null;
   madiMistakes: string | null;
+  /** The mushaf with this session's red-marked words, null when none were
+   * marked (or the published link isn't one of our own mushaf pages). */
+  lohMarksLink: string | null;
+  madiMarksLink: string | null;
   /** Assigned THIS session, to be recited next time. */
   newLoh: string | null;
   newMadi: string | null;
@@ -570,7 +574,41 @@ function mistakeLine(m: MistakeTally | undefined): string | null {
   return parts.length ? parts.join(SEP) : 'بدون أخطاء';
 }
 
-export function buildSessions(stats: PublicStats): SessionView[] {
+/** Only a link to our own mushaf page, on this site, is ever shown as a
+ * button — the published value is data, and a parent taps it trusting us. */
+export function safeMarksLink(
+  link: string | undefined,
+  origin: string = globalThis.location?.origin ?? '',
+): string | null {
+  if (!link || !origin) return null;
+  let url: URL;
+  try {
+    url = new URL(link);
+  } catch {
+    return null;
+  }
+  if (url.origin !== origin) return null;
+  if (!/\/mushaf\/(index\.html)?$/.test(url.pathname)) return null;
+  return url.href;
+}
+
+/** The newest session's red-marks links, for the button at the top of the
+ * page. Only the newest one: an older session's marks under a heading that
+ * reads "آخر جلسة" would show the parent the wrong day. */
+export function latestMarks(
+  stats: PublicStats,
+  origin?: string,
+): { date: string; dateLabel: string; loh: string | null; madi: string | null } | null {
+  const s = stats.recentSessions[0];
+  if (!s) return null;
+  const loh = safeMarksLink(s.loh?.marksLink, origin);
+  const madi = safeMarksLink(s.madi?.marksLink, origin);
+  if (!loh && !madi) return null;
+  const when = formatSessionDate(s.date);
+  return { date: s.date, dateLabel: when.hijri || when.gregorian || s.date, loh, madi };
+}
+
+export function buildSessions(stats: PublicStats, origin?: string): SessionView[] {
   const all = stats.recentSessions;
   return all.slice(0, SESSIONS_WINDOW).map((s, i) => {
     const when = formatSessionDate(s.date);
@@ -597,6 +635,8 @@ export function buildSessions(stats: PublicStats): SessionView[] {
       recitedMadi: prev && prev.newMadi.length ? suraLabelForParent(prev.newMadi) : null,
       lohMistakes: s.loh ? mistakeLine(s.loh.mistakes) : null,
       madiMistakes: s.madi ? mistakeLine(s.madi.mistakes) : null,
+      lohMarksLink: safeMarksLink(s.loh?.marksLink, origin),
+      madiMarksLink: safeMarksLink(s.madi?.marksLink, origin),
       newLoh: s.newLoh.length ? suraLabelForParent(s.newLoh) : null,
       newMadi: s.newMadi.length ? suraLabelForParent(s.newMadi) : null,
       note: s.note,

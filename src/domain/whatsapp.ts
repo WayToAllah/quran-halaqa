@@ -136,8 +136,15 @@ export function buildWhatsAppMessage(
   const madiLinks = mistakeLinks?.madi ?? [];
   if (lohLinks.length || madiLinks.length) {
     msg += '🔴 *الكلمات اللي غلط فيها معلّمة بالأحمر في المصحف*' + nl;
-    lohLinks.forEach((l) => (msg += '• اللوح: ' + l + nl));
-    madiLinks.forEach((l) => (msg += '• الماضي: ' + l + nl));
+    if (parentToken) {
+      // The parent page shows the marks as a button ("أخطاء آخر جلسة"), so
+      // the message points there instead of carrying the long mushaf link.
+      msg += 'تلاقيها في صفحة المتابعة تحت 👇' + nl;
+    } else {
+      // No parent page to point at: the links themselves are the only way in.
+      lohLinks.forEach((l) => (msg += '• اللوح: ' + l + nl));
+      madiLinks.forEach((l) => (msg += '• الماضي: ' + l + nl));
+    }
     msg += nl;
   }
 
