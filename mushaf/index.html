@@ -88,9 +88,18 @@ html.direct #viewer{display:flex}
 <div id="viewer">
   <div class="bar">
     <button class="x" id="close" aria-label="إغلاق">&times;</button>
-    <div class="t"><b>زيد احمد</b><span id="ward"></span></div>
+    <div class="t"><b id="tname"></b><span id="ward"></span></div>
     <div class="p" id="pnum"></div>
   </div>
+<script>
+// العنوان بيظهر فورًا (الشاشة بتتفتح قبل ما بيانات المصحف تحمّل)، فلازم يتكتب
+// من اللينك نفسه هنا — كان فيه اسم تجربة ثابت بيبان لحد ما التحميل يخلص.
+(function () {
+  var q = new URLSearchParams(location.search), n = q.get('n') || '';
+  var view = q.has('e') || q.has('m');
+  document.getElementById('tname').textContent = view ? (n ? 'أخطاء ' + n : 'أخطاء التسميع') : (n || 'التسميع');
+})();
+</script>
   <div class="mush"><span id="mjuz"></span><span id="msura"></span></div>
   <div class="stage" id="stage"></div>
   <div class="pnumber" id="mpage"></div>
@@ -591,7 +600,8 @@ document.getElementById('go').onclick = () => {
   if (!pages.length) return;
   counts = pages.map(() => 0); idx = 0; ward = pages.slice(); marks.clear(); actions.length = 0;
   pages.forEach((pp) => ensureFontsFor(pp));
-  document.getElementById('ward').textContent = 'اللوح، ' + sEl.value + ' ' + AR(fEl.value) + '-' + AR(tEl.value);
+  document.querySelector('.bar .t b').textContent = (EMBED && EMBED.name) || 'التسميع';
+  document.getElementById('ward').textContent = ((EMBED && EMBED.ward) || 'اللوح') + '، ' + sEl.value + ' ' + AR(fEl.value) + '-' + AR(tEl.value);
   document.getElementById('viewer').classList.add('on');
   render();
   announceReady();
