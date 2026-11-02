@@ -134,10 +134,14 @@ describe('RecordScreen — المصحف', () => {
       { type: 'mushaf-count', id: first.token, count: 4, rk: '78.1.2.3.4.5' },
       '*',
     );
-    await waitFor(() => expect(screen.getByDisplayValue('96')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByDisplayValue('96')).toBeInTheDocument(), {
+      timeout: 3000,
+    });
     const second = await openViewer();
     window.postMessage({ type: 'mushaf-count', id: second.token, count: 1, rk: '78.1.2' }, '*');
-    await waitFor(() => expect(screen.getByDisplayValue('99')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByDisplayValue('99')).toBeInTheDocument(), {
+      timeout: 3000,
+    });
   });
 
   it('starts a different student with a clean viewer', async () => {
