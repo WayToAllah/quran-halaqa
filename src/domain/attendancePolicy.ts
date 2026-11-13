@@ -65,9 +65,10 @@ export interface AttendanceTally {
   attended: number;
   /** Days owed. */
   required: number;
-  /** Days that counted toward what was owed (≤ required). */
+  /** Days that counted toward what was owed (≤ required). Extra days in one
+   * week make up for days missed in another: min(attended, required). */
   credited: number;
-  /** attended − credited: days beyond the weekly quota. */
+  /** attended − credited: days beyond everything owed, after making up. */
   extra: number;
   /** credited / required, rounded; 0 when nothing was owed. */
   pct: number;
@@ -118,7 +119,6 @@ export function tallyAttendance(
 
   let attended = 0;
   let required = 0;
-  let credited = 0;
   const graded: { last: string; short: boolean; inProgress: boolean; week: boolean }[] = [];
   for (const u of units.values()) {
     let owed = u.perWeek === null ? u.days : Math.min(u.perWeek, u.days);
@@ -126,7 +126,6 @@ export function tallyAttendance(
     const got = Math.min(u.came, owed);
     attended += u.came;
     required += owed;
-    credited += got;
     graded.push({
       last: u.last,
       short: got < owed,
@@ -143,6 +142,11 @@ export function tallyAttendance(
     missedStreak++;
   }
 
+  // Extra days anywhere in the window make up for missed ones elsewhere (the
+  // teacher's rule: two extra days this week cover a missed day last week).
+  // The weekly shortfall above still drives `missedStreak` — a missed week is
+  // still worth a follow-up even when it was made up later.
+  const credited = Math.min(attended, required);
   return {
     attended,
     required,

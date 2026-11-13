@@ -58,14 +58,32 @@ describe('tallyAttendance — one day a week', () => {
     expect(t).toMatchObject({ attended: 5, required: 3, credited: 3, extra: 2, pct: 100 });
   });
 
-  it('an extra day does not make up for a missed week', () => {
+  it('an extra day makes up for a missed week', () => {
+    // Two days in week one, none in week two, one in week three: three days
+    // owed, three came — the extra day covers the missed week.
     const t = tallyAttendance(
       new Set(['2026-09-26', '2026-09-28', '2026-10-10']),
       HALAQA,
       study,
       AFTER,
     );
-    expect(t).toMatchObject({ attended: 3, required: 3, credited: 2, extra: 1, pct: 67 });
+    expect(t).toMatchObject({ attended: 3, required: 3, credited: 3, extra: 0, pct: 100 });
+  });
+
+  it('making up never goes past 100%, and the rest still shows as extra', () => {
+    const t = tallyAttendance(
+      new Set(['2026-09-26', '2026-09-28', '2026-09-30', '2026-10-10']),
+      HALAQA,
+      study,
+      AFTER,
+    );
+    expect(t).toMatchObject({ attended: 4, required: 3, credited: 3, extra: 1, pct: 100 });
+  });
+
+  it('a made-up week is still a missed week for the follow-up list', () => {
+    // Extra days earlier don't hide that he stopped coming lately.
+    const t = tallyAttendance(new Set(['2026-09-26', '2026-09-28']), HALAQA, study, AFTER);
+    expect(t).toMatchObject({ credited: 2, pct: 67, missedStreak: 2 });
   });
 
   it('the week in progress can only help: his day may still be ahead', () => {

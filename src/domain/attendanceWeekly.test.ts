@@ -46,13 +46,15 @@ describe('weekly quota through the leaderboards', () => {
   it('personal ranking: one day a week is 100%', () => {
     const { list } = getPersonalAttendanceRanking(students, records, records, policy, TODAY);
     expect(byId(list, 's1')).toMatchObject({ attendPct: 100, attendedDays: 3, enrolledDays: 3 });
-    expect(byId(list, 's2')).toMatchObject({ attendPct: 33, attendedDays: 2, extraDays: 1 });
+    // خالد: two days in week one, then nothing — the extra day covers one of
+    // the two missed weeks.
+    expect(byId(list, 's2')).toMatchObject({ attendPct: 67, attendedDays: 2, extraDays: 0 });
   });
 
   it('halaqa-wide ranking uses the same weekly rule', () => {
     const { list } = getAttendanceRanking(students, records, undefined, policy, TODAY);
     expect(byId(list, 's1').attendPct).toBe(100);
-    expect(byId(list, 's2').attendPct).toBe(33);
+    expect(byId(list, 's2').attendPct).toBe(67);
   });
 
   it('student rows follow the policy', () => {
@@ -74,14 +76,14 @@ describe('weekly quota through the leaderboards', () => {
   it('the parent projection: percentage, days owed and extra days', () => {
     const halaqaDays = [...new Set(records.map((r) => r.date!))].sort().reverse();
     const out = buildStudentPublicStats(students[1], records, 7, null, halaqaDays, seasons, TODAY);
-    expect(out.attendPct).toBe(33);
-    // attendedDays is what COUNTED (one day in week one); the second day that
-    // week is the extra one, shown beside it as +١.
+    expect(out.attendPct).toBe(67);
+    // attendedDays is what COUNTED: both days of week one, the second making up
+    // a missed week, so nothing is left over as extra.
     expect(out.seasonStats?.stu).toMatchObject({
-      attendPct: 33,
-      attendedDays: 1,
+      attendPct: 67,
+      attendedDays: 2,
       halaqaDays: 3,
-      extraDays: 1,
+      extraDays: 0,
     });
     const zaid = buildStudentPublicStats(students[0], records, 7, null, halaqaDays, seasons, TODAY);
     expect(zaid.attendPct).toBe(100);
