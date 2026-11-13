@@ -20,29 +20,33 @@ export function usePreviousSession(
   student: Student | null,
   excludeRecordId?: string,
 ) {
-  const [prev, setPrev] = useState<SessionRecord | null>(null);
-  const [loading, setLoading] = useState(false);
+  // The answer is kept with the request it answers. Switching students used to
+  // leave the LAST student's session in place until the new one's records
+  // arrived — long enough for the auto-fill to write that student's next loh
+  // into the new student's rows (and the evaluation card, mushaf ward and
+  // WhatsApp message to show the wrong assignment). Now a stale answer is
+  // simply not returned.
+  const key = student ? `${mosqueId}|${halaqaId}|${student.id}|${excludeRecordId ?? ''}` : null;
+  const [answer, setAnswer] = useState<{ key: string; prev: SessionRecord | null } | null>(null);
 
   useEffect(() => {
-    if (!student) {
-      setPrev(null);
-      return;
-    }
+    if (!student || !key) return;
     let cancelled = false;
-    setLoading(true);
     getAllRecordsForStudent(mosqueId, halaqaId, student.id)
       .then((records) => {
         if (cancelled) return;
-        setPrev(findPreviousSession(student, records, excludeRecordId));
+        setAnswer({ key, prev: findPreviousSession(student, records, excludeRecordId) });
       })
-      .catch((err) => console.error('usePreviousSession failed:', err))
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+      .catch((err) => {
+        console.error('usePreviousSession failed:', err);
+        if (!cancelled) setAnswer({ key, prev: null });
       });
     return () => {
       cancelled = true;
     };
-  }, [mosqueId, halaqaId, student?.id, excludeRecordId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 
-  return { prev, loading };
+  const current = key !== null && answer?.key === key;
+  return { prev: current ? answer!.prev : null, loading: key !== null && !current };
 }
