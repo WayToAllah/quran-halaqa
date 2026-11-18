@@ -1,6 +1,6 @@
 import { arrayUnion, doc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
-import { halaqaConverter, mosqueConverter } from './converters';
+import { halaqaConverter } from './converters';
 import { genId } from '../domain/ids';
 import { buildMosqueSetup, type MosqueSetupInput } from '../domain/mosqueSetup';
 import type { Tenant } from '../domain/tenant';
@@ -24,7 +24,10 @@ export async function createMosque(input: MosqueSetupInput, ownerUid: string): P
   const plan = buildMosqueSetup(input, ownerUid, () => genId('m'), Date.now());
   const { id: mosqueId } = plan.mosque;
 
-  await setDoc(doc(db, 'mosques', mosqueId).withConverter(mosqueConverter), plan.mosque);
+  // No converter here, on purpose: the generic converters strip `id` from the
+  // body, but firestore.rules requires it on the mosque (pinned to the path),
+  // so a converted write was rejected every time.
+  await setDoc(doc(db, 'mosques', mosqueId), { ...plan.mosque });
   await setDoc(doc(db, 'mosques', mosqueId, 'members', ownerUid), plan.member);
 
   for (const halaqa of plan.halaqat) {
