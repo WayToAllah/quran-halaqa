@@ -1,3 +1,4 @@
+import { createPortal } from 'preact/compat';
 import { useState } from 'preact/hooks';
 import { CreateMosqueModal } from './CreateMosqueModal';
 import { useToast } from '../../ui/ToastProvider';
@@ -117,24 +118,32 @@ export function TenantSwitcher({ uid }: { uid: string | null }) {
         </div>
       )}
 
-      {creating && uid && (
-        <CreateMosqueModal
-          ownerUid={uid}
-          onClose={() => setCreating(false)}
-          onCreated={afterCreate}
-        />
-      )}
+      {/* Rendered at the page root: this component sits inside the sticky app
+          bar (z-10), a stacking context of its own, so a modal mounted here was
+          painted UNDER the bottom nav (z-20) — which covered «إنشاء المسجد». */}
+      {createPortal(
+        <>
+          {creating && uid && (
+            <CreateMosqueModal
+              ownerUid={uid}
+              onClose={() => setCreating(false)}
+              onCreated={afterCreate}
+            />
+          )}
 
-      {pending && (
-        <ConfirmDialog
-          title="فيه جلسة مش محفوظة"
-          message={`لو بدّلت لـ${pending.mosqueName} دلوقتي، اللي كتبته في شاشة التسجيل هيتمسح. تحب تحفظه الأول؟`}
-          confirmLabel="بدّل وامسح"
-          cancelLabel="إلغاء"
-          destructive
-          onConfirm={confirmSwitch}
-          onCancel={() => setPending(null)}
-        />
+          {pending && (
+            <ConfirmDialog
+              title="فيه جلسة مش محفوظة"
+              message={`لو بدّلت لـ${pending.mosqueName} دلوقتي، اللي كتبته في شاشة التسجيل هيتمسح. تحب تحفظه الأول؟`}
+              confirmLabel="بدّل وامسح"
+              cancelLabel="إلغاء"
+              destructive
+              onConfirm={confirmSwitch}
+              onCancel={() => setPending(null)}
+            />
+          )}
+        </>,
+        document.body,
       )}
     </>
   );

@@ -162,4 +162,27 @@ describe('TenantSwitcher — adding a mosque', () => {
     expect(screen.getByRole('button', { name: 'إنشاء المسجد' })).toBeInTheDocument();
     expect(screen.getByTestId('now')).toHaveTextContent('altayseer/main');
   });
+
+  // The switcher lives inside the sticky app bar (z-10), which is its own
+  // stacking context — a modal rendered there sat UNDER the bottom nav (z-20),
+  // hiding «إنشاء المسجد». Both dialogs must render at the page root.
+  it('renders the new-mosque modal and the unsaved-draft dialog outside the app bar', async () => {
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <TenantProvider initial={{ mosqueId: 'altayseer', halaqaId: 'main' }}>
+          <DraftGuardProvider>
+            <header data-testid="bar" class="sticky top-0 z-10">
+              <TenantSwitcher uid="uid_1" />
+            </header>
+          </DraftGuardProvider>
+        </TenantProvider>
+      </ToastProvider>,
+    );
+    await user.click(screen.getByRole('button', { name: /مسجد التيسير/ }));
+    await user.click(await screen.findByRole('button', { name: /مسجد جديد/ }));
+
+    const create = screen.getByRole('button', { name: 'إنشاء المسجد' });
+    expect(screen.getByTestId('bar')).not.toContainElement(create);
+  });
 });
