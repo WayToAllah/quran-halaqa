@@ -22,9 +22,11 @@ import {
   cleanAssignmentRow,
   cleanTajweed,
   rowsSignature,
+  resolvePrevRow,
+  prevRowProblem,
 } from '../../domain/record';
 import { computeNextLoh, computeNextMadi } from '../../domain/nextTask';
-import { suraLabel } from '../../domain/suras';
+import { suraLabel, findSuraByName } from '../../domain/suras';
 import { buildWhatsAppMessage, normalizeWhatsAppPhone } from '../../domain/whatsapp';
 import { raceTimeout } from '../../domain/raceTimeout';
 import { SuraRow } from './SuraRow';
@@ -245,9 +247,9 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   function mushafListFor(which: MushafTarget): readonly SuraAssignment[] {
     switch (which) {
       case 'loh':
-        return editedPrevLoh ?? prevLohList;
+        return effectivePrevLoh;
       case 'madi':
-        return editedPrevMadi ?? prevMadiList;
+        return effectivePrevMadi;
       case 'newLoh':
         return lohRows;
       case 'newMadi':
@@ -389,8 +391,14 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   const activeEdits = prevEdits && prevEdits.sourceId === evalSource?.id ? prevEdits : null;
   const editedPrevLoh = activeEdits?.loh ?? null;
   const editedPrevMadi = activeEdits?.madi ?? null;
-  const effectivePrevLoh = editedPrevLoh ?? prevLohList;
-  const effectivePrevMadi = editedPrevMadi ?? prevMadiList;
+  // The boxes may be mid-typing (one end blank); everything downstream — the
+  // summary line, the mushaf, the save — reads the row as it will be stored.
+  const resolveEdits = (edited: SuraAssignment[] | null, stored: SuraAssignment[]) =>
+    edited ? edited.map((r, i) => (stored[i] ? resolvePrevRow(stored[i], r) : r)) : null;
+  const resolvedPrevLoh = resolveEdits(editedPrevLoh, prevLohList);
+  const resolvedPrevMadi = resolveEdits(editedPrevMadi, prevMadiList);
+  const effectivePrevLoh = resolvedPrevLoh ?? prevLohList;
+  const effectivePrevMadi = resolvedPrevMadi ?? prevMadiList;
 
   /** Records a correction against the session currently being evaluated. */
   function setEditedPrev(which: 'loh' | 'madi', rows: SuraAssignment[]) {
@@ -758,6 +766,21 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
         ? [{ name: 'التجويد', rows: [tajweed], label: () => 'سورة التجويد' }]
         : []),
     ];
+    // A corrected «من»/«إلى» on the previous session must still be a real
+    // range — pages.ts would read an inverted one as the whole sura.
+    for (const [name, tab, rows] of [
+      ['اللوح', 'loh', resolvedPrevLoh],
+      ['الماضي', 'madi', resolvedPrevMadi],
+    ] as const) {
+      for (const row of rows ?? []) {
+        const problem = prevRowProblem(row);
+        if (problem) {
+          setWardTab(tab);
+          showToast(`${name} — سورة ${row.sura}: ${problem}`, true);
+          return;
+        }
+      }
+    }
     for (const section of sections) {
       const bad = firstIncompleteRow(section.rows);
       if (bad) {
@@ -858,8 +881,8 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   function buildPrevSessionUpdate(): SessionRecord | null {
     if (!evalSource || !evalSourceIsSeparateRecord) return null;
     if (!editedPrevLoh && !editedPrevMadi) return null;
-    const newLoh = (editedPrevLoh ?? prevLohList).filter(isRowComplete).map(cleanAssignmentRow);
-    const newMadi = (editedPrevMadi ?? prevMadiList).filter(isRowComplete).map(cleanAssignmentRow);
+    const newLoh = effectivePrevLoh.filter(isRowComplete).map(cleanAssignmentRow);
+    const newMadi = effectivePrevMadi.filter(isRowComplete).map(cleanAssignmentRow);
     const unchanged =
       rowsSignature(newLoh) === rowsSignature(prevLohList.map(cleanAssignmentRow)) &&
       rowsSignature(newMadi) === rowsSignature(prevMadiList.map(cleanAssignmentRow));
@@ -962,6 +985,34 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
    * When evalSource isn't a separate saved record (editing a student's very
    * first session), the whole section is plain text too: that assignment is
    * already editable below in "اللوح الجديد"/"الماضي الجديد". */
+  /** One keystroke in a «من»/«إلى» box of the eval card. The edit keeps the
+   * box exactly as typed (blank included, so retyping works); resolvePrevRow()
+   * turns it into what's stored. Setting «من» on a whole-sura assignment writes
+   * out its last ayah so the teacher sees the range they just created. */
+  function editPrevAyah(
+    which: 'loh' | 'madi',
+    list: SuraAssignment[],
+    current: SuraAssignment[],
+    i: number,
+    field: 'from' | 'to',
+    e: Event,
+  ) {
+    const val = (e.target as HTMLInputElement).value;
+    const next: SuraAssignment = { ...current[i] };
+    if (val) next[field] = val;
+    else delete next[field];
+    if (field === 'from' && val && !next.to && !list[i].to) {
+      const sura = findSuraByName(next.sura);
+      if (sura) next.to = String(sura.count);
+    }
+    if (field === 'to' && val && !next.from && current[i] === list[i])
+      next.from = list[i].from || '1';
+    setEditedPrev(
+      which,
+      current.map((x, idx) => (idx === i ? next : x)),
+    );
+  }
+
   function renderPrevRangeSection(
     label: string,
     which: 'loh' | 'madi',
@@ -993,7 +1044,15 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
                 {/* A whole-sura assignment carries no `from` — it starts at
                     ayah 1 by definition, so that's what the teacher should
                     read, not a bare sura name next to a lone box. */}
-                <span class="text-ink-dark">{`سورة ${item.sura} (من ${item.from || '1'}`}</span>
+                <span class="text-ink-dark">{`سورة ${item.sura} (من`}</span>
+                <input
+                  type="number"
+                  min={1}
+                  aria-label={`أول آية اتحفظت في ${item.sura}`}
+                  class="w-14 text-center rounded-lg border border-mustard/50 bg-[#FFFCF3] py-1 text-sm font-semibold text-forest"
+                  value={current[i] === list[i] ? item.from || '1' : (current[i]?.from ?? '')}
+                  onInput={(e) => editPrevAyah(which, list, current, i, 'from', e)}
+                />
                 <span class="text-taupe text-xs">إلى</span>
                 <input
                   type="number"
@@ -1001,27 +1060,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
                   aria-label={`آخر آية اتحفظت في ${item.sura}`}
                   class="w-14 text-center rounded-lg border border-mustard/50 bg-[#FFFCF3] py-1 text-sm font-semibold text-forest"
                   value={current[i]?.to ?? ''}
-                  onInput={(e) => {
-                    const val = (e.target as HTMLInputElement).value;
-                    // Row i is rebuilt from the STORED row, so the implied
-                    // start is written out explicitly the moment an end ayah
-                    // makes the assignment a real range — a saved
-                    // {sura, to} with no `from` would read as ambiguous
-                    // everywhere else. Emptying the box puts the row back to
-                    // exactly what was stored, so no phantom edit is saved.
-                    const orig = list[i];
-                    const next: SuraAssignment = { ...orig };
-                    if (val) {
-                      next.from = orig.from || '1';
-                      next.to = val;
-                    } else {
-                      delete next.to;
-                    }
-                    setEditedPrev(
-                      which,
-                      current.map((x, idx) => (idx === i ? next : x)),
-                    );
-                  }}
+                  onInput={(e) => editPrevAyah(which, list, current, i, 'to', e)}
                 />
                 <span class="text-ink-dark">)</span>
               </div>

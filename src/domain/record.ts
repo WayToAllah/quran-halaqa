@@ -309,3 +309,52 @@ export function sessionGrading(
 
   return hasScore(next.loh) || hasScore(next.madi) ? next : null;
 }
+
+/**
+ * What a corrected previous-session row really means once the teacher's
+ * half-typed boxes are filled in from what was stored.
+ *
+ * The eval card lets «من» and «إلى» be emptied while typing, so the edit can
+ * hold a row with one end missing. A blank box falls back to the stored value;
+ * a range with only a start runs to the sura's last ayah, one with only an end
+ * starts at ayah 1. If the result covers exactly what was stored, the stored
+ * row comes back untouched so no phantom correction gets saved.
+ */
+export function resolvePrevRow(orig: SuraAssignment, edited: SuraAssignment): SuraAssignment {
+  if (edited.range || orig.range) return edited;
+  const r: SuraAssignment = { ...edited };
+  if (!r.from && orig.from) r.from = orig.from;
+  if (!r.to && orig.to) r.to = orig.to;
+  if (!r.from && !r.to) return { ...orig };
+  if (!r.from) r.from = '1';
+  if (!r.to) {
+    const sura = findSuraByName(r.sura);
+    if (sura) r.to = String(sura.count);
+  }
+  const span = (x: SuraAssignment) => {
+    const s = findSuraByName(x.sura);
+    const f = parseInt(String(x.from ?? '1'), 10);
+    const t = parseInt(String(x.to ?? s?.count ?? ''), 10);
+    return `${f}-${t}`;
+  };
+  if (prevRowProblem(r) === null && span(r) === span(orig)) return { ...orig };
+  return r;
+}
+
+/**
+ * Why a corrected previous-session row can't be saved, or null if it's fine.
+ * Matters because pages.ts quietly reads an inverted or out-of-sura range as
+ * the WHOLE sura — the count would jump instead of shrinking.
+ */
+export function prevRowProblem(row: SuraAssignment): string | null {
+  if (row.range || !row.sura) return null;
+  const sura = findSuraByName(row.sura);
+  const f = row.from ? parseInt(String(row.from), 10) : null;
+  const t = row.to ? parseInt(String(row.to), 10) : null;
+  if (f !== null && !(f >= 1)) return 'آية البداية لازم تكون 1 أو أكتر';
+  if (t !== null && !(t >= 1)) return 'آية النهاية لازم تكون 1 أو أكتر';
+  if (sura && ((f ?? 0) > sura.count || (t ?? 0) > sura.count))
+    return `السورة ${sura.count} آية بس`;
+  if (f !== null && t !== null && f > t) return 'آية البداية بعد آية النهاية';
+  return null;
+}

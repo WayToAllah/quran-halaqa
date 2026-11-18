@@ -97,17 +97,6 @@ describe('RecordScreen — correcting a previous session range from the eval car
     expect(screen.queryByText(/تعديل ما اتحفظ فعلاً/)).not.toBeInTheDocument();
   });
 
-  it('keeps the start ayah as plain text — only the end is correctable', async () => {
-    previousSessionForS1 = prevSession;
-    renderScreen();
-    await selectStudent('زيد احمد');
-    await screen.findByText('📋 ما سمعناه النهارده');
-
-    expect(screen.getByText(/البقرة \(من 1/)).toBeInTheDocument();
-    // Exactly two number boxes in the card belong to ranges (loh + madi ends).
-    expect(screen.queryByLabelText('آية البداية')).not.toBeInTheDocument();
-  });
-
   it('renders a whole-sura range assignment as plain text, with no input', async () => {
     previousSessionForS1 = {
       ...prevSession,
@@ -271,7 +260,7 @@ describe('RecordScreen — correcting a previous session range from the eval car
     await selectStudent('زيد احمد');
     await screen.findByText('📋 ما سمعناه النهارده');
 
-    expect(screen.getByText('سورة المدثر (من 1')).toBeInTheDocument();
+    expect(screen.getByLabelText('أول آية اتحفظت في المدثر')).toHaveValue(1);
     expect(endAyahBox('المدثر')).toHaveValue(null); // open-ended: whole sura
   });
 
