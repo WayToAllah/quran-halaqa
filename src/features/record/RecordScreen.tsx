@@ -287,6 +287,10 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
 
   const [lohRows, setLohRows] = useState<SuraAssignment[]>([emptyRow()]);
   const [madiRows, setMadiRows] = useState<SuraAssignment[]>([emptyRow()]);
+  // The page shows one ward at a time: «اللوح» = today's loh evaluation with
+  // the new loh right under it, «الماضي» = the same for madi. Both halves stay
+  // mounted (just hidden) so nothing typed is lost when switching.
+  const [wardTab, setWardTab] = useState<'loh' | 'madi'>('loh');
 
   const [tajweedEnabled, setTajweedEnabled] = useState(false);
   const [tajweed, setTajweed] = useState<SuraAssignment>(emptyRow());
@@ -553,6 +557,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   }
 
   function resetForm() {
+    setWardTab('loh');
     setSelectedStudent(null);
     setStudentQuery('');
     setEditingId(null);
@@ -756,6 +761,9 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     for (const section of sections) {
       const bad = firstIncompleteRow(section.rows);
       if (bad) {
+        // Bring the offending ward into view — it may be on the hidden tab.
+        if (section.name === 'اللوح') setWardTab('loh');
+        else if (section.name === 'الماضي') setWardTab('madi');
         showToast(`${section.name} — ${section.label(bad.index)}: ${bad.reason}`, true);
         return;
       }
@@ -1163,8 +1171,51 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
           <div class={cardCls + ' text-[12px] text-taupe'}>⏳ بنجيب آخر جلسة للطالب…</div>
         )}
 
+        <div class="flex gap-2 mb-3" role="group" aria-label="اللوح أو الماضي">
+          {(
+            [
+              { id: 'loh', label: '📗 اللوح', score: prevLohScore },
+              { id: 'madi', label: '📙 الماضي', score: prevMadiScore },
+            ] as const
+          ).map((t) => {
+            const active = wardTab === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                aria-pressed={active}
+                class={
+                  'flex-1 py-2.5 rounded-[12px] text-[14px] font-extrabold border-[1.5px] flex items-center justify-center gap-1.5 ' +
+                  (active
+                    ? 'bg-forest text-white border-forest'
+                    : 'bg-white text-forest border-forest/20')
+                }
+                onClick={() => setWardTab(t.id)}
+              >
+                {t.label}
+                {t.score !== '' && (
+                  <span
+                    class={
+                      'text-[11px] font-bold px-2 py-0.5 rounded-full ' +
+                      (active ? 'bg-white/20' : 'bg-forest/10')
+                    }
+                  >
+                    {t.score}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
         {selectedStudent && evalSource && (showLohEval || showMadiEval) && (
-          <div class={cardCls + ' space-y-3.5'}>
+          <div
+            class={
+              cardCls +
+              ' space-y-3.5' +
+              ((wardTab === 'loh' ? showLohEval : showMadiEval) ? '' : ' hidden')
+            }
+          >
             <div>
               <div class="font-extrabold text-ink-dark text-[13.5px]">📋 ما سمعناه النهارده</div>
               <div class="text-[11px] text-taupe mt-0.5">
@@ -1175,7 +1226,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
             </div>
 
             {showLohEval && (
-              <div>
+              <div data-testid="ward-panel-loh" class={wardTab === 'loh' ? '' : 'hidden'}>
                 {renderPrevRangeSection('اللوح', 'loh', prevLohList, prevLohInfo, editedPrevLoh)}
                 {/* The badge sits on the LABEL line, not in the row below, and
                     that line keeps a fixed height whether or not a badge is in
@@ -1244,7 +1295,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
             )}
 
             {showMadiEval && (
-              <div class="pt-3.5 border-t border-hairline">
+              <div data-testid="ward-panel-madi" class={wardTab === 'madi' ? '' : 'hidden'}>
                 {renderPrevRangeSection(
                   'الماضي',
                   'madi',
@@ -1313,7 +1364,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
           </div>
         )}
 
-        <div class={cardCls}>
+        <div data-testid="ward-panel-loh" class={cardCls + (wardTab === 'loh' ? '' : ' hidden')}>
           <div class="flex items-center gap-2 mb-3.5">
             <div class="w-2 h-2 rounded-full bg-forest" />
             <div class="text-[13.5px] font-extrabold text-ink-dark">اللوح الجديد</div>
@@ -1350,7 +1401,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
           </button>
         </div>
 
-        <div class={cardCls}>
+        <div data-testid="ward-panel-madi" class={cardCls + (wardTab === 'madi' ? '' : ' hidden')}>
           <div class="flex items-center gap-2 mb-3.5">
             <div class="w-2 h-2 rounded-full bg-mustard" />
             <div class="text-[13.5px] font-extrabold text-ink-dark">مراجعة الماضي</div>
