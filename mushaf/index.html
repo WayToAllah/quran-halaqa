@@ -57,6 +57,9 @@ html.direct #viewer{display:flex}
 .hintbar{padding:0 12px 8px;font-size:12px;color:#8a7256;background:#fff9f1;text-align:center;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
 .w{cursor:pointer}
 .w.m{color:#d32f2f}
+/* مصحف الطالب: أخطاء الجلسات اللي فاتت (أحمر فاتح) واللي اتصلّحت (أخضر) */
+.w.h{color:#e08585}
+.w.g{color:#2e7d32}
 #viewer.ro .w{cursor:default}
 #viewer.ro .foot{display:none}
 .share{width:40px;height:40px;border-radius:50%;background:#fffdf9;border:1px solid #e6d6c1;font-size:17px;color:#0f6e56;flex:0 0 auto;display:none}
@@ -66,7 +69,7 @@ html.direct #viewer{display:flex}
 <script>
 // قبل ما الصفحة تترسم: لو الرابط فيه ورد أو أخطاء، نخبّي شاشة الاختيار من الأول
 // بدل ما تظهر ثانية لحد ما الكود يخلص ويخبّيها.
-(function () { var q = location.search; if (/[?&](a|e|m)=/.test(q)) document.documentElement.classList.add('direct'); })();
+(function () { var q = location.search; if (/[?&](a|e|m|g|t)=/.test(q)) document.documentElement.classList.add('direct'); })();
 </script>
 </head>
 <body>
@@ -97,8 +100,9 @@ html.direct #viewer{display:flex}
 // من اللينك نفسه هنا — كان فيه اسم تجربة ثابت بيبان لحد ما التحميل يخلص.
 (function () {
   var q = new URLSearchParams(location.search), n = q.get('n') || '';
-  var view = q.has('e') || q.has('m');
-  document.getElementById('tname').textContent = view ? (n ? 'أخطاء ' + n : 'أخطاء التسميع') : (n || 'التسميع');
+  var view = q.has('e') || q.has('m') || q.has('g');
+  document.getElementById('tname').textContent = q.has('b') ? (n ? 'مصحف ' + n : 'مصحف المراجعة')
+    : view ? (n ? 'أخطاء ' + n : 'أخطاء التسميع') : (n || 'التسميع');
 })();
 </script>
   <div class="mush"><span id="mjuz"></span><span id="msura"></span></div>
@@ -340,17 +344,44 @@ function fit(sheet) {
 const marks = new Map();          // رقم الصفحة → Set من معرّفات الكلمات
 const actions = [];               // سجل عشان زرار التراجع
 const EMPTY = new Set();
+// مصحف الطالب: hist = حالة كل كلمة من الجلسات اللي فاتت ('r' لسه غلط، 'g' اتصلّحت)،
+// fixed = الكلمات القديمة اللي المحفّظ علّمها "اتصلّحت" في الفتحة دي.
+const hist = new Map();
+const fixed = new Map();
+function fixedOn(p) { return fixed.get(p) || EMPTY; }
+function wordClass(p, id) {
+  if (marksOn(p).has(id)) return 'm';
+  if (fixedOn(p).has(id)) return 'g';
+  const h = hist.get(id);
+  return h === 'r' ? 'h' : h === 'g' ? 'g' : '';
+}
 function setWords(s, loose) {
-  const m = marksOn(s._p);
   s.innerHTML = s._w.map(w => {
     const id = w.k + ':' + w.p;
     if (s._last[w.k] === w.p) return '<span class="n">' + w.c + '</span>';
-    return '<span class="w' + (m.has(id) ? ' m' : '') + '" data-id="' + id + '">' + w.c + '</span>';
+    const c = wordClass(s._p, id);
+    return '<span class="w' + (c ? ' ' + c : '') + '" data-id="' + id + '">' + w.c + '</span>';
   }).join(loose ? ' ' : '');
 }
 function paintMarks() {
-  const m = marksOn(pages[idx]);
-  document.querySelectorAll('#stage .w').forEach(w => w.classList.toggle('m', m.has(w.dataset.id)));
+  const p = pages[idx];
+  document.querySelectorAll('#stage .w').forEach(w => {
+    const c = wordClass(p, w.dataset.id);
+    ['m', 'g', 'h'].forEach(k => w.classList.toggle(k, c === k));
+  });
+}
+function allFixed() {
+  const out = [];
+  [...fixed.keys()].sort((a, b) => a - b).forEach(p => out.push(...[...fixed.get(p)].sort(cmpId)));
+  return out;
+}
+function addTo(map, id) {
+  const [s, a] = id.split(':').map(Number);
+  const p = pageOfAyah(s, a);
+  if (!p) return 0;
+  if (!map.has(p)) map.set(p, new Set());
+  map.get(p).add(id);
+  return p;
 }
 function allMarks() {
   const out = [];
@@ -430,42 +461,53 @@ async function shareMarks() {
   }
 }
 // ---- صفحة ولي الأمر: نفس المصحف، للقراءة بس ----
+// مصحف الطالب بالـ token بتاع ولي الأمر: اللينك قصير وثابت، والأخطاء بتتقري
+// من publicStats وقت الفتح، فكل مرة بيبان آخر حال من غير لينك جديد.
+const BOOK_T = (() => {
+  const t = new URLSearchParams(location.search).get('t') || '';
+  return /^[A-Za-z0-9_-]{8,200}$/.test(t) ? t : '';
+})();
 const VIEW = (() => {
   const q = new URLSearchParams(location.search);
+  if (BOOK_T) return { ids: [], green: [], book: true, items: [], pg: [], extra: 0, name: '', ward: '' };
   // e= اللينك القصير الجديد، m= الشكل القديم (لينكات اتبعتت قبل كده لازم تفضل شغالة)
-  if (!q.has('e') && !q.has('m')) return null;
+  if (!q.has('e') && !q.has('m') && !q.has('g')) return null;
   const ids = q.has('e') ? decodeShort(q.get('e')) : decodeMarks(q.get('m'));
+  const green = decodeShort(q.get('g'));
   const items = (q.get('a') || '').split(',').map(s => s.split(':')).filter(x => x[0])
     .map(x => ({ sura: decodeURIComponent(x[0]), from: x[1] || '', to: x[2] || '' }));
   const pg = q.has('p') ? decodePages(q.get('p'))
     : (q.get('pg') || '').split('.').map(Number).filter(n => n >= 1 && n <= 604);
-  return { ids, items, pg, extra: Math.max(0, +q.get('x') || 0), name: q.get('n') || '', ward: q.get('w') || '' };
+  return { ids, green, book: q.has('b'), items, pg, extra: Math.max(0, +q.get('x') || 0), name: q.get('n') || '', ward: q.get('w') || '' };
 })();
 function viewHint() {
   const n = markedTotal(), x = VIEW.extra;
   const plural = (k, one, two, few, many) => k === 1 ? one : k === 2 ? two : AR(k) + ' ' + (k <= 10 ? few : many);
+  if (VIEW.book) {
+    const g = VIEW.green.length;
+    let b = n ? 'الأحمر لسه محتاج مراجعة: ' + plural(n, 'كلمة واحدة', 'كلمتين', 'كلمات', 'كلمة') : 'مفيش كلمات محتاجة مراجعة';
+    if (g) b += ' · الأخضر اتصلّح: ' + plural(g, 'كلمة واحدة', 'كلمتين', 'كلمات', 'كلمة');
+    document.getElementById('hint').textContent = b;
+    return;
+  }
   let t = n ? 'الكلمات اللي بالأحمر فيها خطأ — ' + plural(n, 'كلمة واحدة', 'كلمتين', 'كلمات', 'كلمة') : 'مفيش كلمات معلّمة';
   if (x) t += '، و' + plural(x, 'خطأ تاني', 'خطأين تانيين', 'أخطاء تانية', 'خطأ تاني') + ' (تردد أو وقف)';
   document.getElementById('hint').textContent = t;
 }
 function startView() {
   if (!VIEW) return;
-  VIEW.ids.forEach(id => {
-    const [s, a] = id.split(':').map(Number);
-    const p = pageOfAyah(s, a);
-    if (!p) return;
-    if (!marks.has(p)) marks.set(p, new Set());
-    marks.get(p).add(id);
-  });
+  VIEW.ids.forEach(id => addTo(marks, id));
+  const greenPages = new Set();
+  VIEW.green.forEach(id => { hist.set(id, 'g'); const p = pageOfId(id); if (p) greenPages.add(p); });
   let ps = VIEW.items.length ? pagesForWard(VIEW.items, suraIdx, ayahCount) : VIEW.pg;
-  if (!ps.length) ps = [...marks.keys()];
-  ps = [...new Set([...ps, ...marks.keys()])].sort((a, b) => a - b);
+  ps = [...new Set([...ps, ...marks.keys(), ...greenPages])].sort((a, b) => a - b);
   if (!ps.length) { document.documentElement.classList.remove('direct'); return; }
   pages = ps; ward = ps.slice(); counts = pages.map(() => 0);
   idx = Math.max(0, pages.findIndex(p => marks.has(p)));
   pages.forEach(pp => ensureFontsFor(pp));
   document.querySelector('.wrap').style.display = 'none';
-  document.querySelector('.bar .t b').textContent = VIEW.name ? 'أخطاء ' + VIEW.name : 'أخطاء التسميع';
+  document.querySelector('.bar .t b').textContent = VIEW.book ? (VIEW.name ? 'مصحف ' + VIEW.name : 'مصحف المراجعة')
+    : VIEW.name ? 'أخطاء ' + VIEW.name : 'أخطاء التسميع';
   document.getElementById('ward').textContent = VIEW.ward;
   document.getElementById('close').style.visibility = 'hidden';
   const v = document.getElementById('viewer');
@@ -520,6 +562,7 @@ function label(p) {
   document.getElementById('mpage').textContent = AR(p);
 }
 function marksOn(p) { return marks.get(p) || EMPTY; }
+function pageOfId(id) { const [s, a] = id.split(':').map(Number); return pageOfAyah(s, a); }
 function markedTotal() { let n = 0; marks.forEach(m => { n += m.size; }); return n; }
 function grandTotal() { return counts.reduce((a, b) => a + b, 0) + markedTotal(); }
 function total() {
@@ -528,6 +571,8 @@ function total() {
   document.getElementById('cnt').textContent = AR(t);
   document.getElementById('share').classList.toggle('on', markedTotal() > 0);
   if (VIEW) { viewHint(); return; }
+  const oldHere = [...hist].some(([id, v]) => v === 'r' && pageOfId(id) === pages[idx] && !fixedOn(pages[idx]).has(id));
+  if (oldHere && t === 0) { document.getElementById('hint').textContent = 'الأحمر الفاتح أخطاء قديمة — دوس على الكلمة لو اتصلّحت تبقى خضرا'; return; }
   document.getElementById('hint').textContent = t === 0 ? 'دوس على الكلمة الغلط تتعلّم بالأحمر، أو على زرار الخطأ' : 'إجمالي الأخطاء ' + AR(t) + (pages.length > 1 ? '، وفي الصفحة دي ' + AR(here) : '');
 }
 // ---- خارجي: يفتح الورد مباشرةً من رابط، ويرجّع العدد للتطبيق ----
@@ -540,7 +585,9 @@ const EMBED = (() => {
   if (!items.length) return null;
   return { items, name: q.get('n') || '', ward: q.get('w') || '', token: q.get('id') || '', phone: (q.get('ph') || '').replace(/[^0-9]/g, ''),
     // ما كان عليه المصحف لما اتقفل آخر مرة لنفس الطالب (الكلمات الحمرا وضغطات زرار الخطأ)
-    rk: q.get('rk') || '', rx: Math.max(0, Math.floor(+q.get('rx')) || 0) };
+    rk: q.get('rk') || '', rx: Math.max(0, Math.floor(+q.get('rx')) || 0),
+    // مصحف الطالب من الجلسات اللي فاتت، واللي اتعلّم "اتصلّح" في الفتحة دي قبل كده
+    hr: q.get('hr') || '', hg: q.get('hg') || '', rg: q.get('rg') || '' };
 })();
 /** Told to the app once the ward is actually on screen. Separate from the
  * iframe loading: the viewer can come up and still fail to place the ward. */
@@ -553,7 +600,7 @@ function announceReady() {
 function reportCount(total) {
   if (!EMBED) return false;
   const msg = { type: 'mushaf-count', id: EMBED.token, count: total, marks: allMarks(), link: markedTotal() ? shareLink() : '',
-    rk: encodeShort(allMarks()), rx: counts.reduce((a, b) => a + b, 0) };
+    rk: encodeShort(allMarks()), rx: counts.reduce((a, b) => a + b, 0), ok: encodeShort(allFixed()) };
   if (window.parent && window.parent !== window) { window.parent.postMessage(msg, '*'); return true; }
   if (window.opener) { window.opener.postMessage(msg, '*'); return true; }
   return false;
@@ -574,7 +621,10 @@ function startEmbedded() {
     return;
   }
   document.querySelector('.wrap').style.display = 'none';
-  ward = pages.slice(); marks.clear(); actions.length = 0;
+  ward = pages.slice(); marks.clear(); actions.length = 0; fixed.clear(); hist.clear();
+  decodeShort(EMBED.hr).forEach(id => hist.set(id, 'r'));
+  decodeShort(EMBED.hg).forEach(id => hist.set(id, 'g'));
+  decodeShort(EMBED.rg).forEach(id => { if (hist.get(id) === 'r') addTo(fixed, id); });
   // لو الطالب كان معلَّم له أخطاء قبل كده، نرجّعها زي ما كانت بدل صفحة بيضا
   decodeShort(EMBED.rk).forEach(id => {
     const [s, a] = id.split(':').map(Number);
@@ -678,7 +728,8 @@ document.getElementById('undo').onclick = () => {
   for (let i = actions.length - 1; i >= 0; i--) {
     if (actions[i].p !== p) continue;
     const a = actions.splice(i, 1)[0];
-    if (a.id) { marksOn(p).delete(a.id); paintMarks(); } else if (counts[idx] > 0) counts[idx]--;
+    if (a.fix) { fixedOn(p).delete(a.id); paintMarks(); }
+    else if (a.id) { marksOn(p).delete(a.id); paintMarks(); } else if (counts[idx] > 0) counts[idx]--;
     break;
   }
   total();
@@ -692,10 +743,19 @@ document.getElementById('stage').addEventListener('click', e => {
   const m = marks.get(p);
   if (m.has(id)) {
     m.delete(id);
-    const i = actions.findIndex(a => a.p === p && a.id === id);
+    const i = actions.findIndex(a => a.p === p && a.id === id && !a.fix);
     if (i >= 0) actions.splice(i, 1);
+  } else if (hist.get(id) === 'r') {
+    // خطأ قديم: دوسة تعلّمه "اتصلّح" (أخضر)، ودوسة تانية ترجّعه
+    if (!fixed.has(p)) fixed.set(p, new Set());
+    const f = fixed.get(p);
+    if (f.has(id)) {
+      f.delete(id);
+      const i = actions.findIndex(a => a.p === p && a.id === id && a.fix);
+      if (i >= 0) actions.splice(i, 1);
+    } else { f.add(id); actions.push({ p, id, fix: true }); }
   } else { m.add(id); actions.push({ p, id }); }
-  w.classList.toggle('m', m.has(id));
+  paintMarks();
   total();
 });
 document.getElementById('share').onclick = shareMarks;
@@ -706,10 +766,42 @@ document.getElementById('done').onclick = () => {
   document.getElementById('viewer').classList.remove('on');
   alert('اتسجّل ' + AR(t) + ' خطأ. في النسخة النهائية الرقم ده هيتحفظ مع الجلسة.');
 };
+async function loadBook() {
+  const url = 'https://firestore.googleapis.com/v1/projects/quran-app-abe52/databases/(default)/documents/publicStats/'
+    + encodeURIComponent(BOOK_T) + '?key=AIzaSyCLzsd-tyAPKoS6HQ-Kw6LEwaxPSibbKSg&mask.fieldPaths=name&mask.fieldPaths=mushafBook';
+  const res = await fetch(url);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error('book ' + res.status);
+  const f = (await res.json()).fields || {};
+  const b = (f.mushafBook && f.mushafBook.mapValue && f.mushafBook.mapValue.fields) || {};
+  const str = v => (v && typeof v.stringValue === 'string' ? v.stringValue : '');
+  return { name: str(f.name), red: str(b.red), green: str(b.green) };
+}
+function bookMessage(msg) {
+  const v = document.getElementById('viewer');
+  v.classList.add('on', 'ro');
+  document.getElementById('close').style.visibility = 'hidden';
+  document.getElementById('stage').innerHTML = '<div class="miss">' + msg + '</div>';
+  document.getElementById('hint').textContent = '';
+}
 startEmbedded();
-startView();
-// أي رابط مالقيناش فيه حاجة نعرضها: نرجّع شاشة الاختيار بدل صفحة فاضية
-if (!document.getElementById('viewer').classList.contains('on')) document.documentElement.classList.remove('direct');
+if (BOOK_T) {
+  document.getElementById('tname').textContent = 'مصحف المراجعة';
+  loadBook().then(b => {
+    if (!b) { bookMessage('الرابط ده مش شغال. اطلب اللينك من المحفّظ.'); return; }
+    VIEW.name = b.name; VIEW.ids = decodeShort(b.red); VIEW.green = decodeShort(b.green);
+    if (!VIEW.ids.length && !VIEW.green.length) {
+      document.getElementById('tname').textContent = b.name ? 'مصحف ' + b.name : 'مصحف المراجعة';
+      bookMessage('مفيش أخطاء متعلّمة لسه — ما شاء الله 🌿');
+      return;
+    }
+    startView();
+  }).catch(() => bookMessage('تعذّر تحميل المصحف.<br>اتأكد إنك متصل بالنت وجرّب تاني.'));
+} else {
+  startView();
+  // أي رابط مالقيناش فيه حاجة نعرضها: نرجّع شاشة الاختيار بدل صفحة فاضية
+  if (!document.getElementById('viewer').classList.contains('on')) document.documentElement.classList.remove('direct');
+}
 </script>
 </body>
 </html>
