@@ -1,3 +1,4 @@
+import { mushafBookLink } from '../../domain/mushafBook';
 import { useEffect, useState } from 'preact/hooks';
 import type { PublicStats } from '../../types';
 import { fetchPublicStatsRest } from '../../data/firestoreRest';
@@ -152,6 +153,7 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
   const task = buildCurrentTask(stats);
   const sessions = buildSessions(stats);
   const marks = latestMarks(stats);
+  const bookLink = mushafBookLink(stats.mushafBook, stats.name, globalThis.location?.href ?? '');
   const rankText = rankBadgeText(stats.rank);
   // publicStats documents written before a badge was hidden still carry it,
   // so filter on read as well as on write (see domain/badges.ts).
@@ -245,6 +247,23 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
                 </a>
               )}
             </div>
+          </div>
+        )}
+
+        {/* The child's own mushaf: every word missed in any session, red until
+            the teacher marks it fixed, then green. */}
+        {bookLink && (
+          <div style={cardStyle} data-testid="mushaf-book">
+            <div style="font-size:12.5px;font-weight:700;color:var(--ink);letter-spacing:0.02em;display:flex;align-items:center;gap:9px;margin-bottom:12px">
+              <span style={titleDot}>📗</span>
+              مصحف المراجعة
+            </div>
+            <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:12px">
+              كل الكلمات اللي غلط فيها قبل كده: الأحمر لسه محتاج مراجعة، والأخضر اتصلّح
+            </div>
+            <a href={bookLink} style={marksButton}>
+              📖 افتح المصحف
+            </a>
           </div>
         )}
 

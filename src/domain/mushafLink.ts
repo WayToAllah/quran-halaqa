@@ -1,4 +1,5 @@
 import type { SuraAssignment } from '../types';
+import type { MushafBook } from './mushafBook';
 
 /**
  * The mushaf viewer lives outside the app bundle, at /mushaf/ next to it, and is
@@ -42,11 +43,16 @@ export interface MushafLinkOptions {
    *  shows the same red words and the same count instead of a blank page. `rk`
    *  is the viewer's own short marks format; `rx` the taps on the error button. */
   restore?: MushafRestore;
+  /** The student's book from earlier sessions: still-red words show red and
+   *  can be tapped to mark them fixed (green); green ones show green. */
+  history?: MushafBook | null;
 }
 
 export interface MushafRestore {
   rk: string;
   rx: number;
+  /** Earlier red words marked fixed in this open, short format. */
+  ok?: string;
 }
 
 /** Full URL for the viewer, or null when there is nothing to show. */
@@ -59,6 +65,7 @@ export function mushafLink(
     base = '../mushaf/',
     phone = '',
     restore,
+    history,
   }: MushafLinkOptions = {},
 ): string | null {
   const a = mushafWardParam(list);
@@ -70,6 +77,9 @@ export function mushafLink(
   if (phone) params.push(`ph=${encodeURIComponent(phone)}`);
   if (restore?.rk) params.push(`rk=${encodeURIComponent(restore.rk)}`);
   if (restore && restore.rx > 0) params.push(`rx=${Math.floor(restore.rx)}`);
+  if (restore?.ok && SHORT_MARKS.test(restore.ok)) params.push(`rg=${restore.ok}`);
+  if (history?.red && SHORT_MARKS.test(history.red)) params.push(`hr=${history.red}`);
+  if (history?.green && SHORT_MARKS.test(history.green)) params.push(`hg=${history.green}`);
   return `${base}?${params.join('&')}`;
 }
 
@@ -99,14 +109,15 @@ const SHORT_MARKS = /^\d+(\.\d+){2,}(_\d+(\.\d+){2,})*$/;
 export function readMushafState(
   data: unknown,
   token: string,
-): { rk: string; rx: number; total: number } | null {
+): { rk: string; rx: number; ok: string; total: number } | null {
   const total = readMushafCount(data, token);
   if (total === null) return null;
-  const msg = data as { rk?: unknown; rx?: unknown };
+  const msg = data as { rk?: unknown; rx?: unknown; ok?: unknown };
   const rk = typeof msg.rk === 'string' && SHORT_MARKS.test(msg.rk) ? msg.rk : '';
+  const ok = typeof msg.ok === 'string' && SHORT_MARKS.test(msg.ok) ? msg.ok : '';
   const rxNum = Number(msg.rx);
   const rx = Number.isFinite(rxNum) && rxNum > 0 ? Math.floor(rxNum) : 0;
-  return { rk, rx, total };
+  return { rk, rx, ok, total };
 }
 
 /**

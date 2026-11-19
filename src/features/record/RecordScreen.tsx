@@ -137,6 +137,7 @@ function toMushafMarks(
   };
   // Firestore rejects undefined, so the link is only added when there is one.
   if (links[0]) marks.link = links[0];
+  if (state.restore.ok) marks.ok = state.restore.ok;
   return marks;
 }
 
@@ -146,7 +147,10 @@ function fromMushafMarks(m: MushafMarks | undefined): {
 } {
   if (!m) return { state: null, links: [] };
   return {
-    state: { restore: { rk: m.rk ?? '', rx: m.rx ?? 0 }, total: m.total ?? 0 },
+    state: {
+      restore: { rk: m.rk ?? '', rx: m.rx ?? 0, ...(m.ok ? { ok: m.ok } : {}) },
+      total: m.total ?? 0,
+    },
     links: m.link ? [m.link] : [],
   };
 }
@@ -176,12 +180,11 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   // its loh/madi even when there's no live "previous session" to evaluate).
   const [editingRecordData, setEditingRecordData] = useState<SessionRecord | null>(null);
 
-  const { prev: prevSession, loading: prevLoading } = usePreviousSession(
-    mosqueId,
-    halaqaId,
-    selectedStudent,
-    editingId ?? undefined,
-  );
+  const {
+    prev: prevSession,
+    book: mushafBook,
+    loading: prevLoading,
+  } = usePreviousSession(mosqueId, halaqaId, selectedStudent, editingId ?? undefined);
   const [prevLohScore, setPrevLohScore] = useState('');
   const [prevMadiScore, setPrevMadiScore] = useState('');
   // Lets the teacher correct what a PAST session's assignment actually
@@ -282,7 +285,8 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   /** Remember how the viewer was left, for the next open. */
   function rememberMushaf(which: 'loh' | 'madi', state: MushafRestore & { total: number }) {
     const { total, ...restore } = state;
-    const entry = restore.rk || restore.rx > 0 || total > 0 ? { restore, total } : null;
+    const entry =
+      restore.rk || restore.rx > 0 || restore.ok || total > 0 ? { restore, total } : null;
     if (which === 'loh') setLohMushaf(entry);
     else setMadiMushaf(entry);
   }
@@ -1571,6 +1575,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
           list={mushafListFor(mushafFor)}
           studentName={selectedStudent ? getStudentName(selectedStudent) : ''}
           token={mushafToken}
+          history={mushafBook}
           phone={selectedStudent ? normalizeWhatsAppPhone(selectedStudent.phonePrimary) : ''}
           // Read-only targets pass no handler at all, so a count arriving from
           // the viewer's close button closes the frame and changes nothing.

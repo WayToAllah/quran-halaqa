@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { getAllRecordsForStudent } from '../data/records.repo';
 import { findPreviousSession } from '../domain/record';
+import { buildMushafBook, type MushafBook } from '../domain/mushafBook';
 import type { SessionRecord, Student } from '../types';
 
 /**
@@ -27,7 +28,11 @@ export function usePreviousSession(
   // WhatsApp message to show the wrong assignment). Now a stale answer is
   // simply not returned.
   const key = student ? `${mosqueId}|${halaqaId}|${student.id}|${excludeRecordId ?? ''}` : null;
-  const [answer, setAnswer] = useState<{ key: string; prev: SessionRecord | null } | null>(null);
+  const [answer, setAnswer] = useState<{
+    key: string;
+    prev: SessionRecord | null;
+    book: MushafBook | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!student || !key) return;
@@ -35,11 +40,17 @@ export function usePreviousSession(
     getAllRecordsForStudent(mosqueId, halaqaId, student.id)
       .then((records) => {
         if (cancelled) return;
-        setAnswer({ key, prev: findPreviousSession(student, records, excludeRecordId) });
+        setAnswer({
+          key,
+          prev: findPreviousSession(student, records, excludeRecordId),
+          // The student's mushaf from the sessions before this one, so the
+          // viewer opens with every earlier red word already showing.
+          book: buildMushafBook(student, records, excludeRecordId),
+        });
       })
       .catch((err) => {
         console.error('usePreviousSession failed:', err);
-        if (!cancelled) setAnswer({ key, prev: null });
+        if (!cancelled) setAnswer({ key, prev: null, book: null });
       });
     return () => {
       cancelled = true;
@@ -48,5 +59,9 @@ export function usePreviousSession(
   }, [key]);
 
   const current = key !== null && answer?.key === key;
-  return { prev: current ? answer!.prev : null, loading: key !== null && !current };
+  return {
+    prev: current ? answer!.prev : null,
+    book: current ? answer!.book : null,
+    loading: key !== null && !current,
+  };
 }

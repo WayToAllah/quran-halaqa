@@ -36,6 +36,22 @@ describe('MushafModal', () => {
     expect(frame.getAttribute('src')).toContain('id=r_9');
   });
 
+  it("opens with the student's earlier mistakes from the mushaf book", () => {
+    render(
+      <MushafModal
+        label="اللوح"
+        list={[{ sura: 'النبأ', from: '1', to: '40' }]}
+        studentName="زيد"
+        token="r_1"
+        history={{ red: '78.1.2', green: '78.2.1' }}
+        onClose={vi.fn()}
+      />,
+    );
+    const src = screen.getByTestId('mushaf-frame').getAttribute('src')!;
+    expect(src).toContain('hr=78.1.2');
+    expect(src).toContain('hg=78.2.1');
+  });
+
   it('leaves the name and the ward to the viewer instead of repeating them above it', () => {
     renderModal();
     expect(screen.queryByText('زيد احمد')).toBeNull();

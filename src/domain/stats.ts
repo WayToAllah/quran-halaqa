@@ -1,4 +1,5 @@
 import type { Badge, PublicStats, ScoreEval, SessionRecord, Student } from '../types';
+import { buildMushafBook } from './mushafBook';
 import { inPeriod, seasonRange, sortSeasons, type Season } from './seasons';
 import { localDateStr } from './dates';
 import { PER_DAY, policyFromSeasons, tallyAttendance } from './attendancePolicy';
@@ -298,6 +299,8 @@ export function buildStudentPublicStats(
     seasonFields.seasonStats = seasonStats;
   }
 
+  const book = buildMushafBook(student, allRecs);
+
   const badges = buildStudentBadges({
     attendPct,
     allRecs,
@@ -328,5 +331,6 @@ export function buildStudentPublicStats(
     scoreHistory,
     monthlyStats,
     ...seasonFields,
+    ...(book.red || book.green ? { mushafBook: book } : {}),
   };
 }

@@ -74,6 +74,9 @@ export interface MushafMarks {
   rx: number;
   total: number;
   link?: string;
+  /** Earlier red words (from past sessions) the teacher marked fixed this
+   *  time, same short format as `rk`. Feeds the student's mushaf book. */
+  ok?: string;
 }
 
 export interface ScoreEval {
@@ -151,6 +154,10 @@ export interface Badge {
 export interface PublicStats {
   name: string;
   updatedAt: number;
+  /** Every word this student has missed, kept across sessions: still-red and
+   *  since-fixed (green), in the mushaf viewer's short format. Absent until a
+   *  word was marked at all. */
+  mushafBook?: { red: string; green: string };
   /** Halaqa-wide day count. Basis of `rank`, NOT of `attendPct`. */
   totalHalaqaDays: number;
   /** Halaqa days since this student's first recorded day — the denominator of

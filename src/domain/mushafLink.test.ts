@@ -163,10 +163,28 @@ describe('mushafLink restore', () => {
   });
 });
 
+describe('mushafLink history', () => {
+  it("carries the book and this open's fixes", () => {
+    const url = mushafLink([{ sura: 'الناس' }], {
+      token: 't',
+      restore: { rk: '', rx: 0, ok: '114.1.2' },
+      history: { red: '114.1.2_114.2.1', green: '113.1.1' },
+    })!;
+    expect(url).toContain('rg=114.1.2');
+    expect(url).toContain('hr=114.1.2_114.2.1');
+    expect(url).toContain('hg=113.1.1');
+  });
+  it('drops a malformed book', () => {
+    const url = mushafLink([{ sura: 'الناس' }], { history: { red: '&x=1', green: '' } })!;
+    expect(url).not.toContain('hr=');
+    expect(url).not.toContain('hg=');
+  });
+});
+
 describe('readMushafState', () => {
   const base = { type: 'mushaf-count', id: 'r_9', count: 5, rk: '114.2.1.3', rx: 3 };
   it('reads what the viewer needs back on the next open', () => {
-    expect(readMushafState(base, 'r_9')).toEqual({ rk: '114.2.1.3', rx: 3, total: 5 });
+    expect(readMushafState(base, 'r_9')).toEqual({ rk: '114.2.1.3', rx: 3, ok: '', total: 5 });
   });
   it('is null for another open or a non-count message', () => {
     expect(readMushafState(base, 'r_10')).toBeNull();
@@ -176,8 +194,13 @@ describe('readMushafState', () => {
     expect(readMushafState({ type: 'mushaf-count', id: 'r_9', count: 0 }, 'r_9')).toEqual({
       rk: '',
       rx: 0,
+      ok: '',
       total: 0,
     });
+  });
+  it('reads the words marked fixed, short format only', () => {
+    expect(readMushafState({ ...base, ok: '78.1.2' }, 'r_9')?.ok).toBe('78.1.2');
+    expect(readMushafState({ ...base, ok: 'x' }, 'r_9')?.ok).toBe('');
   });
   it('drops marks that are not the viewer short-format', () => {
     expect(readMushafState({ ...base, rk: '<script>' }, 'r_9')?.rk).toBe('');

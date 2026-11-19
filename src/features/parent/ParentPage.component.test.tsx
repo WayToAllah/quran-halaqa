@@ -13,6 +13,19 @@ describe('ParentPage', () => {
     expect(screen.getAllByText(/آل عمران/).length).toBeGreaterThan(0);
   });
 
+  it('shows the mushaf book button only when words were ever marked', () => {
+    const { unmount } = render(<ParentPage previewStats={MOCK_PUBLIC_STATS} />);
+    expect(screen.queryByTestId('mushaf-book')).not.toBeInTheDocument();
+    unmount();
+    render(
+      <ParentPage
+        previewStats={{ ...MOCK_PUBLIC_STATS, mushafBook: { red: '78.1.2', green: '78.2.1' } }}
+      />,
+    );
+    const link = screen.getByText(/افتح المصحف/).closest('a')!;
+    expect(link.getAttribute('href')).toContain('/mushaf/?b=1&e=78.1.2&g=78.2.1');
+  });
+
   it('shows a friendly not-found message when there is no token', () => {
     render(<ParentPage />);
     expect(screen.getByText(/الرابط غير صحيح/)).toBeInTheDocument();

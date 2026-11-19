@@ -8,6 +8,7 @@ import {
   type MushafRestore,
 } from '../../domain/mushafLink';
 import type { SuraAssignment } from '../../types';
+import type { MushafBook } from '../../domain/mushafBook';
 
 interface Props {
   /** 'اللوح' or 'الماضي' — passed through to the viewer header. */
@@ -19,6 +20,8 @@ interface Props {
   token: string;
   /** Parent's WhatsApp number (normalized); the viewer's send button opens that chat. */
   phone?: string;
+  /** The student's mushaf from earlier sessions (red / fixed-green words). */
+  history?: MushafBook | null;
   /** Number of mistakes the teacher tapped while the viewer was open. Omitted
    *  when the viewer is opened just to READ a ward (the new assignment has no
    *  score to feed), in which case the count is dropped — but the message is
@@ -46,6 +49,7 @@ export function MushafModal({
   studentName,
   token,
   phone,
+  history,
   onCount,
   restore,
   onState,
@@ -57,6 +61,7 @@ export function MushafModal({
     token,
     phone,
     restore: restore ?? undefined,
+    history,
   });
   const closedRef = useRef(false);
   // The viewer draws its own header with the name and the ward, so this frame
