@@ -153,7 +153,12 @@ export function ParentPage({ token, previewStats, load = fetchPublicStatsRest }:
   const task = buildCurrentTask(stats);
   const sessions = buildSessions(stats);
   const marks = latestMarks(stats);
-  const bookLink = mushafBookLink(stats.mushafBook, stats.name, globalThis.location?.href ?? '');
+  const bookLink = mushafBookLink(
+    stats.mushafBook,
+    stats.name,
+    globalThis.location?.href ?? '',
+    token,
+  );
   const rankText = rankBadgeText(stats.rank);
   // publicStats documents written before a badge was hidden still carry it,
   // so filter on read as well as on write (see domain/badges.ts).

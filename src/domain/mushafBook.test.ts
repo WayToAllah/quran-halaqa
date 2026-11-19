@@ -90,6 +90,16 @@ describe('mushafBookLink', () => {
       ),
     ).toBe('https://x.io/q/mushaf/?b=1&e=78.1.2&g=78.1.3&n=%D8%A3%D8%AD%D9%85%D8%AF');
   });
+  it('with the parent token, a short permanent link the viewer resolves itself', () => {
+    expect(
+      mushafBookLink(
+        { red: '78.1.2', green: '' },
+        'أحمد',
+        'https://x.io/q/v3/child.html',
+        'abcDEF_123-x',
+      ),
+    ).toBe('https://x.io/q/mushaf/?b=1&t=abcDEF_123-x');
+  });
   it('is null with nothing marked or a malformed value', () => {
     expect(mushafBookLink({ red: '', green: '' }, 'a', 'https://x.io/q/v3/')).toBeNull();
     expect(

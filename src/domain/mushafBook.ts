@@ -83,13 +83,18 @@ export function buildMushafBook(
   return { red: encodeShortMarks(red), green: encodeShortMarks(green) };
 }
 
+const TOKEN = /^[A-Za-z0-9_-]{8,200}$/;
+
 /** Read-only link to the book, beside the app (`../mushaf/`), or null when there
- *  is nothing to show. The published values are data: anything not in the short
- *  format is refused, so the link can never carry something else. */
+ *  is nothing to show. With the parent token the link is short and permanent:
+ *  the viewer reads the book from publicStats itself, so it always shows the
+ *  latest state. Without one (preview) the words ride in the link. The published
+ *  values are data: anything not in the short format is refused. */
 export function mushafBookLink(
   book: MushafBook | undefined | null,
   name: string,
   pageHref: string,
+  token?: string,
 ): string | null {
   if (!book) return null;
   const red = book.red || '';
@@ -102,6 +107,7 @@ export function mushafBookLink(
   } catch {
     return null;
   }
+  if (token && TOKEN.test(token)) return `${base.href}?b=1&t=${token}`;
   const q = ['b=1'];
   if (red) q.push(`e=${red}`);
   if (green) q.push(`g=${green}`);

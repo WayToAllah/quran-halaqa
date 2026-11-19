@@ -26,6 +26,15 @@ describe('ParentPage', () => {
     expect(link.getAttribute('href')).toContain('/mushaf/?b=1&e=78.1.2&g=78.2.1');
   });
 
+  it('links the book by the parent token, so the link stays short and current', async () => {
+    const load = vi
+      .fn()
+      .mockResolvedValue({ ...MOCK_PUBLIC_STATS, mushafBook: { red: '78.1.2', green: '' } });
+    render(<ParentPage token="tok_ABC_12345" load={load} />);
+    const link = await waitFor(() => screen.getByText(/افتح المصحف/).closest('a')!);
+    expect(link.getAttribute('href')).toMatch(/\/mushaf\/\?b=1&t=tok_ABC_12345$/);
+  });
+
   it('shows a friendly not-found message when there is no token', () => {
     render(<ParentPage />);
     expect(screen.getByText(/الرابط غير صحيح/)).toBeInTheDocument();
