@@ -32,6 +32,16 @@ let studentsForHook: Student[] = students;
 vi.mock('../../hooks/useStudents', () => ({
   useStudents: () => ({ students: studentsForHook, loaded: true }),
 }));
+const downloadXlsxMock = vi.fn((_sheet: { header: string[]; rows: unknown[][] }, _name: string) =>
+  Promise.resolve(),
+);
+vi.mock('../../data/excel', () => ({
+  downloadXlsx: (sheet: { header: string[]; rows: unknown[][] }, name: string) =>
+    downloadXlsxMock(sheet, name),
+}));
+vi.mock('../../hooks/useSeasons', () => ({
+  useSeasons: () => ({ seasons: [], loaded: true, save: vi.fn() }),
+}));
 vi.mock('../../hooks/useAllRecords', () => ({
   useAllRecords: () => ({ records, loaded: true }),
 }));
@@ -486,5 +496,19 @@ describe('StudentModal — phone storage', () => {
     };
     expect(saved.phonePrimary).toBe('01001234567');
     expect(saved.phoneSecondary).toBe('01117654321');
+  });
+});
+
+describe('StudentsScreen — Excel export', () => {
+  it("downloads the whole roster with this season's numbers, search ignored", async () => {
+    renderScreen();
+    await userEvent.type(screen.getByPlaceholderText('ابحث بالاسم…'), 'zzz');
+    await userEvent.click(screen.getByRole('button', { name: 'تصدير الطلاب وإحصائياتهم Excel' }));
+
+    await waitFor(() => expect(downloadXlsxMock).toHaveBeenCalledTimes(1));
+    const [sheet, fileName] = downloadXlsxMock.mock.calls[0];
+    expect(sheet.header[0]).toBe('الاسم');
+    expect(sheet.rows).toHaveLength(students.length);
+    expect(fileName).toMatch(/^الطلاب - .*\.xlsx$/);
   });
 });

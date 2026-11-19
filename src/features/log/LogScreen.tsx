@@ -1,3 +1,7 @@
+import { localDateStr } from '../../domain/dates';
+import { ExportButton } from '../../ui/ExportButton';
+import { buildLogSheet, exportFileName } from '../../domain/excelExport';
+import { downloadXlsx } from '../../data/excel';
 import { useMemo, useState } from 'preact/hooks';
 import { useRecentRecords } from '../../hooks/useRecentRecords';
 import { useRecordSearch } from '../../hooks/useRecordSearch';
@@ -329,6 +333,12 @@ export function LogScreen({ onEditRecord }: LogScreenProps = {}) {
     );
   }
 
+  /** Exactly the sessions listed — filter, search and order kept. */
+  async function exportLog() {
+    const sheet = buildLogSheet(visibleRecords, students, isSearching ? search.results : records);
+    await downloadXlsx(sheet, exportFileName('السجل', localDateStr()));
+  }
+
   function handleEdit(r: SessionRecord) {
     if (onEditRecord) {
       onEditRecord(r);
@@ -340,7 +350,14 @@ export function LogScreen({ onEditRecord }: LogScreenProps = {}) {
 
   return (
     <div class="p-[18px] pb-[100px]" dir="rtl">
-      <div class="text-[19px] font-extrabold text-ink-dark mb-4">السجل</div>
+      <div class="flex items-center justify-between mb-4">
+        <div class="text-[19px] font-extrabold text-ink-dark">السجل</div>
+        <ExportButton
+          label="تصدير الجلسات الظاهرة Excel"
+          disabled={showSkeleton || visibleRecords.length === 0}
+          onExport={exportLog}
+        />
+      </div>
 
       <SearchInput
         class="mb-4"

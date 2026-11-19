@@ -26,6 +26,11 @@ import { FloatingAddButton } from '../../ui/FloatingAddButton';
 import type { Student } from '../../types';
 
 import { CHILD_STATS_BASE_URL } from '../../config';
+import { useSeasons } from '../../hooks/useSeasons';
+import { ExportButton } from '../../ui/ExportButton';
+import { buildStudentsSheet, exportFileName } from '../../domain/excelExport';
+import { downloadXlsx } from '../../data/excel';
+import { localDateStr } from '../../domain/dates';
 
 // A generic person-silhouette icon for the student avatar circle (Heroicons
 // "user" solid, inlined so we don't need an icon-library dependency for one glyph).
@@ -45,8 +50,18 @@ export function StudentsScreen() {
   const tenant = useTenant();
   const { mosqueId, halaqaId } = tenant;
   const { students, loaded: studentsLoaded } = useStudents(mosqueId, halaqaId);
-  const { records } = useAllRecords(mosqueId, halaqaId);
+  const { records, loaded: recordsLoaded } = useAllRecords(mosqueId, halaqaId);
+  const { seasons } = useSeasons(mosqueId, halaqaId);
   const { showToast } = useToast();
+
+  /** Whole roster (search ignored) with this season's numbers — the same ones
+   * الإحصائيات shows by default. */
+  async function exportStudents() {
+    const today = localDateStr();
+    const roster = sortStudentsByName(students.filter((s) => !pendingDeleteIds.has(s.id)));
+    const sheet = buildStudentsSheet(roster, records, seasons, today);
+    await downloadXlsx(sheet, exportFileName(`الطلاب - ${sheet.title}`, today));
+  }
 
   const [query, setQuery] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -138,8 +153,14 @@ export function StudentsScreen() {
 
   return (
     <div class="p-[18px] pb-[100px]" dir="rtl">
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-2 mb-4">
         <div class="text-[19px] font-extrabold text-ink-dark">الطلاب</div>
+        <div class="flex-1" />
+        <ExportButton
+          label="تصدير الطلاب وإحصائياتهم Excel"
+          disabled={!studentsLoaded || !recordsLoaded || students.length === 0}
+          onExport={exportStudents}
+        />
         <span class="text-xs font-bold text-[#8A6A15] bg-[#FFF8E6] px-3 py-1 rounded-full">
           {/* While searching, count what is actually listed — "٥٣ طالب" over
               two visible rows just looks wrong. */}

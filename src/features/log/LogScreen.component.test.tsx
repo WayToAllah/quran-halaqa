@@ -62,6 +62,16 @@ vi.mock('../../hooks/useRecentRecords', () => ({
     hasMore: hasMoreValue,
   }),
 }));
+const downloadXlsxMock = vi.fn((_sheet: { header: string[]; rows: unknown[][] }, _name: string) =>
+  Promise.resolve(),
+);
+vi.mock('../../data/excel', () => ({
+  downloadXlsx: (sheet: { header: string[]; rows: unknown[][] }, name: string) =>
+    downloadXlsxMock(sheet, name),
+}));
+vi.mock('../../hooks/useSeasons', () => ({
+  useSeasons: () => ({ seasons: [], loaded: true, save: vi.fn() }),
+}));
 vi.mock('../../hooks/useStudents', () => ({
   useStudents: () => ({ students, loaded: true }),
 }));
@@ -395,5 +405,18 @@ describe('LogScreen — load more', () => {
     hasMoreValue = false;
     renderScreen();
     expect(screen.queryByRole('button', { name: 'تحميل المزيد' })).not.toBeInTheDocument();
+  });
+});
+
+describe('LogScreen — Excel export', () => {
+  it('downloads exactly the sessions listed', async () => {
+    renderScreen();
+    await userEvent.click(screen.getByRole('button', { name: 'تصدير الجلسات الظاهرة Excel' }));
+
+    await waitFor(() => expect(downloadXlsxMock).toHaveBeenCalledTimes(1));
+    const [sheet, fileName] = downloadXlsxMock.mock.calls[0];
+    expect(sheet.header).toContain('درجة اللوح');
+    expect(sheet.rows).toHaveLength(records.length);
+    expect(fileName).toMatch(/^السجل-\d{4}-\d{2}-\d{2}\.xlsx$/);
   });
 });
