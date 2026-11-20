@@ -1089,7 +1089,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
   return (
     <div class="p-[18px] pb-[150px] space-y-3" dir="rtl">
       <div class="flex items-center gap-2">
-        <div class="relative shrink-0 flex items-center gap-1 max-w-[128px]">
+        <div class="relative min-w-0 flex-1 flex items-center gap-1">
           <svg
             viewBox="0 0 24 24"
             width="13"
@@ -1112,7 +1112,7 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
             value={date}
             onInput={(e) => setDate((e.target as HTMLInputElement).value)}
           />
-          <span class="pointer-events-none text-[11px] font-bold text-[#0F3D2E] truncate">
+          <span class="pointer-events-none text-[12px] font-bold text-[#0F3D2E] truncate">
             {dateDisplay || 'اختر التاريخ'}
           </span>
         </div>
