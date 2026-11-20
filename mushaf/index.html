@@ -101,7 +101,7 @@ html.direct #viewer{display:flex}
 (function () {
   var q = new URLSearchParams(location.search), n = q.get('n') || '';
   var view = q.has('e') || q.has('m') || q.has('g');
-  document.getElementById('tname').textContent = q.has('b') ? (n ? 'مصحف ' + n : 'مصحف المراجعة')
+  document.getElementById('tname').textContent = q.has('b') ? (n || 'مصحف المراجعة')
     : view ? (n ? 'أخطاء ' + n : 'أخطاء التسميع') : (n || 'التسميع');
 })();
 </script>
@@ -506,7 +506,7 @@ function startView() {
   idx = Math.max(0, pages.findIndex(p => marks.has(p)));
   pages.forEach(pp => ensureFontsFor(pp));
   document.querySelector('.wrap').style.display = 'none';
-  document.querySelector('.bar .t b').textContent = VIEW.book ? (VIEW.name ? 'مصحف ' + VIEW.name : 'مصحف المراجعة')
+  document.querySelector('.bar .t b').textContent = VIEW.book ? (VIEW.name || 'مصحف المراجعة')
     : VIEW.name ? 'أخطاء ' + VIEW.name : 'أخطاء التسميع';
   document.getElementById('ward').textContent = VIEW.ward;
   document.getElementById('close').style.visibility = 'hidden';
@@ -791,7 +791,7 @@ if (BOOK_T) {
     if (!b) { bookMessage('الرابط ده مش شغال. اطلب اللينك من المحفّظ.'); return; }
     VIEW.name = b.name; VIEW.ids = decodeShort(b.red); VIEW.green = decodeShort(b.green);
     if (!VIEW.ids.length && !VIEW.green.length) {
-      document.getElementById('tname').textContent = b.name ? 'مصحف ' + b.name : 'مصحف المراجعة';
+      document.getElementById('tname').textContent = b.name || 'مصحف المراجعة';
       bookMessage('مفيش أخطاء متعلّمة لسه — ما شاء الله 🌿');
       return;
     }
