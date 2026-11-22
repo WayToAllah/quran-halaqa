@@ -77,6 +77,9 @@ export interface MushafMarks {
   /** Earlier red words (from past sessions) the teacher marked fixed this
    *  time, same short format as `rk`. Feeds the student's mushaf book. */
   ok?: string;
+  /** Passages marked as one mistake: first-last word per passage,
+   *  `s.a.w-s.a.w` joined by `_`. Their words are in `rk` too. */
+  sg?: string;
 }
 
 export interface ScoreEval {

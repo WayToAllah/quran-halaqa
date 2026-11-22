@@ -138,6 +138,7 @@ function toMushafMarks(
   // Firestore rejects undefined, so the link is only added when there is one.
   if (links[0]) marks.link = links[0];
   if (state.restore.ok) marks.ok = state.restore.ok;
+  if (state.restore.sg) marks.sg = state.restore.sg;
   return marks;
 }
 
@@ -148,7 +149,12 @@ function fromMushafMarks(m: MushafMarks | undefined): {
   if (!m) return { state: null, links: [] };
   return {
     state: {
-      restore: { rk: m.rk ?? '', rx: m.rx ?? 0, ...(m.ok ? { ok: m.ok } : {}) },
+      restore: {
+        rk: m.rk ?? '',
+        rx: m.rx ?? 0,
+        ...(m.ok ? { ok: m.ok } : {}),
+        ...(m.sg ? { sg: m.sg } : {}),
+      },
       total: m.total ?? 0,
     },
     links: m.link ? [m.link] : [],

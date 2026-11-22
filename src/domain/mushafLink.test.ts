@@ -171,6 +171,11 @@ describe('mushafLink history', () => {
       history: { red: '114.1.2_114.2.1', green: '113.1.1' },
     })!;
     expect(url).toContain('rg=114.1.2');
+    expect(
+      mushafLink([{ sura: 'الناس' }], {
+        restore: { rk: '114.1.1.2', rx: 0, sg: '114.1.1-114.1.2' },
+      }),
+    ).toContain('rs=114.1.1-114.1.2');
     expect(url).toContain('hr=114.1.2_114.2.1');
     expect(url).toContain('hg=113.1.1');
   });
@@ -184,7 +189,13 @@ describe('mushafLink history', () => {
 describe('readMushafState', () => {
   const base = { type: 'mushaf-count', id: 'r_9', count: 5, rk: '114.2.1.3', rx: 3 };
   it('reads what the viewer needs back on the next open', () => {
-    expect(readMushafState(base, 'r_9')).toEqual({ rk: '114.2.1.3', rx: 3, ok: '', total: 5 });
+    expect(readMushafState(base, 'r_9')).toEqual({
+      rk: '114.2.1.3',
+      rx: 3,
+      ok: '',
+      sg: '',
+      total: 5,
+    });
   });
   it('is null for another open or a non-count message', () => {
     expect(readMushafState(base, 'r_10')).toBeNull();
@@ -195,8 +206,13 @@ describe('readMushafState', () => {
       rk: '',
       rx: 0,
       ok: '',
+      sg: '',
       total: 0,
     });
+  });
+  it('reads passages marked as one mistake, format-checked', () => {
+    expect(readMushafState({ ...base, sg: '78.1.1-78.2.2' }, 'r_9')?.sg).toBe('78.1.1-78.2.2');
+    expect(readMushafState({ ...base, sg: '78.1.1' }, 'r_9')?.sg).toBe('');
   });
   it('reads the words marked fixed, short format only', () => {
     expect(readMushafState({ ...base, ok: '78.1.2' }, 'r_9')?.ok).toBe('78.1.2');

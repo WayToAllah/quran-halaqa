@@ -53,6 +53,8 @@ export interface MushafRestore {
   rx: number;
   /** Earlier red words marked fixed in this open, short format. */
   ok?: string;
+  /** Passages marked as one mistake (first-last word each). */
+  sg?: string;
 }
 
 /** Full URL for the viewer, or null when there is nothing to show. */
@@ -78,6 +80,7 @@ export function mushafLink(
   if (restore?.rk) params.push(`rk=${encodeURIComponent(restore.rk)}`);
   if (restore && restore.rx > 0) params.push(`rx=${Math.floor(restore.rx)}`);
   if (restore?.ok && SHORT_MARKS.test(restore.ok)) params.push(`rg=${restore.ok}`);
+  if (restore?.sg && SEGMENTS.test(restore.sg)) params.push(`rs=${restore.sg}`);
   if (history?.red && SHORT_MARKS.test(history.red)) params.push(`hr=${history.red}`);
   if (history?.green && SHORT_MARKS.test(history.green)) params.push(`hg=${history.green}`);
   return `${base}?${params.join('&')}`;
@@ -98,6 +101,8 @@ export function readMushafCount(data: unknown, token: string): number | null {
 }
 
 /** The viewer's short marks format: groups of `sura.ayah.word.word…` joined by `_`. */
+/** Passages marked as one mistake: `s.a.w-s.a.w` groups joined by `_`. */
+const SEGMENTS = /^\d+\.\d+\.\d+-\d+\.\d+\.\d+(_\d+\.\d+\.\d+-\d+\.\d+\.\d+)*$/;
 const SHORT_MARKS = /^\d+(\.\d+){2,}(_\d+(\.\d+){2,})*$/;
 
 /**
@@ -109,15 +114,16 @@ const SHORT_MARKS = /^\d+(\.\d+){2,}(_\d+(\.\d+){2,})*$/;
 export function readMushafState(
   data: unknown,
   token: string,
-): { rk: string; rx: number; ok: string; total: number } | null {
+): { rk: string; rx: number; ok: string; sg: string; total: number } | null {
   const total = readMushafCount(data, token);
   if (total === null) return null;
-  const msg = data as { rk?: unknown; rx?: unknown; ok?: unknown };
+  const msg = data as { rk?: unknown; rx?: unknown; ok?: unknown; sg?: unknown };
+  const sg = typeof msg.sg === 'string' && SEGMENTS.test(msg.sg) ? msg.sg : '';
   const rk = typeof msg.rk === 'string' && SHORT_MARKS.test(msg.rk) ? msg.rk : '';
   const ok = typeof msg.ok === 'string' && SHORT_MARKS.test(msg.ok) ? msg.ok : '';
   const rxNum = Number(msg.rx);
   const rx = Number.isFinite(rxNum) && rxNum > 0 ? Math.floor(rxNum) : 0;
-  return { rk, rx, ok, total };
+  return { rk, rx, ok, sg, total };
 }
 
 /**
