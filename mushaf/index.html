@@ -60,6 +60,10 @@ html.direct #viewer{display:flex}
 /* مصحف الطالب: أخطاء الجلسات اللي فاتت (أحمر فاتح) واللي اتصلّحت (أخضر) */
 .w.h{color:#e08585}
 .w.g{color:#2e7d32}
+/* خطأ في مقطع: كذا كلمة متعلّمة بخطأ واحد */
+.w.sg{background:rgba(211,47,47,.10);border-radius:3px}
+.w.sel{color:#d32f2f;background:rgba(211,47,47,.22);border-radius:3px}
+#stage{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
 #viewer.ro .w{cursor:default}
 #viewer.ro .foot{display:none}
 .share{width:40px;height:40px;border-radius:50%;background:#fffdf9;border:1px solid #e6d6c1;font-size:17px;color:#0f6e56;flex:0 0 auto;display:none}
@@ -348,9 +352,48 @@ const EMPTY = new Set();
 // fixed = الكلمات القديمة اللي المحفّظ علّمها "اتصلّحت" في الفتحة دي.
 const hist = new Map();
 const fixed = new Map();
+// مقاطع: رقم الصفحة → Map(أول كلمة → Set كلمات المقطع). كلمات المقطع موجودة في
+// marks عادي (عشان تبان حمرا وتتحفظ)، بس المقطع كله بيتحسب خطأ واحد.
+const segs = new Map();
+function segsOn(p) { return segs.get(p) || new Map(); }
+function segOf(p, id) { for (const [k, set] of segsOn(p)) if (set.has(id)) return k; return null; }
+function pageMarked(p) {
+  let n = marksOn(p).size;
+  segsOn(p).forEach(set => { n -= set.size - 1; });
+  return n;
+}
+function dropSeg(p, k) {
+  const set = segsOn(p).get(k);
+  if (!set) return;
+  set.forEach(id => marksOn(p).delete(id));
+  segs.get(p).delete(k);
+  const i = actions.findIndex(a => a.p === p && a.seg === k);
+  if (i >= 0) actions.splice(i, 1);
+}
+function allSegs() {
+  const out = [];
+  [...segs.keys()].sort((a, b) => a - b).forEach(p => segsOn(p).forEach(set => {
+    const ids = [...set].sort(cmpId);
+    out.push(ids[0].split(':').join('.') + '-' + ids[ids.length - 1].split(':').join('.'));
+  }));
+  return out.join('_');
+}
+// "78.1.2-78.2.3_…": أول وآخر كلمة في كل مقطع؛ الكلمات اللي بينهم من الكلمات المعلّمة
+function restoreSegs(str) {
+  if (!/^\d+\.\d+\.\d+-\d+\.\d+\.\d+(_\d+\.\d+\.\d+-\d+\.\d+\.\d+)*$/.test(str || '')) return;
+  str.split('_').forEach(part => {
+    const [a, b] = part.split('-').map(x => x.split('.').join(':'));
+    const p = pageOfId(a);
+    if (!p) return;
+    const ids = [...marksOn(p)].filter(id => cmpId(id, a) >= 0 && cmpId(id, b) <= 0);
+    if (ids.length < 2) return;
+    if (!segs.has(p)) segs.set(p, new Map());
+    segs.get(p).set(ids.sort(cmpId)[0], new Set(ids));
+  });
+}
 function fixedOn(p) { return fixed.get(p) || EMPTY; }
 function wordClass(p, id) {
-  if (marksOn(p).has(id)) return 'm';
+  if (marksOn(p).has(id)) return segOf(p, id) ? 'm sg' : 'm';
   if (fixedOn(p).has(id)) return 'g';
   const h = hist.get(id);
   return h === 'r' ? 'h' : h === 'g' ? 'g' : '';
@@ -367,7 +410,8 @@ function paintMarks() {
   const p = pages[idx];
   document.querySelectorAll('#stage .w').forEach(w => {
     const c = wordClass(p, w.dataset.id);
-    ['m', 'g', 'h'].forEach(k => w.classList.toggle(k, c === k));
+    const cs = c.split(' ');
+    ['m', 'g', 'h', 'sg'].forEach(k => w.classList.toggle(k, cs.includes(k)));
   });
 }
 function allFixed() {
@@ -442,6 +486,8 @@ function decodePages(str) {
 }
 function shareLink() {
   let q = 'e=' + encodeShort(allMarks());
+  const sg = allSegs();
+  if (sg) q += '&s=' + sg;
   if (ward.length) q += '&p=' + encodePages(ward);
   const extra = counts.reduce((a, b) => a + b, 0);
   if (extra) q += '&x=' + extra;
@@ -478,7 +524,7 @@ const VIEW = (() => {
     .map(x => ({ sura: decodeURIComponent(x[0]), from: x[1] || '', to: x[2] || '' }));
   const pg = q.has('p') ? decodePages(q.get('p'))
     : (q.get('pg') || '').split('.').map(Number).filter(n => n >= 1 && n <= 604);
-  return { ids, green, book: q.has('b'), items, pg, extra: Math.max(0, +q.get('x') || 0), name: q.get('n') || '', ward: q.get('w') || '' };
+  return { ids, green, sg: q.get('s') || '', book: q.has('b'), items, pg, extra: Math.max(0, +q.get('x') || 0), name: q.get('n') || '', ward: q.get('w') || '' };
 })();
 function viewHint() {
   const n = markedTotal(), x = VIEW.extra;
@@ -490,13 +536,16 @@ function viewHint() {
     document.getElementById('hint').textContent = b;
     return;
   }
-  let t = n ? 'الكلمات اللي بالأحمر فيها خطأ — ' + plural(n, 'كلمة واحدة', 'كلمتين', 'كلمات', 'كلمة') : 'مفيش كلمات معلّمة';
+  let t = !n ? 'مفيش كلمات معلّمة' : segs.size
+    ? 'الأحمر فيه ' + plural(n, 'خطأ واحد', 'خطأين', 'أخطاء', 'خطأ') + ' (المقطع المظلّل بيتحسب خطأ واحد)'
+    : 'الكلمات اللي بالأحمر فيها خطأ — ' + plural(n, 'كلمة واحدة', 'كلمتين', 'كلمات', 'كلمة');
   if (x) t += '، و' + plural(x, 'خطأ تاني', 'خطأين تانيين', 'أخطاء تانية', 'خطأ تاني') + ' (تردد أو وقف)';
   document.getElementById('hint').textContent = t;
 }
 function startView() {
   if (!VIEW) return;
   VIEW.ids.forEach(id => addTo(marks, id));
+  if (!VIEW.book) restoreSegs(VIEW.sg);
   const greenPages = new Set();
   VIEW.green.forEach(id => { hist.set(id, 'g'); const p = pageOfId(id); if (p) greenPages.add(p); });
   let ps = VIEW.items.length ? pagesForWard(VIEW.items, suraIdx, ayahCount) : VIEW.pg;
@@ -563,17 +612,17 @@ function label(p) {
 }
 function marksOn(p) { return marks.get(p) || EMPTY; }
 function pageOfId(id) { const [s, a] = id.split(':').map(Number); return pageOfAyah(s, a); }
-function markedTotal() { let n = 0; marks.forEach(m => { n += m.size; }); return n; }
+function markedTotal() { let n = 0; marks.forEach((m, p) => { n += pageMarked(p); }); return n; }
 function grandTotal() { return counts.reduce((a, b) => a + b, 0) + markedTotal(); }
 function total() {
   const t = grandTotal();
-  const here = (counts[idx] || 0) + marksOn(pages[idx]).size;
+  const here = (counts[idx] || 0) + pageMarked(pages[idx]);
   document.getElementById('cnt').textContent = AR(t);
   document.getElementById('share').classList.toggle('on', markedTotal() > 0);
   if (VIEW) { viewHint(); return; }
   const oldHere = [...hist].some(([id, v]) => v === 'r' && pageOfId(id) === pages[idx] && !fixedOn(pages[idx]).has(id));
-  if (oldHere && t === 0) { document.getElementById('hint').textContent = 'الأحمر الفاتح أخطاء قديمة — دوس على الكلمة لو اتصلّحت تبقى خضرا'; return; }
-  document.getElementById('hint').textContent = t === 0 ? 'دوس على الكلمة الغلط تتعلّم بالأحمر، أو على زرار الخطأ' : 'إجمالي الأخطاء ' + AR(t) + (pages.length > 1 ? '، وفي الصفحة دي ' + AR(here) : '');
+  if (oldHere && t === 0) { document.getElementById('hint').textContent = 'الأحمر الفاتح أخطاء قديمة — دوسة يعني غلط تاني، ودوستين ورا بعض تبقى خضرا (اتصلّحت)'; return; }
+  document.getElementById('hint').textContent = t === 0 ? 'دوس على الكلمة الغلط، أو اضغط مطوّل واسحب على مقطع يتحسب خطأ واحد' : 'إجمالي الأخطاء ' + AR(t) + (pages.length > 1 ? '، وفي الصفحة دي ' + AR(here) : '');
 }
 // ---- خارجي: يفتح الورد مباشرةً من رابط، ويرجّع العدد للتطبيق ----
 const EMBED = (() => {
@@ -587,7 +636,7 @@ const EMBED = (() => {
     // ما كان عليه المصحف لما اتقفل آخر مرة لنفس الطالب (الكلمات الحمرا وضغطات زرار الخطأ)
     rk: q.get('rk') || '', rx: Math.max(0, Math.floor(+q.get('rx')) || 0),
     // مصحف الطالب من الجلسات اللي فاتت، واللي اتعلّم "اتصلّح" في الفتحة دي قبل كده
-    hr: q.get('hr') || '', hg: q.get('hg') || '', rg: q.get('rg') || '' };
+    hr: q.get('hr') || '', hg: q.get('hg') || '', rg: q.get('rg') || '', rs: q.get('rs') || '' };
 })();
 /** Told to the app once the ward is actually on screen. Separate from the
  * iframe loading: the viewer can come up and still fail to place the ward. */
@@ -600,7 +649,7 @@ function announceReady() {
 function reportCount(total) {
   if (!EMBED) return false;
   const msg = { type: 'mushaf-count', id: EMBED.token, count: total, marks: allMarks(), link: markedTotal() ? shareLink() : '',
-    rk: encodeShort(allMarks()), rx: counts.reduce((a, b) => a + b, 0), ok: encodeShort(allFixed()) };
+    rk: encodeShort(allMarks()), rx: counts.reduce((a, b) => a + b, 0), ok: encodeShort(allFixed()), sg: allSegs() };
   if (window.parent && window.parent !== window) { window.parent.postMessage(msg, '*'); return true; }
   if (window.opener) { window.opener.postMessage(msg, '*'); return true; }
   return false;
@@ -621,7 +670,7 @@ function startEmbedded() {
     return;
   }
   document.querySelector('.wrap').style.display = 'none';
-  ward = pages.slice(); marks.clear(); actions.length = 0; fixed.clear(); hist.clear();
+  ward = pages.slice(); marks.clear(); actions.length = 0; fixed.clear(); hist.clear(); segs.clear();
   decodeShort(EMBED.hr).forEach(id => hist.set(id, 'r'));
   decodeShort(EMBED.hg).forEach(id => hist.set(id, 'g'));
   decodeShort(EMBED.rg).forEach(id => { if (hist.get(id) === 'r') addTo(fixed, id); });
@@ -633,6 +682,7 @@ function startEmbedded() {
     if (!marks.has(p)) marks.set(p, new Set());
     marks.get(p).add(id);
   });
+  restoreSegs(EMBED.rs);
   pages = [...new Set([...pages, ...marks.keys()])].sort((a, b) => a - b);
   counts = pages.map(() => 0); idx = Math.max(0, pages.indexOf(ward[0]));
   counts[idx] = EMBED.rx;
@@ -652,7 +702,7 @@ document.getElementById('ward').addEventListener('click', e => e.currentTarget.c
 document.getElementById('go').onclick = () => {
   calc();
   if (!pages.length) return;
-  counts = pages.map(() => 0); idx = 0; ward = pages.slice(); marks.clear(); actions.length = 0;
+  counts = pages.map(() => 0); idx = 0; ward = pages.slice(); marks.clear(); actions.length = 0; segs.clear();
   pages.forEach((pp) => ensureFontsFor(pp));
   document.querySelector('.bar .t b').textContent = (EMBED && EMBED.name) || 'التسميع';
   document.getElementById('ward').textContent = ((EMBED && EMBED.ward) || 'اللوح') + '، ' + sEl.value + ' ' + AR(fEl.value) + '-' + AR(tEl.value);
@@ -697,6 +747,7 @@ function goTo(n, dir) {
   }, { passive: true });
   st.addEventListener('touchmove', e => {
     if (!active) return;
+    if (SEL && SEL.on) { dx = dy = 0; return; }
     dx = e.touches[0].clientX - x0;
     dy = e.touches[0].clientY - y0;
     if (Math.abs(dx) > Math.abs(dy) * 1.5 && Math.abs(dx) > 10) {
@@ -708,6 +759,7 @@ function goTo(n, dir) {
   st.addEventListener('touchend', () => {
     if (!active) return;
     active = false;
+    if (SEL && SEL.on) return;
     st.classList.remove('drag');
     const img = st.querySelector('.sheet') || st.querySelector('img');
     if (img) img.style.transform = '';
@@ -728,36 +780,133 @@ document.getElementById('undo').onclick = () => {
   for (let i = actions.length - 1; i >= 0; i--) {
     if (actions[i].p !== p) continue;
     const a = actions.splice(i, 1)[0];
-    if (a.fix) { fixedOn(p).delete(a.id); paintMarks(); }
+    if (a.seg) { actions.push(a); dropSeg(p, a.seg); paintMarks(); }
+    else if (a.fix) { fixedOn(p).delete(a.id); paintMarks(); }
     else if (a.id) { marksOn(p).delete(a.id); paintMarks(); } else if (counts[idx] > 0) counts[idx]--;
     break;
   }
   total();
 };
+let SEL = null;          // تحديد مقطع بالضغط المطوّل والسحب
+let skipClick = false;
+let lastTap = null;      // عشان الدوستين ورا بعض على خطأ قديم = اتصلّح
 document.getElementById('stage').addEventListener('click', e => {
   if (VIEW) return;
+  if (skipClick) { skipClick = false; return; }
   const w = e.target.closest('.w');
   if (!w) return;
   const p = pages[idx], id = w.dataset.id;
   if (!marks.has(p)) marks.set(p, new Set());
   const m = marks.get(p);
-  if (m.has(id)) {
+  const k = segOf(p, id);
+  const now = Date.now();
+  const dbl = !k && lastTap && lastTap.id === id && now - lastTap.t < 380;
+  lastTap = dbl ? null : { id, t: now };
+  if (dbl && hist.get(id) === 'r') {
+    // دوستين ورا بعض على خطأ قديم: الدوسة الأولى كانت علّمته غلط — نلغيها ويبقى أخضر
+    m.delete(id);
+    for (let i = actions.length - 1; i >= 0; i--) if (actions[i].p === p && actions[i].id === id) actions.splice(i, 1);
+    if (!fixed.has(p)) fixed.set(p, new Set());
+    fixed.get(p).add(id); actions.push({ p, id, fix: true });
+  } else if (dbl) {
+    // دوسة تانية سريعة على كلمة جديدة: الأولى كفاية
+  } else if (k) {
+    // دوسة على أي كلمة في المقطع تشيل المقطع كله
+    dropSeg(p, k);
+  } else if (m.has(id)) {
     m.delete(id);
     const i = actions.findIndex(a => a.p === p && a.id === id && !a.fix);
     if (i >= 0) actions.splice(i, 1);
-  } else if (hist.get(id) === 'r') {
-    // خطأ قديم: دوسة تعلّمه "اتصلّح" (أخضر)، ودوسة تانية ترجّعه
-    if (!fixed.has(p)) fixed.set(p, new Set());
-    const f = fixed.get(p);
-    if (f.has(id)) {
-      f.delete(id);
-      const i = actions.findIndex(a => a.p === p && a.id === id && a.fix);
-      if (i >= 0) actions.splice(i, 1);
-    } else { f.add(id); actions.push({ p, id, fix: true }); }
+  } else if (fixedOn(p).has(id)) {
+    // أخضر واتداس عليه: يرجع زي ما كان (أحمر فاتح)
+    fixed.get(p).delete(id);
+    const i = actions.findIndex(a => a.p === p && a.id === id && a.fix);
+    if (i >= 0) actions.splice(i, 1);
   } else { m.add(id); actions.push({ p, id }); }
   paintMarks();
   total();
 });
+function commitSeg(p, ids) {
+  if (!marks.has(p)) marks.set(p, new Set());
+  if (!segs.has(p)) segs.set(p, new Map());
+  const all = new Set(ids);
+  // مقطع بيلمس مقطع تاني: يتدمجوا في مقطع واحد
+  [...segsOn(p)].forEach(([k, set]) => {
+    if ([...set].some(id => all.has(id))) { set.forEach(id => all.add(id)); dropSeg(p, k); }
+  });
+  all.forEach(id => {
+    marks.get(p).add(id);
+    fixedOn(p).delete(id);
+    for (let i = actions.length - 1; i >= 0; i--) if (actions[i].p === p && actions[i].id === id) actions.splice(i, 1);
+  });
+  const key = [...all].sort(cmpId)[0];
+  segs.get(p).set(key, all);
+  actions.push({ p, seg: key });
+}
+(function () {
+  const st = document.getElementById('stage');
+  const words = () => [...st.querySelectorAll('.w')];
+  function preview() {
+    const ws = words();
+    const a = ws.indexOf(SEL.start), b = ws.indexOf(SEL.cur);
+    const [lo, hi] = a < b ? [a, b] : [b, a];
+    ws.forEach((w, i) => w.classList.toggle('sel', i >= lo && i <= hi));
+    SEL.ids = ws.slice(lo, hi + 1).map(w => w.dataset.id);
+  }
+  function end(commit) {
+    if (!SEL) return;
+    clearTimeout(SEL.timer);
+    if (SEL.on) {
+      st.querySelectorAll('.w.sel').forEach(w => w.classList.remove('sel'));
+      skipClick = true;
+      setTimeout(() => { skipClick = false; }, 400);
+      if (commit && SEL.ids.length > 1) { commitSeg(pages[idx], SEL.ids); paintMarks(); total(); }
+      else if (commit && SEL.ids.length === 1) { skipClick = false; SEL.start.click(); skipClick = true; }
+    }
+    SEL = null;
+  }
+  st.addEventListener('touchstart', e => {
+    if (VIEW || e.touches.length !== 1) { end(false); return; }
+    const w = e.target.closest && e.target.closest('.w');
+    if (!w) return;
+    const t = e.touches[0];
+    SEL = { on: false, start: w, cur: w, ids: [], x: t.clientX, y: t.clientY };
+    SEL.timer = setTimeout(() => {
+      if (!SEL) return;
+      SEL.on = true;
+      if (navigator.vibrate) try { navigator.vibrate(15); } catch (_) {}
+      preview();
+    }, 300);
+  }, { passive: true });
+  st.addEventListener('touchmove', e => {
+    if (!SEL) return;
+    const t = e.touches[0];
+    if (!SEL.on) {
+      if (Math.abs(t.clientX - SEL.x) > 8 || Math.abs(t.clientY - SEL.y) > 8) end(false);
+      return;
+    }
+    e.preventDefault();
+    const el = document.elementFromPoint(t.clientX, t.clientY);
+    const w = el && el.closest && el.closest('#stage .w');
+    if (w && w !== SEL.cur) { SEL.cur = w; preview(); }
+  }, { passive: false });
+  st.addEventListener('touchend', () => end(true));
+  st.addEventListener('touchcancel', () => end(false));
+  st.addEventListener('contextmenu', e => { if (!VIEW) e.preventDefault(); });
+  // بالماوس (كمبيوتر): اضغط واسحب على كذا كلمة
+  st.addEventListener('mousedown', e => {
+    if (VIEW || e.button !== 0) return;
+    const w = e.target.closest('.w');
+    if (!w) return;
+    SEL = { on: false, start: w, cur: w, ids: [], mouse: true };
+  });
+  st.addEventListener('mousemove', e => {
+    if (!SEL || !SEL.mouse) return;
+    const w = e.target.closest('.w');
+    if (w && w !== SEL.cur) { SEL.on = true; SEL.cur = w; preview(); }
+  });
+  document.addEventListener('mouseup', () => { if (SEL && SEL.mouse) end(true); });
+})();
 document.getElementById('share').onclick = shareMarks;
 document.getElementById('close').onclick = () => { if (EMBED) { reportCount(grandTotal()); return; } document.getElementById('viewer').classList.remove('on'); };
 document.getElementById('done').onclick = () => {
