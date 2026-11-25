@@ -166,18 +166,37 @@ interface ComboProps {
    * what is actually in the box. The caller keeps `raw` so an unresolved row
    * can still be recognised as started — see SuraAssignment.draft. */
   onCommit: (name: string, raw: string) => void;
+  ariaLabel?: string;
+  /** Smaller box for inline use (the evaluation card). */
+  compact?: boolean;
+  /** On blur, put the box back to `value` when the typed text matches no
+   * sura — for callers that only ever hold a resolved sura. */
+  revertOnBlur?: boolean;
 }
 
 /** A searchable sura combobox. Emits the committed sura name (empty string
  * while the typed text has no exact match). Factored out so the range mode's
  * "إلى سورة" picker reuses the exact same search/normalization behavior as the
  * primary picker. */
-function SuraCombobox({ value, placeholder, onCommit }: ComboProps) {
+export function SuraCombobox({
+  value,
+  placeholder,
+  onCommit,
+  ariaLabel,
+  compact = false,
+  revertOnBlur = false,
+}: ComboProps) {
   const [query, setQuery] = useState(value || '');
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Re-sync the box only when `value` actually changes. The mount run would
+  // otherwise be a deferred no-op that can land after the first keystroke and
+  // put the old name back over what was just typed.
+  const syncedValue = useRef(value);
   useEffect(() => {
+    if (syncedValue.current === value) return;
+    syncedValue.current = value;
     setQuery(value || '');
   }, [value]);
 
@@ -210,19 +229,29 @@ function SuraCombobox({ value, placeholder, onCommit }: ComboProps) {
   }
 
   return (
-    <div class="flex-1 min-w-0 relative">
+    <div class={compact ? 'w-32 relative' : 'flex-1 min-w-0 relative'}>
       <input
         type="text"
         placeholder={placeholder}
+        aria-label={ariaLabel}
         class={
-          'w-full border rounded-[11px] px-3.5 py-3 text-sm text-ink-dark ' +
-          (query && !value ? 'border-amber-400' : 'border-hairline')
+          (compact
+            ? 'w-full border rounded-lg px-2 py-1 text-sm font-semibold text-forest bg-[#FFFCF3] '
+            : 'w-full border rounded-[11px] px-3.5 py-3 text-sm text-ink-dark ') +
+          (query && (!value || (compact && !findSuraByName(query)))
+            ? 'border-amber-400'
+            : compact
+              ? 'border-mustard/50'
+              : 'border-hairline')
         }
         value={query}
         onFocus={() => setOpen(true)}
         onInput={(e) => handleInput((e.target as HTMLInputElement).value)}
         onBlur={() => {
-          blurTimer.current = setTimeout(() => setOpen(false), 120);
+          blurTimer.current = setTimeout(() => {
+            setOpen(false);
+            if (revertOnBlur && !findSuraByName(query)) setQuery(value || '');
+          }, 120);
         }}
       />
       {open && (

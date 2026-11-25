@@ -323,9 +323,14 @@ export function sessionGrading(
 export function resolvePrevRow(orig: SuraAssignment, edited: SuraAssignment): SuraAssignment {
   if (edited.range || orig.range) return edited;
   const r: SuraAssignment = { ...edited };
-  if (!r.from && orig.from) r.from = orig.from;
-  if (!r.to && orig.to) r.to = orig.to;
-  if (!r.from && !r.to) return { ...orig };
+  // A different sura is a real correction on its own: the old sura's ayah
+  // numbers mean nothing there, so blanks fall to the new sura's whole span.
+  const sameSura = r.sura === orig.sura;
+  if (sameSura) {
+    if (!r.from && orig.from) r.from = orig.from;
+    if (!r.to && orig.to) r.to = orig.to;
+    if (!r.from && !r.to) return { ...orig };
+  }
   if (!r.from) r.from = '1';
   if (!r.to) {
     const sura = findSuraByName(r.sura);
@@ -337,7 +342,7 @@ export function resolvePrevRow(orig: SuraAssignment, edited: SuraAssignment): Su
     const t = parseInt(String(x.to ?? s?.count ?? ''), 10);
     return `${f}-${t}`;
   };
-  if (prevRowProblem(r) === null && span(r) === span(orig)) return { ...orig };
+  if (sameSura && prevRowProblem(r) === null && span(r) === span(orig)) return { ...orig };
   return r;
 }
 

@@ -29,7 +29,7 @@ import { computeNextLoh, computeNextMadi } from '../../domain/nextTask';
 import { suraLabel, findSuraByName } from '../../domain/suras';
 import { buildWhatsAppMessage, normalizeWhatsAppPhone } from '../../domain/whatsapp';
 import { raceTimeout } from '../../domain/raceTimeout';
-import { SuraRow } from './SuraRow';
+import { SuraRow, SuraCombobox } from './SuraRow';
 import { FloatingSaveButton } from './FloatingSaveButton';
 import { useGroupAttendance } from '../../hooks/useGroupAttendance';
 import { GroupAttendanceModal } from './GroupAttendanceModal';
@@ -1030,6 +1030,20 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     );
   }
 
+  /** A sura picked in the eval card's sura box. Text that names no sura yet
+   * changes nothing (the box reverts on blur). Picking a different sura
+   * starts it as the whole sura — the old sura's ayah numbers mean nothing
+   * there — and the teacher shortens it with «إلى» as usual. */
+  function editPrevSura(which: 'loh' | 'madi', current: SuraAssignment[], i: number, name: string) {
+    const sura = name ? findSuraByName(name) : undefined;
+    if (!sura || sura.name === current[i]?.sura) return;
+    const next: SuraAssignment = { sura: sura.name, from: '1', to: String(sura.count) };
+    setEditedPrev(
+      which,
+      current.map((x, idx) => (idx === i ? next : x)),
+    );
+  }
+
   function renderPrevRangeSection(
     label: string,
     which: 'loh' | 'madi',
@@ -1061,7 +1075,16 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
                 {/* A whole-sura assignment carries no `from` — it starts at
                     ayah 1 by definition, so that's what the teacher should
                     read, not a bare sura name next to a lone box. */}
-                <span class="text-ink-dark">{`سورة ${item.sura} (من`}</span>
+                <span class="text-ink-dark">سورة</span>
+                <SuraCombobox
+                  compact
+                  revertOnBlur
+                  ariaLabel={`تعديل سورة ${item.sura}`}
+                  placeholder="السورة"
+                  value={current[i]?.sura ?? item.sura}
+                  onCommit={(name) => editPrevSura(which, current, i, name)}
+                />
+                <span class="text-ink-dark">(من</span>
                 <input
                   type="number"
                   min={1}

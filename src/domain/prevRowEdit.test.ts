@@ -55,3 +55,21 @@ describe('prevRowProblem', () => {
     );
   });
 });
+
+describe('resolvePrevRow — changing the sura itself', () => {
+  it('keeps a new sura even when the ayah numbers are unchanged', () => {
+    expect(resolvePrevRow(orig, { sura: 'النبأ', from: '1', to: '10' })).toEqual({
+      sura: 'النبأ',
+      from: '1',
+      to: '10',
+    });
+  });
+
+  it('does not carry the old sura’s ayah numbers onto the new one', () => {
+    expect(resolvePrevRow(orig, { sura: 'النبأ' })).toEqual({
+      sura: 'النبأ',
+      from: '1',
+      to: '40',
+    });
+  });
+});

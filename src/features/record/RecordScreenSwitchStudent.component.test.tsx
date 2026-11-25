@@ -122,7 +122,8 @@ describe("RecordScreen — opening another student's session for edit", () => {
       { ...last('s_2', 'الملك', '30'), id: 'r_prev_omar', date: '2026-11-10' },
       today,
     ]);
-    await waitFor(() => expect(screen.getAllByText(/الملك/).length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByDisplayValue('الملك').length).toBeGreaterThan(0));
     expect(screen.queryByText(/النبأ/)).toBeNull();
+    expect(screen.queryAllByDisplayValue('النبأ')).toHaveLength(0);
   });
 });

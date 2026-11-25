@@ -77,9 +77,9 @@ describe('edit-mode evaluation card', () => {
     await screen.findByText(/تعديل جلسة محفوظة/);
 
     // Eval card now references the previous session's مادي.
-    expect(screen.getByText(/سورة المدثر/)).toBeInTheDocument();
-    // The record's own القيامة must NOT appear as an eval-card label anymore…
-    expect(screen.queryByText(/سورة القيامة/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('تعديل سورة المدثر')).toHaveValue('المدثر');
+    // The record's own القيامة must NOT appear in the eval card anymore…
+    expect(screen.queryByLabelText('تعديل سورة القيامة')).not.toBeInTheDocument();
     // …but it IS still the new assignment below (its input value).
     expect(screen.getByDisplayValue('القيامة')).toBeInTheDocument();
   });
@@ -88,8 +88,8 @@ describe('edit-mode evaluation card', () => {
     previousSessionForS1 = prevSession;
     renderScreen(makeEditRec('30')); // filled "إلى"
     await screen.findByText(/تعديل جلسة محفوظة/);
-    expect(screen.getByText(/سورة المدثر/)).toBeInTheDocument();
-    expect(screen.queryByText(/سورة القيامة/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('تعديل سورة المدثر')).toHaveValue('المدثر');
+    expect(screen.queryByLabelText('تعديل سورة القيامة')).not.toBeInTheDocument();
   });
 
   it('falls back to the record’s own assignment when editing the first-ever session', async () => {

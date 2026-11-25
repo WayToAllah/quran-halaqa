@@ -183,7 +183,8 @@ describe('RecordScreen — previous session card', () => {
     renderScreen();
     await selectStudent('زيد احمد');
     expect(screen.getByText('📋 ما سمعناه النهارده')).toBeInTheDocument();
-    expect(screen.getByText(/سورة البقرة/)).toBeInTheDocument();
+    // The sura sits in its editable box in the eval card.
+    expect(screen.getByLabelText('تعديل سورة البقرة')).toHaveValue('البقرة');
   });
 
   // The card used to re-implement its own sura formatter, which knew nothing
