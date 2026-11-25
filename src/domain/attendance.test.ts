@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   ATTENDANCE_BADGE_THRESHOLD,
-  EXCLUDED_HALAQA_DATES,
   computeAbsenceStreak,
   computeAttendanceStreak,
   enrolledHalaqaDates,
@@ -22,14 +21,6 @@ describe('sortedHalaqaDatesDesc', () => {
       { id: '3', date: '2026-07-01' }, // duplicate date
     ];
     expect(sortedHalaqaDatesDesc(records)).toEqual(['2026-07-03', '2026-07-01']);
-  });
-
-  it('excludes EXCLUDED_HALAQA_DATES', () => {
-    const records: SessionRecord[] = [
-      { id: '1', date: '2026-07-01' },
-      { id: '2', date: EXCLUDED_HALAQA_DATES[0] },
-    ];
-    expect(sortedHalaqaDatesDesc(records)).toEqual(['2026-07-01']);
   });
 });
 
@@ -161,13 +152,6 @@ describe('enrolledHalaqaDates', () => {
     expect(enrolledHalaqaDates([], halaqaDatesDesc)).toEqual([]);
   });
 
-  it('still counts later days when the student joined on an excluded date', () => {
-    // The excluded day is absent from halaqaDates, but joining on it must not
-    // wipe out the window that follows it.
-    const recs: SessionRecord[] = [{ id: 'r1', date: EXCLUDED_HALAQA_DATES[0] }];
-    expect(enrolledHalaqaDates(recs, halaqaDatesDesc)).toEqual(halaqaDatesDesc);
-  });
-
   it('de-duplicates repeated dates in the input calendar', () => {
     const recs: SessionRecord[] = [{ id: 'r1', date: '2026-07-01' }];
     const dup = ['2026-07-03', '2026-07-03', '2026-07-01'];
@@ -247,17 +231,6 @@ describe('getPersonalAttendanceRanking', () => {
     expect(mohamed.attendPct).toBe(50);
   });
 
-  it('excludes EXCLUDED_HALAQA_DATES from the denominator', () => {
-    const recs: SessionRecord[] = [
-      { id: 'a', studentId: 's_1', date: '2026-07-01' },
-      { id: 'b', studentId: 's_1', date: EXCLUDED_HALAQA_DATES[0] },
-      { id: 'c', studentId: 's_2', date: '2026-07-01' },
-      { id: 'd', studentId: 's_2', date: EXCLUDED_HALAQA_DATES[0] },
-    ];
-    const { list } = getPersonalAttendanceRanking(students, recs, recs);
-    expect(list.every((x) => x.enrolledDays === 1)).toBe(true);
-  });
-
   it('ranks densely — ties share a rank with no gap after them', () => {
     const recs: SessionRecord[] = [
       { id: 'a', studentId: 's_1', date: '2026-07-01' },
@@ -330,21 +303,6 @@ describe('getDaysAttendedRanking', () => {
     expect(totalHalaqaDays).toBe(4);
     expect(list.find((x) => x.id === 's_2')!.attendPct).toBe(25);
     expect(list.find((x) => x.id === 's_1')!.attendPct).toBe(50);
-  });
-
-  it('counts an excluded halaqa date in the day count, matching production', () => {
-    // Deliberate: EXCLUDED_HALAQA_DATES comes out of the denominator so nobody is
-    // punished for missing a make-up day, but a student who did turn up still gets
-    // the day. Production does exactly this; the new tab inherits it rather than
-    // diverging from the other two.
-    const recs: SessionRecord[] = [
-      { id: 'a', studentId: 's_1', date: '2026-07-01' },
-      { id: 'b', studentId: 's_1', date: EXCLUDED_HALAQA_DATES[0] },
-    ];
-    const { totalHalaqaDays, list } = getDaysAttendedRanking([students[0]], recs);
-    expect(totalHalaqaDays).toBe(1);
-    expect(list[0].uniqueDays).toBe(2);
-    expect(list[0].attendPct).toBe(100); // capped, not 200
   });
 
   it('leaves out students with no record inside the window', () => {

@@ -114,14 +114,6 @@ describe('computeSummaryStats', () => {
     expect(s.totalAyat).toBe(17);
   });
 
-  it('excludes EXCLUDED_HALAQA_DATES from totalHalaqaDays', () => {
-    const records: SessionRecord[] = [
-      { id: 'r1', studentId: 's_1', date: '2026-06-04' }, // excluded bonus day
-      { id: 'r2', studentId: 's_1', date: '2026-07-01' },
-    ];
-    expect(computeSummaryStats(records).totalHalaqaDays).toBe(1);
-  });
-
   it('averages the distinct students present per halaqa day', () => {
     const records: SessionRecord[] = [
       { id: 'r1', studentId: 's_1', date: '2026-07-01' },
@@ -137,16 +129,6 @@ describe('computeSummaryStats', () => {
       { id: 'r1', studentId: 's_1', date: '2026-07-01' },
       { id: 'att_1', studentId: 's_1', date: '2026-07-01' },
     ];
-    expect(computeSummaryStats(records).avgDailyAttendance).toBe(1);
-  });
-
-  it('excludes EXCLUDED_HALAQA_DATES from the daily attendance average', () => {
-    const records: SessionRecord[] = [
-      { id: 'r1', studentId: 's_1', date: '2026-06-04' }, // excluded bonus day
-      { id: 'r2', studentId: 's_2', date: '2026-06-04' },
-      { id: 'r3', studentId: 's_1', date: '2026-07-01' },
-    ];
-    // only 2026-07-01 counts, with a single student present
     expect(computeSummaryStats(records).avgDailyAttendance).toBe(1);
   });
 

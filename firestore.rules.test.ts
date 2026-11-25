@@ -58,7 +58,6 @@ beforeEach(async () => {
     await setDoc(doc(db, 'mosques', MOSQUE_ID, 'members', ADMIN_UID), { role: 'admin' });
     await setDoc(doc(db, 'mosques', MOSQUE_ID, 'halaqat', HALAQA_ID), {
       name: 'الحلقة الرئيسية',
-      excludedDates: [],
       attendanceBadgeThreshold: 70,
     });
     await setDoc(doc(db, 'mosques', MOSQUE_ID, 'halaqat', HALAQA_ID, 'students', 's_1'), {

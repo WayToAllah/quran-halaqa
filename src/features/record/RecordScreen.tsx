@@ -275,15 +275,22 @@ export function RecordScreen({ editRecord = null, onEditConsumed }: Props = {}) 
     const delta = count - (prev?.total ?? 0);
     // One link per evaluation, always the latest: it already holds every red word.
     const links = marksLink ? [marksLink] : [];
+    // Closing the viewer always reports a count, even when it was only opened
+    // to follow along. With nothing changed (delta 0) a score already in the
+    // field — typed by hand, or from an earlier count — stays as it is; it used
+    // to be replaced by 100. An empty field still gets the counter's score, so
+    // «تم» on a clean recitation gives 100 as before.
+    const current = which === 'loh' ? prevLohScore : prevMadiScore;
+    const keepScore = delta === 0 && current.trim() !== '';
     if (which === 'loh') {
       const next = adjustFullMistakes(lohMistakes, delta);
       setLohMistakes(next);
-      setPrevLohScore(String(committedMistakeScore(next)));
+      if (!keepScore) setPrevLohScore(String(committedMistakeScore(next)));
       setLohMarkLinks(links);
     } else {
       const next = adjustFullMistakes(madiMistakes, delta);
       setMadiMistakes(next);
-      setPrevMadiScore(String(committedMistakeScore(next)));
+      if (!keepScore) setPrevMadiScore(String(committedMistakeScore(next)));
       setMadiMarkLinks(links);
     }
   }

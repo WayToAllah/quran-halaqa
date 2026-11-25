@@ -132,9 +132,6 @@ export interface MosqueMember {
 export interface Halaqa {
   id: string;
   name: string;
-  /** Bonus/makeup days excluded from attendance % (was a hardcoded constant,
-   * now per-halaqa so changing it doesn't require a redeploy). */
-  excludedDates: string[];
   /** Minimum attendance % for the "نجم الحضور" badge (was a hardcoded constant). */
   attendanceBadgeThreshold: number;
   /** Admin-editable rotating intentions (نوايا) shown in the app header. Stored

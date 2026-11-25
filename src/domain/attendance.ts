@@ -3,32 +3,18 @@ import { getStudentName, recordsForStudent } from './students';
 import { PER_DAY, tallyAttendance, type AttendancePolicy } from './attendancePolicy';
 import { localDateStr } from './dates';
 
-/**
- * Bonus/makeup halaqa days that shouldn't count against attendance
- * percentages. Ported as-is from the live app's hardcoded constant.
- *
- * TODO(phase 2): this becomes a per-halaqa Firestore setting
- * (`halaqat/{id}.excludedDates`) instead of a code constant, so changing it
- * doesn't require a redeploy.
- */
-export const EXCLUDED_HALAQA_DATES: readonly string[] = ['2026-06-04'];
-
 /** Minimum attendance % to earn the "نجم الحضور" badge.
- * TODO(phase 2): per-halaqa setting, see EXCLUDED_HALAQA_DATES note above. */
+ * TODO(phase 2): per-halaqa setting. */
 export const ATTENDANCE_BADGE_THRESHOLD = 70;
 
 /**
- * Unique halaqa dates (excluding EXCLUDED_HALAQA_DATES), newest first. Date
+ * Unique halaqa dates (every date with any record), newest first. Date
  * strings are 'YYYY-MM-DD' so a plain string sort is chronologically correct.
  */
 export function sortedHalaqaDatesDesc(allRecords: SessionRecord[]): string[] {
-  return Array.from(
-    new Set(
-      allRecords
-        .map((r) => r.date)
-        .filter((d): d is string => !!d && !EXCLUDED_HALAQA_DATES.includes(d)),
-    ),
-  ).sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
+  return Array.from(new Set(allRecords.map((r) => r.date).filter((d): d is string => !!d))).sort(
+    (a, b) => (a < b ? 1 : a > b ? -1 : 0),
+  );
 }
 
 /**
@@ -95,8 +81,8 @@ export function firstRecordDate(studentRecords: SessionRecord[]): string | null 
  * denominator so every student on the leaderboard is measured on the same
  * scale — see PROJECT_CONTEXT.md §5.
  *
- * `halaqaDates` is expected to already have EXCLUDED_HALAQA_DATES removed
- * (i.e. the output of sortedHalaqaDatesDesc); order is preserved.
+ * `halaqaDates` is expected to be the output of sortedHalaqaDatesDesc; order
+ * is preserved.
  */
 export function enrolledHalaqaDates(
   studentRecords: SessionRecord[],
@@ -225,11 +211,7 @@ export function getAttendanceRanking(
   today: string = localDateStr(),
 ): { totalHalaqaDays: number; list: AttendanceRankEntry[] } {
   const halaqaDates = sortedHalaqaDatesDesc(recordsFilter);
-  const totalHalaqaDays = new Set(
-    recordsFilter
-      .map((r) => r.date)
-      .filter((d): d is string => !!d && !EXCLUDED_HALAQA_DATES.includes(d)),
-  ).size;
+  const totalHalaqaDays = halaqaDates.length;
 
   const per = students
     .map((s): Omit<AttendanceRankEntry, 'rank'> | null => {

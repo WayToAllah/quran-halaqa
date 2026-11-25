@@ -157,8 +157,8 @@ export function buildStudentPublicStats(
   const enrolledDates = enrolledHalaqaDates(allRecs, halaqaDatesDesc);
 
   // The numerator is the INTERSECTION with that same window, not the student's
-  // raw date count. Anything the denominator drops — a bonus day in
-  // EXCLUDED_HALAQA_DATES, an undated legacy row — must be dropped here too,
+  // raw date count. Anything the denominator drops — an undated legacy row,
+  // a day before the student joined — must be dropped here too,
   // or the fraction compares two different calendars and reads too high (the
   // old Math.min(100, …) cap existed only to hide exactly that). Attendance
   // marks and full sessions both count, and a day carrying both counts once.

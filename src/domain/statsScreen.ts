@@ -12,7 +12,7 @@ import {
 import { hasScore, scoreName } from './scoring';
 import { SURAS, itemAyat } from './suras';
 import { getStudentName, recordsForStudent } from './students';
-import { EXCLUDED_HALAQA_DATES, computeAbsenceStreak, sortedHalaqaDatesDesc } from './attendance';
+import { computeAbsenceStreak, sortedHalaqaDatesDesc } from './attendance';
 import { toArabicDigits } from './text';
 import { localDateStr } from './dates';
 import { assignmentsGradedRepeat, isRepeatGrade } from './record';
@@ -140,7 +140,7 @@ export function computeSummaryStats(
   const presentByDay = new Map<string, Set<string>>();
   records.forEach((r) => {
     const d = r.date;
-    if (!d || EXCLUDED_HALAQA_DATES.includes(d)) return;
+    if (!d) return;
     let present = presentByDay.get(d);
     if (!present) {
       present = new Set<string>();
@@ -752,7 +752,7 @@ export function averageWeeklyAttendance(records: SessionRecord[]): number {
   const byWeek = new Map<string, Set<string>>();
   for (const r of records) {
     const d = r.date;
-    if (!d || EXCLUDED_HALAQA_DATES.includes(d)) continue;
+    if (!d) continue;
     const key = r.studentId || r.student;
     if (!key) continue;
     const w = saturdayOf(d);

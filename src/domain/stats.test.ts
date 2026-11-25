@@ -375,16 +375,15 @@ describe('buildStudentPublicStats attendance window (parent-facing)', () => {
 });
 
 describe('buildStudentPublicStats attendance numerator (parent-facing)', () => {
-  // Callers pass sortedHalaqaDatesDesc(), which has ALREADY dropped
-  // EXCLUDED_HALAQA_DATES — so 2026-06-04 below is a bonus/makeup day that is
-  // deliberately absent from the denominator. The numerator has to agree:
+  // The halaqa calendar passed in deliberately leaves out 2026-06-04, so a
+  // record on that day is outside the denominator. The numerator has to agree:
   // a day that isn't a halaqa day can't be a day of attendance either.
   const halaqaDatesDesc = ['2026-06-06', '2026-06-05', '2026-06-03', '2026-06-02'];
 
-  it('does not let a bonus (excluded) day inflate the percentage', () => {
+  it('does not let a day outside the halaqa calendar inflate the percentage', () => {
     const recs: SessionRecord[] = [
       { id: 'r1', studentId: 's_1', date: '2026-06-02', loh: { score: 90 } },
-      { id: 'r2', studentId: 's_1', date: '2026-06-04', loh: { score: 90 } }, // bonus day
+      { id: 'r2', studentId: 's_1', date: '2026-06-04', loh: { score: 90 } }, // not in the calendar passed in
       { id: 'r3', studentId: 's_1', date: '2026-06-05', loh: { score: 90 } },
     ];
     const result = buildStudentPublicStats(zaid, recs, 4, null, halaqaDatesDesc);
@@ -439,7 +438,7 @@ describe('buildStudentPublicStats attendance numerator (parent-facing)', () => {
   it('applies the same numerator inside monthlyStats', () => {
     const recs: SessionRecord[] = [
       { id: 'r1', studentId: 's_1', date: '2026-06-02', loh: { score: 90 } },
-      { id: 'r2', studentId: 's_1', date: '2026-06-04', loh: { score: 90 } }, // bonus day
+      { id: 'r2', studentId: 's_1', date: '2026-06-04', loh: { score: 90 } }, // not in the calendar passed in
       { id: 'r3', studentId: 's_1', date: '2026-06-05', loh: { score: 90 } },
     ];
     const result = buildStudentPublicStats(zaid, recs, 4, null, halaqaDatesDesc);

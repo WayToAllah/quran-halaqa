@@ -34,7 +34,7 @@ export function subscribeNiyyat(
 }
 
 /** Persists the full niyyat list. Uses merge so it only touches the `niyyat`
- * field and never clobbers the rest of the halaqa doc (excludedDates, etc.). */
+ * field and never clobbers the rest of the halaqa doc (seasons, etc.). */
 export function saveNiyyat(mosqueId: string, halaqaId: string, niyyat: string[]): Promise<void> {
   return setDoc(halaqaDocRef(mosqueId, halaqaId), { niyyat }, { merge: true });
 }

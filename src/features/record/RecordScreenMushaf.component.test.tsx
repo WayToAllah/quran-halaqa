@@ -81,6 +81,27 @@ describe('RecordScreen — المصحف', () => {
     expect(frame.getAttribute('src')).toContain(`a=${encodeURIComponent('النبأ')}:1:40`);
   });
 
+  it('keeps a hand-typed score when the mushaf is closed without marking anything', async () => {
+    renderScreen();
+    await selectStudent('زيد احمد');
+    await userEvent.type(screen.getByPlaceholderText('مثلاً 90'), '85');
+    await userEvent.click(screen.getByRole('button', { name: /📖 المصحف/ }));
+    const frame = (await screen.findByTestId('mushaf-frame')) as HTMLIFrameElement;
+    const token = new URL(frame.src, window.location.href).searchParams.get('id')!;
+    await sendCount({ type: 'mushaf-count', id: token, count: 0 });
+    expect(screen.getByPlaceholderText('مثلاً 90')).toHaveValue(85);
+  });
+
+  it('still gives 100 when the mushaf is closed with no mistakes and no score typed', async () => {
+    renderScreen();
+    await selectStudent('زيد احمد');
+    await userEvent.click(screen.getByRole('button', { name: /📖 المصحف/ }));
+    const frame = (await screen.findByTestId('mushaf-frame')) as HTMLIFrameElement;
+    const token = new URL(frame.src, window.location.href).searchParams.get('id')!;
+    await sendCount({ type: 'mushaf-count', id: token, count: 0 });
+    await waitFor(() => expect(screen.getByPlaceholderText('مثلاً 90')).toHaveValue(100));
+  });
+
   it('turns the mistakes counted in the mushaf into the evaluation score', async () => {
     renderScreen();
     await selectStudent('زيد احمد');

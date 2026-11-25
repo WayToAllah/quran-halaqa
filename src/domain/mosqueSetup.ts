@@ -73,7 +73,6 @@ export function buildMosqueSetup(
       .map((name) => ({
         id: nextId(),
         name,
-        excludedDates: [],
         attendanceBadgeThreshold: DEFAULT_ATTENDANCE_BADGE_THRESHOLD,
       })),
   };

@@ -56,8 +56,8 @@ describe('buildMosqueSetup', () => {
     expect(plan.ownerUid).toBe('uid_1');
     expect(plan.member).toEqual({ role: 'owner' });
     expect(plan.halaqat).toEqual([
-      { id: 'id2', name: 'الحفظة', excludedDates: [], attendanceBadgeThreshold: 70 },
-      { id: 'id3', name: 'الناشئين', excludedDates: [], attendanceBadgeThreshold: 70 },
+      { id: 'id2', name: 'الحفظة', attendanceBadgeThreshold: 70 },
+      { id: 'id3', name: 'الناشئين', attendanceBadgeThreshold: 70 },
     ]);
   });
 

@@ -59,7 +59,6 @@ describe('buildTenantOptions', () => {
     halaqat: halaqat.map((h) => ({
       id: h.id,
       name: h.name ?? '',
-      excludedDates: [],
       attendanceBadgeThreshold: 70,
     })),
   });

@@ -146,7 +146,7 @@ async function main() {
     console.log('  mosques/' + args.mosqueId + '/members/' + args.adminUid, '{ role: "owner" }');
     console.log(
       '  mosques/' + args.mosqueId + '/halaqat/' + args.halaqaId,
-      '{ name: "الحلقة الرئيسية", excludedDates: ["2026-06-04"], attendanceBadgeThreshold: 70 }',
+      '{ name: "الحلقة الرئيسية", attendanceBadgeThreshold: 70 }',
     );
     if (studentIds[0]) {
       console.log(
@@ -237,10 +237,7 @@ async function main() {
   await db
     .doc(`mosques/${args.mosqueId}/members/${args.adminUid}`)
     .set({ role: 'owner' }, { merge: true });
-  await halaqaRef.set(
-    { name: 'الحلقة الرئيسية', excludedDates: ['2026-06-04'], attendanceBadgeThreshold: 70 },
-    { merge: true },
-  );
+  await halaqaRef.set({ name: 'الحلقة الرئيسية', attendanceBadgeThreshold: 70 }, { merge: true });
 
   console.log(`Writing ${studentIds.length} students...`);
   {

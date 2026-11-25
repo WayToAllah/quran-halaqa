@@ -21,7 +21,6 @@ const mosque = (id: string, name: string) => ({ id, name, createdAt: 0 });
 const halaqa = (id: string, name: string) => ({
   id,
   name,
-  excludedDates: [],
   attendanceBadgeThreshold: 70,
 });
 
