@@ -44,43 +44,6 @@ export function computeSharedStatsInputs(
 }
 
 /**
- * Build and publish one student's public projection to publicStats/{token}.
- *
- * This is the ONLY write to publicStats from the admin client. The parent page
- * (child) never writes anything. A student with no parentToken is skipped
- * (nothing to publish against). Errors are swallowed with a console warning —
- * a failed stats push must never block the actual record save that triggered
- * it (the projection self-heals on the next successful save).
- */
-export async function publishStudentPublicStats(
-  student: Student,
-  allStudents: Student[],
-  allRecords: SessionRecord[],
-  seasons: Season[] = [],
-): Promise<void> {
-  if (!student.parentToken) return;
-  try {
-    const { totalHalaqaDays, rankById, halaqaDatesDesc } = computeSharedStatsInputs(
-      allStudents,
-      allRecords,
-      seasons,
-    );
-    const rank = rankById[student.id] ?? null;
-    const stats = buildStudentPublicStats(
-      student,
-      allRecords,
-      totalHalaqaDays,
-      rank,
-      halaqaDatesDesc,
-      seasons,
-    );
-    await setPublicStats(student.parentToken, stats);
-  } catch (err) {
-    console.warn('publishStudentPublicStats failed for', student.id, err);
-  }
-}
-
-/**
  * Republish publicStats for the given student ids after a save/delete/bulk
  * write, so the parent page reflects the change.
  *
@@ -128,7 +91,7 @@ export async function republishPublicStatsFor(tenant: Tenant, studentIds: string
             inputs.halaqaDatesDesc,
             seasons,
           );
-          await setPublicStats(student.parentToken, stats);
+          await setPublicStats(student.parentToken, { ...stats, mosqueId });
         } catch (err) {
           console.warn('republishPublicStatsFor: failed for', id, err);
         }

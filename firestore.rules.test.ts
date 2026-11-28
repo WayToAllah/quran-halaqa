@@ -162,8 +162,77 @@ describe('publicStats/{token} — public get, no list, member-only write (transi
   it('allows a mosque MEMBER to write publicStats (transitional — moves to Cloud Function in Phase 5)', async () => {
     const dbAdmin = testEnv.authenticatedContext(ADMIN_UID).firestore();
     await assertSucceeds(
-      setDoc(doc(dbAdmin, 'publicStats', TOKEN), { name: 'زيد احمد', attendPct: 80 }),
+      setDoc(doc(dbAdmin, 'publicStats', TOKEN), {
+        name: 'زيد احمد',
+        attendPct: 80,
+        mosqueId: MOSQUE_ID,
+      }),
     );
+  });
+});
+
+// A second mosque, created by its own teacher. Each publicStats doc now says
+// which mosque published it (`mosqueId`); the write is checked against THAT
+// mosque's members — it used to be hardcoded to altayseer, so a new mosque's
+// parent pages could never be published.
+describe('publicStats/{token} — every mosque publishes its own parents’ pages', () => {
+  const OTHER = 'm_other';
+  const OTHER_UID = 'teacher_other';
+  const NEW_TOKEN = 'token-of-other-mosque';
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, 'mosques', OTHER), { id: OTHER, name: 'مسجد آخر', ownerUid: OTHER_UID });
+      await setDoc(doc(db, 'mosques', OTHER, 'members', OTHER_UID), { role: 'owner' });
+    });
+  });
+
+  it('lets a member of the new mosque publish a page stamped with its own mosque', async () => {
+    const db = testEnv.authenticatedContext(OTHER_UID).firestore();
+    await assertSucceeds(setDoc(doc(db, 'publicStats', NEW_TOKEN), { name: 'ط', mosqueId: OTHER }));
+    // …and republish it later.
+    await assertSucceeds(
+      setDoc(doc(db, 'publicStats', NEW_TOKEN), { name: 'ط', attendPct: 90, mosqueId: OTHER }),
+    );
+  });
+
+  it('refuses a page with no mosqueId, or one stamped with a mosque the writer is not in', async () => {
+    const db = testEnv.authenticatedContext(OTHER_UID).firestore();
+    await assertFails(setDoc(doc(db, 'publicStats', NEW_TOKEN), { name: 'ط' }));
+    await assertFails(
+      setDoc(doc(db, 'publicStats', NEW_TOKEN), { name: 'ط', mosqueId: MOSQUE_ID }),
+    );
+  });
+
+  it("does not let another mosque's member overwrite or take over an existing page", async () => {
+    // TOKEN is an altayseer page written before mosqueId existed.
+    const other = testEnv.authenticatedContext(OTHER_UID).firestore();
+    await assertFails(setDoc(doc(other, 'publicStats', TOKEN), { name: 'مزوّر', mosqueId: OTHER }));
+    await assertFails(deleteDoc(doc(other, 'publicStats', TOKEN)));
+
+    // And altayseer can't take over the new mosque's page either.
+    const dbOther = testEnv.authenticatedContext(OTHER_UID).firestore();
+    await assertSucceeds(
+      setDoc(doc(dbOther, 'publicStats', NEW_TOKEN), { name: 'ط', mosqueId: OTHER }),
+    );
+    const admin = testEnv.authenticatedContext(ADMIN_UID).firestore();
+    await assertFails(
+      setDoc(doc(admin, 'publicStats', NEW_TOKEN), { name: 'مزوّر', mosqueId: MOSQUE_ID }),
+    );
+  });
+
+  it('treats an old page without mosqueId as altayseer’s: its members can still update and delete it', async () => {
+    const admin = testEnv.authenticatedContext(ADMIN_UID).firestore();
+    await assertSucceeds(
+      setDoc(doc(admin, 'publicStats', TOKEN), { name: 'زيد احمد', mosqueId: MOSQUE_ID }),
+    );
+    await assertSucceeds(deleteDoc(doc(admin, 'publicStats', TOKEN)));
+  });
+
+  it('allows a member to delete a page that was never published (no-op)', async () => {
+    const db = testEnv.authenticatedContext(OTHER_UID).firestore();
+    await assertSucceeds(deleteDoc(doc(db, 'publicStats', 'never-published')));
   });
 });
 

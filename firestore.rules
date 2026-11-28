@@ -154,11 +154,19 @@ service cloud.firestore {
       // their child's published stats. Writes therefore require actual
       // mosque membership.
       //
-      // The mosque id is hardcoded because publicStats/{token} carries no
-      // mosque context by design (see publicStats.repo.ts). Single tenant
-      // today (mirrors MOSQUE_ID in src/config.ts); Phase 5 removes client
-      // writes entirely, so this never needs to become multi-tenant.
-      allow write: if isMosqueMember('altayseer');
+      // Which mosque: every doc carries the `mosqueId` that published it, and
+      // that id can never change. Docs written before the field existed are
+      // all مسجد التيسير's, so a missing mosqueId reads as 'altayseer'.
+      allow create: if request.resource.data.mosqueId is string
+        && request.resource.data.mosqueId.matches('^[A-Za-z0-9_-]{1,64}$')
+        && isMosqueMember(request.resource.data.mosqueId);
+      allow update: if isMosqueMember(resource.data.get('mosqueId', 'altayseer'))
+        && request.resource.data.mosqueId == resource.data.get('mosqueId', 'altayseer');
+      // Deleting a page that was never published is a no-op; let any real
+      // user's delete of a missing doc through so a student delete never fails.
+      allow delete: if resource == null
+        ? isRealUser()
+        : isMosqueMember(resource.data.get('mosqueId', 'altayseer'));
     }
   }
 }

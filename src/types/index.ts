@@ -154,6 +154,10 @@ export interface Badge {
 export interface PublicStats {
   name: string;
   updatedAt: number;
+  /** The mosque that published this page. firestore.rules checks writes
+   *  against this mosque's members and never lets it change. Absent on pages
+   *  written before multi-mosque, which are all مسجد التيسير's. */
+  mosqueId?: string;
   /** Every word this student has missed, kept across sessions: still-red and
    *  since-fixed (green), in the mushaf viewer's short format. Absent until a
    *  word was marked at all. */

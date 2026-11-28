@@ -84,6 +84,18 @@ describe('republishPublicStatsFor read source', () => {
     expect(getAllRecordsMock).toHaveBeenCalledWith('alnour', 'nashieen');
   });
 
+  // firestore.rules checks the write against the members of the mosque named
+  // IN the doc — a page without it is refused for every mosque but the first.
+  it('stamps each published page with the mosque that publishes it', async () => {
+    const other: Tenant = { mosqueId: 'm_new', halaqaId: 'h_1' };
+    getCachedSnapshotMock.mockReturnValue({ students, records });
+
+    await republishPublicStatsFor(other, ['s_1']);
+
+    expect(setPublicStatsMock).toHaveBeenCalledTimes(1);
+    expect(setPublicStatsMock.mock.calls[0][1]).toMatchObject({ mosqueId: 'm_new' });
+  });
+
   it('does nothing for an empty id list (no reads at all)', async () => {
     await republishPublicStatsFor(TENANT, []);
     expect(getCachedSnapshotMock).not.toHaveBeenCalled();
