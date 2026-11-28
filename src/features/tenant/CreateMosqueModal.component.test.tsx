@@ -69,11 +69,18 @@ describe('CreateMosqueModal', () => {
     await user.click(saveBtn());
     expect(await screen.findByText('اكتب اسم المسجد')).toBeInTheDocument();
     expect(createMosqueMock).not.toHaveBeenCalled();
+  });
 
+  // The halaqa is optional: a mosque with one circle needs only its name, and
+  // gets «الحلقة الرئيسية» (buildMosqueSetup), like مسجد التيسير.
+  it('creates a mosque with only its name, leaving the halaqa blank', async () => {
+    const user = userEvent.setup();
+    setup();
+    expect(halaqaBoxes()[0]).toHaveAttribute('placeholder', 'الحلقة الرئيسية');
     await user.type(nameBox(), 'مسجد النور');
     await user.click(saveBtn());
-    expect(await screen.findByText('ضيف حلقة واحدة على الأقل')).toBeInTheDocument();
-    expect(createMosqueMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(createMosqueMock).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText('ضيف حلقة واحدة على الأقل')).not.toBeInTheDocument();
   });
 
   /**

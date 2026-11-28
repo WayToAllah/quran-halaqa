@@ -111,3 +111,16 @@ describe('buildTenantOptions', () => {
     ]);
   });
 });
+
+describe('buildTenantOptions — owner', () => {
+  it('carries the mosque owner so the switcher can offer renaming the mosque', () => {
+    const opts = buildTenantOptions([
+      {
+        mosqueId: 'm1',
+        mosque: { id: 'm1', name: 'مسجد', createdAt: 0, ownerUid: 'u1' },
+        halaqat: [{ id: 'h1', name: 'ح', attendanceBadgeThreshold: 70 }],
+      },
+    ]);
+    expect(opts[0].ownerUid).toBe('u1');
+  });
+});

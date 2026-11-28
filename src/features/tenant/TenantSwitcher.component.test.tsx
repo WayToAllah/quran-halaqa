@@ -89,7 +89,7 @@ describe('TenantSwitcher', () => {
     const user = userEvent.setup();
     setup();
     await user.click(screen.getByRole('button', { name: /مسجد التيسير/ }));
-    await user.click(await screen.findByRole('button', { name: /مسجد النور/ }));
+    await user.click(await screen.findByRole('button', { name: /^مسجد النور/ }));
 
     await waitFor(() => expect(screen.getByTestId('now')).toHaveTextContent('alnour/h1'));
   });
@@ -103,7 +103,7 @@ describe('TenantSwitcher', () => {
     const user = userEvent.setup();
     setup({ dirty: true });
     await user.click(screen.getByRole('button', { name: /مسجد التيسير/ }));
-    await user.click(await screen.findByRole('button', { name: /مسجد النور/ }));
+    await user.click(await screen.findByRole('button', { name: /^مسجد النور/ }));
 
     expect(screen.getByRole('alertdialog')).toBeInTheDocument();
     expect(screen.getByTestId('now')).toHaveTextContent('altayseer/main');
@@ -113,7 +113,7 @@ describe('TenantSwitcher', () => {
     const user = userEvent.setup();
     setup({ dirty: true });
     await user.click(screen.getByRole('button', { name: /مسجد التيسير/ }));
-    await user.click(await screen.findByRole('button', { name: /مسجد النور/ }));
+    await user.click(await screen.findByRole('button', { name: /^مسجد النور/ }));
     await user.click(screen.getByRole('button', { name: 'إلغاء' }));
 
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
@@ -124,7 +124,7 @@ describe('TenantSwitcher', () => {
     const user = userEvent.setup();
     setup({ dirty: true });
     await user.click(screen.getByRole('button', { name: /مسجد التيسير/ }));
-    await user.click(await screen.findByRole('button', { name: /مسجد النور/ }));
+    await user.click(await screen.findByRole('button', { name: /^مسجد النور/ }));
     await user.click(screen.getByRole('button', { name: 'بدّل وامسح' }));
 
     await waitFor(() => expect(screen.getByTestId('now')).toHaveTextContent('alnour/h1'));

@@ -123,6 +123,9 @@ export interface Mosque {
   id: string;
   name: string;
   createdAt: number;
+  /** Who may rename the mosque and manage its members (firestore.rules).
+   *  Absent on مسجد التيسير, which predates self-created mosques. */
+  ownerUid?: string;
 }
 
 export interface MosqueMember {

@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { createMosque } from '../../data/mosqueSetup.repo';
-import { validateMosqueSetup } from '../../domain/mosqueSetup';
+import { DEFAULT_HALAQA_NAME, validateMosqueSetup } from '../../domain/mosqueSetup';
 import type { Tenant } from '../../domain/tenant';
 
 interface Props {
@@ -11,8 +11,8 @@ interface Props {
 
 export function CreateMosqueModal({ ownerUid, onClose, onCreated }: Props) {
   const [mosqueName, setMosqueName] = useState('');
-  // One row from the start: a mosque with no halaqa can never be opened, so an
-  // empty list would only teach the teacher to hunt for the "add" button.
+  // One row from the start, but optional: left blank, the mosque gets a single
+  // «الحلقة الرئيسية» (buildMosqueSetup), like مسجد التيسير.
   const [halaqaNames, setHalaqaNames] = useState<string[]>(['']);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -70,6 +70,7 @@ export function CreateMosqueModal({ ownerUid, onClose, onCreated }: Props) {
                 <input
                   id={`halaqa-${i}`}
                   class="flex-1 rounded-xl border border-hairline px-3 py-2 text-sm bg-white"
+                  placeholder={i === 0 ? DEFAULT_HALAQA_NAME : undefined}
                   value={name}
                   onInput={(e) => setHalaqa(i, (e.target as HTMLInputElement).value)}
                 />
@@ -86,6 +87,9 @@ export function CreateMosqueModal({ ownerUid, onClose, onCreated }: Props) {
               </div>
             </div>
           ))}
+          <p class="text-[11px] text-taupe">
+            اختياري — لو المسجد فيه حلقة واحدة سيبه فاضي. تقدر تغيّر الاسم أو تضيف حلقات بعدين.
+          </p>
           <button
             type="button"
             class="text-xs text-forest font-semibold underline"

@@ -27,6 +27,9 @@ export interface TenantOption {
   mosqueName: string;
   halaqaId: string;
   halaqaName: string;
+  /** The mosque's owner, when it has one — the only account the rules let
+   *  rename it. */
+  ownerUid?: string;
 }
 
 /** One indexed mosque after fetching: `mosque` is null when the rules refused
@@ -75,6 +78,7 @@ export function buildTenantOptions(entries: MosqueEntry[]): TenantOption[] {
         mosqueName,
         halaqaId: h.id,
         halaqaName: h.name?.trim() || h.id,
+        ...(mosque.ownerUid ? { ownerUid: mosque.ownerUid } : {}),
       });
     }
   }

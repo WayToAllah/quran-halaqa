@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useState } from 'preact/hooks';
 import { getUserMosqueIds } from '../data/users.repo';
 import { getMosque, listHalaqat } from '../data/mosques.repo';
 import { buildTenantOptions, type MosqueEntry, type TenantOption } from '../domain/memberships';
@@ -21,6 +21,9 @@ import type { Tenant } from '../domain/tenant';
 export function useMemberships(uid: string | null, current: Tenant) {
   const [options, setOptions] = useState<TenantOption[]>([]);
   const [loading, setLoading] = useState(false);
+  // Bumped after a rename or a new halaqa, so the list re-reads the names.
+  const [version, setVersion] = useState(0);
+  const reload = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
     if (!uid) {
@@ -29,7 +32,9 @@ export function useMemberships(uid: string | null, current: Tenant) {
       return;
     }
     let alive = true;
-    setLoading(true);
+    // A reload after a rename keeps the current list on screen meanwhile —
+    // flipping to loading would unmount the switcher under the teacher.
+    if (version === 0) setLoading(true);
 
     void (async () => {
       let ids: string[] = [];
@@ -64,7 +69,7 @@ export function useMemberships(uid: string | null, current: Tenant) {
     return () => {
       alive = false;
     };
-  }, [uid, current.mosqueId]);
+  }, [uid, current.mosqueId, version]);
 
-  return { options, loading };
+  return { options, loading, reload };
 }

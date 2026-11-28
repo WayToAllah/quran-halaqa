@@ -1,4 +1,6 @@
-import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
+import { genId } from '../domain/ids';
+import { DEFAULT_ATTENDANCE_BADGE_THRESHOLD } from '../domain/mosqueSetup';
 import { db } from './firebase';
 import { halaqaConverter, mosqueConverter } from './converters';
 import type { Halaqa, Mosque, MosqueMember } from '../types';
@@ -34,4 +36,33 @@ export async function listHalaqat(mosqueId: string): Promise<Halaqa[]> {
     collection(db, 'mosques', mosqueId, 'halaqat').withConverter(halaqaConverter),
   );
   return snap.docs.map((d) => d.data());
+}
+
+/** Rename a mosque. firestore.rules lets only its owner do this, and keeps
+ * `id`/`ownerUid` untouched — updateDoc sends just the name. */
+export async function renameMosque(mosqueId: string, name: string): Promise<void> {
+  await updateDoc(doc(db, 'mosques', mosqueId), { name: name.trim() });
+}
+
+/** Rename a halaqa. Students and records hang off its id, never its name. */
+export async function renameHalaqa(
+  mosqueId: string,
+  halaqaId: string,
+  name: string,
+): Promise<void> {
+  await updateDoc(doc(db, 'mosques', mosqueId, 'halaqat', halaqaId), { name: name.trim() });
+}
+
+/** Add a halaqa to an existing mosque; resolves to the new halaqa's id. */
+export async function addHalaqa(mosqueId: string, name: string): Promise<string> {
+  const halaqa: Halaqa = {
+    id: genId('h'),
+    name: name.trim(),
+    attendanceBadgeThreshold: DEFAULT_ATTENDANCE_BADGE_THRESHOLD,
+  };
+  await setDoc(
+    doc(db, 'mosques', mosqueId, 'halaqat', halaqa.id).withConverter(halaqaConverter),
+    halaqa,
+  );
+  return halaqa.id;
 }

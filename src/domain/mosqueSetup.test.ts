@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { validateMosqueSetup, buildMosqueSetup, MAX_NAME_LEN } from './mosqueSetup';
+import {
+  validateMosqueSetup,
+  buildMosqueSetup,
+  MAX_NAME_LEN,
+  DEFAULT_HALAQA_NAME,
+  validatePlaceName,
+} from './mosqueSetup';
 
 const ids = () => {
   let n = 0;
@@ -15,11 +21,11 @@ describe('validateMosqueSetup', () => {
     expect(validateMosqueSetup({ mosqueName: '   ', halaqaNames: ['الحفظة'] })).toMatch(/المسجد/);
   });
 
-  // A mosque with no halaqa can never be opened — buildTenantOptions drops it,
-  // so the teacher would create it and then not find it in the switcher.
-  it('requires at least one non-blank halaqa', () => {
-    expect(validateMosqueSetup({ mosqueName: 'مسجد النور', halaqaNames: [] })).toMatch(/حلقة/);
-    expect(validateMosqueSetup({ mosqueName: 'مسجد النور', halaqaNames: ['  '] })).toMatch(/حلقة/);
+  // The halaqa is optional: most mosques run one circle, and the teacher
+  // shouldn't have to invent a name for it. buildMosqueSetup supplies one.
+  it('accepts a mosque with no halaqa named', () => {
+    expect(validateMosqueSetup({ mosqueName: 'مسجد النور', halaqaNames: [] })).toBeNull();
+    expect(validateMosqueSetup({ mosqueName: 'مسجد النور', halaqaNames: ['  '] })).toBeNull();
   });
 
   it('rejects names longer than the rules will accept', () => {
@@ -86,9 +92,6 @@ describe('buildMosqueSetup', () => {
     expect(() =>
       buildMosqueSetup({ mosqueName: '', halaqaNames: ['حلقة'] }, 'u', ids(), 0),
     ).toThrow();
-    expect(() =>
-      buildMosqueSetup({ mosqueName: 'مسجد', halaqaNames: [] }, 'u', ids(), 0),
-    ).toThrow();
   });
 
   // The switcher only appears once the index lists the mosque, so the new id
@@ -96,5 +99,30 @@ describe('buildMosqueSetup', () => {
   it('reports the id that must be appended to the user index', () => {
     const plan = buildMosqueSetup({ mosqueName: 'مسجد', halaqaNames: ['حلقة'] }, 'u', ids(), 0);
     expect(plan.mosque.id).toBe('id1');
+  });
+});
+
+describe('buildMosqueSetup — no halaqa named', () => {
+  it('creates one halaqa called «الحلقة الرئيسية», like مسجد التيسير', () => {
+    let n = 0;
+    const plan = buildMosqueSetup(
+      { mosqueName: 'مسجد النور', halaqaNames: ['', ' '] },
+      'u',
+      () => `id${++n}`,
+      0,
+    );
+    expect(plan.halaqat).toHaveLength(1);
+    expect(plan.halaqat[0].name).toBe(DEFAULT_HALAQA_NAME);
+    expect(DEFAULT_HALAQA_NAME).toBe('الحلقة الرئيسية');
+  });
+});
+
+describe('validatePlaceName', () => {
+  it('trims and accepts a normal name', () => {
+    expect(validatePlaceName('  حلقة الفجر ', 'الحلقة')).toBeNull();
+  });
+  it('refuses a blank or over-long name', () => {
+    expect(validatePlaceName('   ', 'الحلقة')).toBe('اكتب اسم الحلقة');
+    expect(validatePlaceName('x'.repeat(81), 'المسجد')).toBe('اسم المسجد طويل أوي');
   });
 });

@@ -1,6 +1,8 @@
 import { createPortal } from 'preact/compat';
 import { useState } from 'preact/hooks';
 import { CreateMosqueModal } from './CreateMosqueModal';
+import { PlaceNameModal } from './PlaceNameModal';
+import { addHalaqa, renameHalaqa, renameMosque } from '../../data/mosques.repo';
 import { useToast } from '../../ui/ToastProvider';
 import { useTenantControls } from './TenantContext';
 import { useDraftGuard } from './DraftGuard';
@@ -20,10 +22,12 @@ import type { TenantOption } from '../../domain/memberships';
 export function TenantSwitcher({ uid }: { uid: string | null }) {
   const { tenant, setTenant } = useTenantControls();
   const { hasDraft } = useDraftGuard();
-  const { options, loading } = useMemberships(uid, tenant);
+  const { options, loading, reload } = useMemberships(uid, tenant);
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState<TenantOption | null>(null);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<TenantOption | null>(null);
+  const [addingHalaqa, setAddingHalaqa] = useState(false);
   const { showToast } = useToast();
 
   // Adding a mosque has to live somewhere reachable, and this is its only
@@ -64,6 +68,33 @@ export function TenantSwitcher({ uid }: { uid: string | null }) {
     showToast('✓ اتعمل المسجد');
   }
 
+  // Only the owner may rename a mosque (firestore.rules); any member may
+  // rename a halaqa. Only what changed is written.
+  async function saveNames(o: TenantOption, values: Record<string, string>) {
+    if (values.mosque !== undefined && values.mosque !== o.mosqueName) {
+      await renameMosque(o.mosqueId, values.mosque);
+    }
+    if (values.halaqa !== o.halaqaName) {
+      await renameHalaqa(o.mosqueId, o.halaqaId, values.halaqa);
+    }
+    setEditing(null);
+    reload();
+    showToast('✓ اتغيّر الاسم');
+  }
+
+  async function saveNewHalaqa(values: Record<string, string>) {
+    const halaqaId = await addHalaqa(tenant.mosqueId, values.halaqa);
+    setAddingHalaqa(false);
+    reload();
+    // Same rule as a new mosque: never throw away a half-typed session.
+    if (hasDraft) {
+      showToast('اتعملت الحلقة. بدّل ليها بعد ما تحفظ الجلسة');
+      return;
+    }
+    setTenant({ mosqueId: tenant.mosqueId, halaqaId });
+    showToast('✓ اتعملت الحلقة');
+  }
+
   function confirmSwitch() {
     if (!pending) return;
     setTenant({ mosqueId: pending.mosqueId, halaqaId: pending.halaqaId });
@@ -92,18 +123,43 @@ export function TenantSwitcher({ uid }: { uid: string | null }) {
             {options.map((o) => {
               const active = o.mosqueId === tenant.mosqueId && o.halaqaId === tenant.halaqaId;
               return (
-                <button
+                <div
                   key={`${o.mosqueId}/${o.halaqaId}`}
-                  type="button"
-                  class="w-full text-right px-4 py-3 border-b border-hairline last:border-b-0 flex flex-col gap-0.5"
+                  class="flex items-stretch border-b border-hairline last:border-b-0"
                   style={{ background: active ? '#F6F3EA' : 'white' }}
-                  onClick={() => choose(o)}
                 >
-                  <span class="text-[13px] font-bold text-ink-dark">{o.mosqueName}</span>
-                  <span class="text-[11px] text-taupe">{o.halaqaName}</span>
-                </button>
+                  <button
+                    type="button"
+                    class="flex-1 min-w-0 text-right px-4 py-3 flex flex-col gap-0.5"
+                    onClick={() => choose(o)}
+                  >
+                    <span class="text-[13px] font-bold text-ink-dark">{o.mosqueName}</span>
+                    <span class="text-[11px] text-taupe">{o.halaqaName}</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`تعديل ${o.mosqueName} — ${o.halaqaName}`}
+                    class="px-4 text-[14px] text-taupe"
+                    onClick={() => {
+                      setOpen(false);
+                      setEditing(o);
+                    }}
+                  >
+                    ✏️
+                  </button>
+                </div>
               );
             })}
+            <button
+              type="button"
+              class="w-full text-right px-4 py-3 text-[12.5px] font-bold text-forest border-t border-hairline"
+              onClick={() => {
+                setOpen(false);
+                setAddingHalaqa(true);
+              }}
+            >
+              {`＋ حلقة جديدة في ${current ? current.mosqueName : tenant.mosqueId}`}
+            </button>
             <button
               type="button"
               class="w-full text-right px-4 py-3 text-[12.5px] font-bold text-forest border-t border-hairline"
@@ -128,6 +184,31 @@ export function TenantSwitcher({ uid }: { uid: string | null }) {
               ownerUid={uid}
               onClose={() => setCreating(false)}
               onCreated={afterCreate}
+            />
+          )}
+
+          {editing && (
+            <PlaceNameModal
+              title="تعديل الاسم"
+              saveLabel="حفظ"
+              fields={[
+                ...(editing.ownerUid && editing.ownerUid === uid
+                  ? [{ id: 'mosque', what: 'المسجد', initial: editing.mosqueName }]
+                  : []),
+                { id: 'halaqa', what: 'الحلقة', initial: editing.halaqaName },
+              ]}
+              onSave={(values) => saveNames(editing, values)}
+              onClose={() => setEditing(null)}
+            />
+          )}
+
+          {addingHalaqa && (
+            <PlaceNameModal
+              title={`حلقة جديدة في ${current ? current.mosqueName : tenant.mosqueId}`}
+              saveLabel="إضافة الحلقة"
+              fields={[{ id: 'halaqa', what: 'الحلقة', initial: '' }]}
+              onSave={saveNewHalaqa}
+              onClose={() => setAddingHalaqa(false)}
             />
           )}
 

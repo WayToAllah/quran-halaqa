@@ -21,7 +21,7 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import { readFileSync } from 'fs';
-import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 
 const PROJECT_ID = 'demo-quran-halaqa-rules-test';
 const MOSQUE_ID = 'altayseer';
@@ -380,5 +380,58 @@ describe('membership is granted by the mosque owner', () => {
     await assertFails(
       setDoc(doc(db, 'mosques', MOSQUE_ID, 'members', OUTSIDER_UID), { role: 'owner' }),
     );
+  });
+});
+
+// Renaming a mosque or halaqa and adding a halaqa from the switcher. The app
+// sends updateDoc({ name }) for a rename and a plain setDoc for a new halaqa.
+describe('names — rename a mosque or halaqa, add a halaqa', () => {
+  const M = 'm_named';
+  const OWNER = 'owner_named';
+  const MEMBER = 'member_named';
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, 'mosques', M), { id: M, name: 'مسجد', createdAt: 1, ownerUid: OWNER });
+      await setDoc(doc(db, 'mosques', M, 'members', OWNER), { role: 'owner' });
+      await setDoc(doc(db, 'mosques', M, 'members', MEMBER), { role: 'admin' });
+      await setDoc(doc(db, 'mosques', M, 'halaqat', 'h1'), {
+        name: 'الحلقة الرئيسية',
+        attendanceBadgeThreshold: 70,
+      });
+    });
+  });
+
+  it('lets the owner rename the mosque', async () => {
+    const db = testEnv.authenticatedContext(OWNER).firestore();
+    await assertSucceeds(updateDoc(doc(db, 'mosques', M), { name: 'مسجد النور' }));
+  });
+
+  it('does not let a non-owner member rename the mosque', async () => {
+    const db = testEnv.authenticatedContext(MEMBER).firestore();
+    await assertFails(updateDoc(doc(db, 'mosques', M), { name: 'مسجد آخر' }));
+  });
+
+  it('refuses a blank mosque name', async () => {
+    const db = testEnv.authenticatedContext(OWNER).firestore();
+    await assertFails(updateDoc(doc(db, 'mosques', M), { name: '' }));
+  });
+
+  it('lets any member rename a halaqa and add one', async () => {
+    const db = testEnv.authenticatedContext(MEMBER).firestore();
+    await assertSucceeds(updateDoc(doc(db, 'mosques', M, 'halaqat', 'h1'), { name: 'حلقة الفجر' }));
+    await assertSucceeds(
+      setDoc(doc(db, 'mosques', M, 'halaqat', 'h2'), {
+        name: 'حلقة البنات',
+        attendanceBadgeThreshold: 70,
+      }),
+    );
+  });
+
+  it('does not let an outsider rename or add a halaqa', async () => {
+    const db = testEnv.authenticatedContext(OUTSIDER_UID).firestore();
+    await assertFails(updateDoc(doc(db, 'mosques', M, 'halaqat', 'h1'), { name: 'x' }));
+    await assertFails(setDoc(doc(db, 'mosques', M, 'halaqat', 'h3'), { name: 'x' }));
   });
 });

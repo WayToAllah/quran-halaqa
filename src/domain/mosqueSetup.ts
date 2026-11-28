@@ -34,15 +34,26 @@ export interface MosqueSetupPlan {
 const clean = (s: string) => s.trim();
 
 /** Returns an Arabic message for the first problem, or null when it's fine. */
-export function validateMosqueSetup(input: MosqueSetupInput): string | null {
-  const name = clean(input.mosqueName);
-  if (!name) return 'اكتب اسم المسجد';
-  if (name.length > MAX_NAME_LEN) return 'اسم المسجد طويل أوي';
+/** The halaqa a mosque gets when the teacher names none — the same name
+ * مسجد التيسير's single halaqa carries. Renamable later from the switcher. */
+export const DEFAULT_HALAQA_NAME = 'الحلقة الرئيسية';
 
+/** One rule for every mosque/halaqa name, at creation and on rename.
+ * `what` is «المسجد» or «الحلقة». */
+export function validatePlaceName(name: string, what: string): string | null {
+  const n = clean(name);
+  if (!n) return `اكتب اسم ${what}`;
+  if (n.length > MAX_NAME_LEN) return `اسم ${what} طويل أوي`;
+  return null;
+}
+
+export function validateMosqueSetup(input: MosqueSetupInput): string | null {
+  const nameProblem = validatePlaceName(input.mosqueName, 'المسجد');
+  if (nameProblem) return nameProblem;
+
+  // Halaqa names are optional: blank rows are dropped, and a mosque with none
+  // gets DEFAULT_HALAQA_NAME (see buildMosqueSetup).
   const halaqat = input.halaqaNames.map(clean).filter(Boolean);
-  // A mosque with no halaqa can never be opened — the switcher drops it — so
-  // the teacher would create it and then not find it anywhere.
-  if (halaqat.length === 0) return 'ضيف حلقة واحدة على الأقل';
   if (halaqat.some((h) => h.length > MAX_NAME_LEN)) return 'اسم الحلقة طويل أوي';
   if (new Set(halaqat).size !== halaqat.length) return 'فيه اسم حلقة مكرر';
 
@@ -67,13 +78,15 @@ export function buildMosqueSetup(
     },
     ownerUid,
     member: { role: 'owner' },
-    halaqat: input.halaqaNames
-      .map(clean)
-      .filter(Boolean)
-      .map((name) => ({
-        id: nextId(),
-        name,
-        attendanceBadgeThreshold: DEFAULT_ATTENDANCE_BADGE_THRESHOLD,
-      })),
+    halaqat: halaqaNamesOrDefault(input.halaqaNames).map((name) => ({
+      id: nextId(),
+      name,
+      attendanceBadgeThreshold: DEFAULT_ATTENDANCE_BADGE_THRESHOLD,
+    })),
   };
+}
+
+function halaqaNamesOrDefault(names: string[]): string[] {
+  const named = names.map(clean).filter(Boolean);
+  return named.length ? named : [DEFAULT_HALAQA_NAME];
 }
