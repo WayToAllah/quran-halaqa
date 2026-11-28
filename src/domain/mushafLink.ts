@@ -1,5 +1,6 @@
 import type { SuraAssignment } from '../types';
 import type { MushafBook } from './mushafBook';
+import { resolvedAyahRange } from './suras';
 
 /**
  * The mushaf viewer lives outside the app bundle, at /mushaf/ next to it, and is
@@ -19,10 +20,12 @@ export function mushafWardParam(list: readonly SuraAssignment[]): string {
     .map((a) => {
       const sura = encodeURIComponent(a.sura);
       if (a.range) return sura;
-      const from = a.from ?? '';
-      const to = a.to ?? '';
-      if (!from && !to) return sura;
-      return `${sura}:${from}:${to}`;
+      if (!a.from && !a.to) return sura;
+      // Send both ends: the viewer reads «من» alone as ONE ayah, while the app
+      // means "to the end of the sura" (resolvedAyahRange).
+      const r = resolvedAyahRange(a);
+      if (!r) return `${sura}:${a.from ?? ''}:${a.to ?? ''}`;
+      return `${sura}:${r.from}:${r.to}`;
     })
     .join(',');
 }

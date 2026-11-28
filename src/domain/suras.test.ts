@@ -194,9 +194,9 @@ describe('itemAyat', () => {
   it('returns 0 for an item with no sura', () => {
     expect(itemAyat({ sura: '' })).toBe(0);
   });
-  it('falls back to full sura length when only "from" is set (no valid range)', () => {
-    // من without a valid to → not a countable range → whole sura length
-    expect(itemAyat({ sura: 'الفاتحة', from: '3' })).toBe(7);
+  it('counts «من» alone up to the last ayah of the sura', () => {
+    // من without إلى → from «من» to the end of the sura (3..7)
+    expect(itemAyat({ sura: 'الفاتحة', from: '3' })).toBe(5);
   });
 });
 

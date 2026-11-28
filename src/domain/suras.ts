@@ -184,6 +184,11 @@ export function ayahRange(from?: string | number, to?: string | number): string 
  * range never shows a dangling "من … إلى". */
 export function suraLabel(item: SuraAssignment): string {
   if (item.range && item.toSura) return 'من ' + item.sura + ' إلى ' + item.toSura;
+  // A half-filled range shows its real ends («من» alone runs to the last ayah).
+  if (!item.range && (item.from || item.to)) {
+    const r = resolvedAyahRange(item);
+    if (r) return item.sura + ayahRange(r.from, r.to);
+  }
   return item.sura + ayahRange(item.from, item.to);
 }
 
@@ -235,9 +240,33 @@ export function itemAyat(item: {
       return sum + (info ? info.count : 0);
     }, 0);
   }
-  const ranged = countAyat(item.from, item.to);
-  if (ranged) return ranged;
-  // Bare sura (no valid ayah range) → full sura length, like production.
-  const info = SURA_BY_NAME.get(item.sura);
-  return info ? info.count : 0;
+  const r = resolvedAyahRange(item);
+  return r ? r.to - r.from + 1 : 0;
+}
+
+/**
+ * The ayah numbers one ordinary (non-range) item actually covers, inside its
+ * sura. The single meaning of a half-filled row, used by every count:
+ * - «من» alone   → from «من» to the sura's last ayah
+ * - «إلى» alone  → from ayah 1 to «إلى»
+ * - neither      → the whole sura
+ * - an impossible range (إلى before من, or من past the end) → the whole sura,
+ *   as before; the record screen flags those rows while typing.
+ * An «إلى» past the last ayah is capped at the last ayah.
+ * Null for an unknown sura.
+ */
+export function resolvedAyahRange(item: {
+  sura?: string;
+  from?: string | number;
+  to?: string | number;
+}): { from: number; to: number } | null {
+  const info = item?.sura ? SURA_BY_NAME.get(item.sura) : undefined;
+  if (!info) return null;
+  const count = info.count;
+  const f = parseInt(String(item.from ?? ''), 10);
+  const t = parseInt(String(item.to ?? ''), 10);
+  const from = f > 0 ? f : 1;
+  const to = t > 0 ? Math.min(t, count) : count;
+  if (from > to) return { from: 1, to: count };
+  return { from, to };
 }

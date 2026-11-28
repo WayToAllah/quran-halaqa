@@ -111,8 +111,8 @@ describe('assignmentAyahSpan', () => {
     expect(assignmentAyahSpan({ sura: 'الفاتحة' })).toEqual([1, 7]);
   });
 
-  it('treats a half-entered range as the whole sura, like itemAyat', () => {
-    expect(assignmentAyahSpan({ sura: 'الفاتحة', from: '3' })).toEqual([1, 7]);
+  it('reads «من» alone as running to the end of the sura, like itemAyat', () => {
+    expect(assignmentAyahSpan({ sura: 'الفاتحة', from: '3' })).toEqual([3, 7]);
     expect(assignmentAyahSpan({ sura: 'الفاتحة', from: '5', to: '2' })).toEqual([1, 7]);
   });
 

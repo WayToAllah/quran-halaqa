@@ -1,4 +1,4 @@
-import { SURAS } from './suras';
+import { SURAS, resolvedAyahRange } from './suras';
 import type { SuraAssignment } from '../types';
 import { arabicPlural } from './text';
 
@@ -106,10 +106,9 @@ export function assignmentAyahSpan(
     return [globalAyahIndex(lo + 1, 1), globalAyahIndex(hi + 1, SURAS[hi].count)];
   }
 
-  const f = parseInt(String(item.from ?? ''), 10);
-  const t = parseInt(String(item.to ?? ''), 10);
-  if (f > 0 && t > 0 && t >= f) return [globalAyahIndex(sura, f), globalAyahIndex(sura, t)];
-  return [globalAyahIndex(sura, 1), globalAyahIndex(sura, SURAS[suraIdx].count)];
+  const r = resolvedAyahRange(item);
+  if (!r) return null;
+  return [globalAyahIndex(sura, r.from), globalAyahIndex(sura, r.to)];
 }
 
 /** One assignment tied to the session it was given in. */
